@@ -6,8 +6,9 @@ import { Button } from "@/components/ui";
 import { Input, FormField, Modal } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
 import { PLANS, type PlanId, parsePlanId } from "@/lib/plans";
+import { InstallAppPrompt } from "@/components/auth/InstallAppPrompt";
 
-type Step = "plan" | "account";
+type Step = "plan" | "account" | "install";
 
 interface SignupFlowProps {
   initialPlan?: PlanId;
@@ -45,7 +46,7 @@ export function SignupFlow({ initialPlan = "GROWTH", onSuccess, onCancel, embedd
       if (onSuccess) {
         onSuccess();
       } else {
-        window.location.assign("/dashboard");
+        setStep("install");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create account");
@@ -53,6 +54,18 @@ export function SignupFlow({ initialPlan = "GROWTH", onSuccess, onCancel, embedd
       setLoading(false);
     }
   };
+
+  if (step === "install") {
+    return (
+      <InstallAppPrompt
+        plan={selectedPlan}
+        embedded={embedded}
+        onContinue={() => {
+          window.location.assign("/dashboard");
+        }}
+      />
+    );
+  }
 
   if (step === "plan") {
     return (
@@ -192,7 +205,7 @@ export function SignupPlanModal({ open, onClose, initialPlan }: SignupPlanModalP
     <Modal
       open={open}
       onClose={onClose}
-      title="Create your account"
+      title="Get started with Pinnacle"
       size="xl"
     >
       <SignupFlow initialPlan={initialPlan} onCancel={onClose} embedded />

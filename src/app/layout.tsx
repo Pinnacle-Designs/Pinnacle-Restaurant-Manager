@@ -10,6 +10,11 @@ export const metadata: Metadata = {
   description:
     "All-in-one restaurant management with live demo — orders, inventory, staff, finances, 12-tab analytics, and an AI command center that answers profit, labor, and ops questions from live data.",
   manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Pinnacle",
+  },
   icons: {
     icon: "/logo.png",
     apple: "/logo.png",
