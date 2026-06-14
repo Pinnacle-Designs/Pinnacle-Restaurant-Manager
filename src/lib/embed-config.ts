@@ -80,8 +80,8 @@ export function getMarketingFrameAncestors(): string[] {
   const githubPages = process.env.GITHUB_PAGES_ORIGIN?.trim();
   if (githubPages) origins.push(githubPages);
 
-  // GitHub Pages (project or user site on any *.github.io host)
-  origins.push("https://david-foy89.github.io");
+  // GitHub Pages — Pinnacle-Designs org project site + any *.github.io host
+  origins.push("https://pinnacle-designs.github.io");
   origins.push("https://*.github.io");
 
   // Vercel production + preview deployments (docs at /docs on same project)
