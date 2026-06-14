@@ -1,14 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { getLocationId } from "@/lib/location";
-import { getSessionUser } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { getEnrichedSessionUser } from "@/lib/location-plan";
+import { hasPermissionInList } from "@/lib/permissions";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/ui";
 import { SocialClient } from "@/components/social/SocialClient";
 
 export default async function SocialPage() {
-  const user = await getSessionUser();
-  if (!user || !hasPermission(user.role, "manage_social")) {
+  const user = await getEnrichedSessionUser();
+  if (!user || !hasPermissionInList(user.permissions, "manage_social")) {
     redirect("/dashboard");
   }
 

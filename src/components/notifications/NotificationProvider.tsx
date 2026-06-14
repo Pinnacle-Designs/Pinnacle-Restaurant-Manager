@@ -3,10 +3,9 @@
 import { useEffect } from "react";
 import { showCriticalNotifications } from "@/lib/notifications";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { hasPermission } from "@/lib/permissions";
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, can } = useAuth();
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
@@ -15,7 +14,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, []);
 
   useEffect(() => {
-    if (loading || !user || !hasPermission(user.role, "view_insights")) return;
+    if (loading || !user || !can("view_insights")) return;
 
     fetch("/api/insights/critical")
       .then((res) => (res.ok ? res.json() : null))

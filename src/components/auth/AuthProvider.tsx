@@ -3,7 +3,8 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import type { AppRole } from "@prisma/client";
 import type { PlanId } from "@/lib/plans";
-import { hasPermission, type Permission } from "@/lib/permissions";
+import type { Permission } from "@/lib/permissions";
+import { hasPermissionInList } from "@/lib/permissions";
 
 export interface AuthUser {
   id: string;
@@ -13,6 +14,7 @@ export interface AuthUser {
   locationId: string | null;
   plan?: PlanId;
   avatarUrl?: string | null;
+  permissions?: Permission[];
 }
 
 interface AuthContextValue {
@@ -57,8 +59,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.href = "/login";
   };
 
-  const can = (permission: Permission) =>
-    user ? hasPermission(user.role, permission) : false;
+  const can = (permission: Permission) => {
+    if (!user) return false;
+    if (user.permissions?.length) {
+      return hasPermissionInList(user.permissions, permission);
+    }
+    return false;
+  };
 
   return (
     <AuthContext.Provider value={{ user, loading, can, logout, refresh }}>

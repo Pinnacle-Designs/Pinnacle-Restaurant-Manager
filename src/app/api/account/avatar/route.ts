@@ -3,6 +3,7 @@ import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
 import { prisma } from "@/lib/prisma";
+import { createSessionToken, sessionCookieOptions } from "@/lib/auth";
 import { requireAuth } from "@/lib/api-auth";
 
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -48,7 +49,13 @@ export async function POST(request: NextRequest) {
       select: { avatarUrl: true },
     });
 
-    return NextResponse.json({ avatarUrl: updated.avatarUrl });
+    const response = NextResponse.json({ avatarUrl: updated.avatarUrl });
+    const token = await createSessionToken({
+      ...user!,
+      avatarUrl: updated.avatarUrl,
+    });
+    response.cookies.set(sessionCookieOptions(token));
+    return response;
   } catch (err) {
     console.error("Avatar upload error:", err);
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });

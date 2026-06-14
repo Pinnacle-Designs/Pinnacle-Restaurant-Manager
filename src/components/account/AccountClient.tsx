@@ -12,17 +12,26 @@ import {
   User,
   CheckCircle2,
   AlertCircle,
+  Users,
 } from "lucide-react";
 import { PageHeader, Button, Badge } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { PermissionsTab } from "@/components/account/PermissionsTab";
 import { PLAN_BY_ID } from "@/lib/plans";
 import { ROLE_LABELS, ROLE_COLORS } from "@/lib/permissions";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { PlanId } from "@/lib/plans";
 import type { AppRole } from "@prisma/client";
 
-type Tab = "profile" | "security" | "billing";
+type Tab = "profile" | "security" | "billing" | "permissions";
+
+const BASE_TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: "profile", label: "Profile", icon: User },
+  { id: "security", label: "Security", icon: Lock },
+  { id: "billing", label: "Billing & autopay", icon: CreditCard },
+  { id: "permissions", label: "Team access", icon: Users },
+];
 
 interface AccountData {
   profile: {
@@ -49,12 +58,6 @@ interface AccountData {
   };
 }
 
-const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: "profile", label: "Profile", icon: User },
-  { id: "security", label: "Security", icon: Lock },
-  { id: "billing", label: "Billing & autopay", icon: CreditCard },
-];
-
 function AvatarPlaceholder({ name }: { name: string }) {
   const initial = name.trim().charAt(0).toUpperCase() || "?";
   return (
@@ -67,9 +70,12 @@ function AvatarPlaceholder({ name }: { name: string }) {
 export function AccountClient() {
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get("tab") as Tab | null) ?? "profile";
-  const { refresh } = useAuth();
+  const { refresh, can } = useAuth();
+  const visibleTabs = BASE_TABS.filter(
+    (item) => item.id !== "permissions" || can("manage_permissions")
+  );
   const [tab, setTab] = useState<Tab>(
-    TABS.some((t) => t.id === initialTab) ? initialTab : "profile"
+    visibleTabs.some((t) => t.id === initialTab) ? initialTab : "profile"
   );
   const [data, setData] = useState<AccountData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -277,7 +283,7 @@ export function AccountClient() {
 
       <div className="flex flex-col gap-6 lg:flex-row">
         <nav className="flex gap-2 overflow-x-auto lg:w-52 lg:flex-col lg:gap-1">
-          {TABS.map((item) => {
+          {visibleTabs.map((item) => {
             const Icon = item.icon;
             const active = tab === item.id;
             return (
@@ -612,6 +618,8 @@ export function AccountClient() {
               )}
             </div>
           )}
+
+          {tab === "permissions" && can("manage_permissions") && <PermissionsTab />}
         </div>
       </div>
     </div>

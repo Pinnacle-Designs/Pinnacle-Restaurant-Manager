@@ -38,12 +38,7 @@ export async function GET(request: NextRequest) {
       email: user!.email,
       name: user!.name,
       role: user!.role,
-      avatarUrl: (
-        await prisma.user.findUnique({
-          where: { id: user!.id },
-          select: { avatarUrl: true },
-        })
-      )?.avatarUrl,
+      avatarUrl: user!.avatarUrl ?? null,
     },
     location: {
       id: locationId,

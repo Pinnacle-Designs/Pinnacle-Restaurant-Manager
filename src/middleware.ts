@@ -120,7 +120,7 @@ export async function middleware(request: NextRequest) {
     return applyFramePolicy(request, NextResponse.redirect(loginUrl));
   }
 
-  if (!canAccessRoute(user.role, pathname)) {
+  if (!canAccessRoute(user.role, pathname, user.permissions)) {
     if (pathname.startsWith("/api/")) {
       return applyFramePolicy(
         request,

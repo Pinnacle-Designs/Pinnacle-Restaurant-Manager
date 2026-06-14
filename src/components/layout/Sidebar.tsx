@@ -46,7 +46,9 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
 
-  const navItems = user ? filterNavForUser(user.role, user.plan, NAV_ITEMS) : NAV_ITEMS;
+  const navItems = user
+    ? filterNavForUser(user.role, user.plan, NAV_ITEMS, user.permissions)
+    : NAV_ITEMS;
 
   return (
     <aside className="hidden w-64 flex-col border-r bg-slate-900 md:flex">

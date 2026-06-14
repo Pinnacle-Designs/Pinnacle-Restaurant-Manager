@@ -1,13 +1,13 @@
 import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 import { getLocationId } from "@/lib/location";
-import { getSessionUser } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { getEnrichedSessionUser } from "@/lib/location-plan";
+import { hasPermissionInList } from "@/lib/permissions";
 import { DashboardClient } from "@/components/dashboard/DashboardClient";
 
 async function getDashboardData() {
   const locationId = await getLocationId();
-  const user = await getSessionUser();
+  const user = await getEnrichedSessionUser();
   const location = await prisma.location.findUnique({ where: { id: locationId } });
 
   const [
@@ -29,7 +29,7 @@ async function getDashboardData() {
         createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
       },
     }),
-    user && hasPermission(user.role, "view_finances")
+    user && hasPermissionInList(user.permissions, "view_finances")
       ? prisma.expense.findMany({
           where: {
             locationId,
@@ -37,7 +37,7 @@ async function getDashboardData() {
           },
         })
       : Promise.resolve([]),
-    user && hasPermission(user.role, "view_insights")
+    user && hasPermissionInList(user.permissions, "view_insights")
       ? prisma.businessInsight.findMany({
           where: { locationId, resolved: false },
           orderBy: { severity: "desc" },

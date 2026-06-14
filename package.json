@@ -2,6 +2,9 @@
   "name": "pinnacle-restaurant-manager",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -21,6 +24,7 @@
   "dependencies": {
     "@prisma/client": "^6.5.0",
     "@zxing/browser": "^0.2.0",
+    "@zxing/library": "^0.22.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.487.0",

@@ -1,6 +1,8 @@
+import { getSessionUser } from "./auth";
 import { prisma } from "./prisma";
 import type { PlanId } from "./plans";
 import type { SessionUser } from "./session";
+import { resolveEffectivePermissions } from "./permission-resolve";
 
 export async function getLocationPlan(locationId: string | null | undefined): Promise<PlanId> {
   if (!locationId) return "STARTER";
@@ -40,5 +42,17 @@ export async function enrichUserWithPlan(user: SessionUser): Promise<SessionUser
     name = dbUser?.name ?? user.name;
   }
 
-  return { ...user, name, plan, avatarUrl };
+  return {
+    ...user,
+    name,
+    plan,
+    avatarUrl,
+    permissions: await resolveEffectivePermissions(user.role, user.locationId, user.id),
+  };
+}
+
+export async function getEnrichedSessionUser(): Promise<SessionUser | null> {
+  const user = await getSessionUser();
+  if (!user) return null;
+  return enrichUserWithPlan(user);
 }

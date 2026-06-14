@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { analyzePhoto } from "@/lib/ai";
 import { getLocationIdFromRequest } from "@/lib/location";
 import { getSessionUserFromRequest } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { userCan } from "@/lib/permission-resolve";
 import { forbiddenResponse, unauthorizedResponse } from "@/lib/api-auth";
 import type { PhotoCategory } from "@prisma/client";
 
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   const locationId = await getLocationIdFromRequest(request);
   const category = request.nextUrl.searchParams.get("category");
 
-  if (category === "RECEIPT" && !hasPermission(user.role, "view_receipts")) {
+  if (category === "RECEIPT" && !(await userCan(user, "view_receipts"))) {
     return forbiddenResponse();
   }
 
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     where: {
       locationId,
       ...(category ? { category: category as PhotoCategory } : {}),
-      ...(!hasPermission(user.role, "view_receipts")
+      ...(!(await userCan(user, "view_receipts"))
         ? { category: { not: "RECEIPT" as PhotoCategory } }
         : {}),
     },
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     const file = formData.get("file") as File | null;
     const category = (formData.get("category") as string) || "OTHER";
 
-    if (category === "RECEIPT" && !hasPermission(user.role, "view_receipts")) {
+    if (category === "RECEIPT" && !(await userCan(user, "view_receipts"))) {
       return forbiddenResponse();
     }
     const title = formData.get("title") as string | null;
