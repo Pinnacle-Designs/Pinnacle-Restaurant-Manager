@@ -467,49 +467,128 @@ export interface PurchasingAnalytics {
 
 export interface ForecastingHighlights {
   staffNeededNextFriday: { hours: number; predictedSales: number; date: string };
-  inventoryOrderTomorrow: Array<{ name: string; quantity: number; unit: string }>;
+  inventoryOrderDate: string;
+  inventoryOrderTomorrow: Array<{ name: string; quantity: number; unit: string; onHand: number }>;
+  cateringDemandNext7d: { orders: number; sales: number; trend: "up" | "down" | "stable" };
+  seasonalTrend: { pattern: string; insight: string; peakDay: string; liftPct: number };
 }
 
 export interface ForecastingAnalytics {
   salesForecast7d: Array<{ date: string; predicted: number }>;
   laborHoursForecast7d: Array<{ date: string; hours: number }>;
   inventoryRecommendations: Array<{ name: string; suggestedOrder: number; unit: string }>;
+  cateringDemandForecast7d: Array<{ date: string; predictedOrders: number; predictedSales: number }>;
+  seasonalTrends: Array<{ label: string; insight: string; impactPct: number }>;
   seasonalNote: string;
   highlights: ForecastingHighlights;
   questions: string[];
 }
 
+export type ProfitDriverType =
+  | "item"
+  | "category"
+  | "employee"
+  | "shift"
+  | "daypart"
+  | "hour"
+  | "day"
+  | "channel"
+  | "location"
+  | "delivery"
+  | "campaign";
+
 export interface ProfitabilityHighlights {
   profitLeaks: Array<{ area: string; amount: number; reason: string }>;
-  marginDrivers: Array<{ name: string; type: "item" | "channel" | "daypart"; profit: number }>;
+  marginDrivers: Array<{ name: string; type: ProfitDriverType; profit: number }>;
+  topProfitItem: { name: string; profit: number } | null;
+  topProfitHour: { hour: number; label: string; profit: number } | null;
+  topProfitDay: { date: string; profit: number } | null;
+  topProfitEmployee: { name: string; profit: number } | null;
+  topProfitChannel: { channel: string; profit: number } | null;
+  topCampaign: { name: string; profit: number } | null;
+  lowestProfitShift: { shift: string; profit: number } | null;
 }
 
 export interface ProfitabilityAnalytics {
   grossProfit: number;
   netProfitEstimate: number;
   profitMarginPct: number;
-  byMenuItem: Array<{ name: string; profit: number; marginPct: number }>;
-  byCategory: Array<{ category: string; profit: number }>;
-  byDaypart: Array<{ daypart: Daypart; profit: number }>;
-  byChannel: Array<{ channel: string; profit: number }>;
-  byDay: Array<{ date: string; profit: number }>;
+  byMenuItem: Array<{ name: string; profit: number; marginPct: number; sales: number }>;
+  byCategory: Array<{ category: string; profit: number; sales: number; marginPct: number }>;
+  byEmployee: Array<{ name: string; role: string; profit: number; sales: number; marginPct: number }>;
+  byShift: Array<{ shift: Daypart; profit: number; sales: number; laborCost: number; marginPct: number }>;
+  byDaypart: Array<{ daypart: Daypart; profit: number; sales: number; marginPct: number }>;
+  byHour: Array<{ hour: number; label: string; profit: number; sales: number; orders: number }>;
+  byDay: Array<{ date: string; profit: number; sales: number }>;
+  byLocation: Array<{ locationId: string; name: string; profit: number; sales: number; marginPct: number }>;
+  byChannel: Array<{ channel: string; profit: number; sales: number; marginPct: number }>;
+  byDeliveryProvider: Array<{ provider: string; profit: number; sales: number; orders: number; marginPct: number }>;
+  byCampaign: Array<{ name: string; channel: string; profit: number; spend: number; revenue: number; roiPct: number }>;
   highlights: ProfitabilityHighlights;
   questions: string[];
 }
 
+export type ExternalFactorCategory =
+  | "weather"
+  | "event"
+  | "holiday"
+  | "sports"
+  | "tourism"
+  | "school";
+
+export interface LearnedPattern {
+  category: ExternalFactorCategory;
+  pattern: string;
+  metric: "sales" | "delivery" | "dine-in" | "orders" | "guests";
+  impactPct: number;
+  confidence: "low" | "medium" | "high";
+  insight: string;
+  sampleSize: number;
+}
+
+export interface WeatherForecastDay {
+  date: string;
+  condition: string;
+  tempHigh: number;
+  tempLow: number;
+  precipitationPct: number;
+  isRainy: boolean;
+}
+
 export interface ExternalFactorsHighlights {
-  weatherImpact: { avgImpactPct: number; insight: string } | null;
-  topEvents: Array<{ description: string; impactPct: number }>;
+  weatherImpact: {
+    avgImpactPct: number;
+    insight: string;
+    deliveryShiftPct: number | null;
+  } | null;
+  topEvents: Array<{ description: string; impactPct: number; category: ExternalFactorCategory }>;
+  learnedPatterns: LearnedPattern[];
+  upcomingForecast: WeatherForecastDay[];
+  tourismLevel: "low" | "moderate" | "high" | null;
+  schoolScheduleNote: string | null;
+  categoryCoverage: Array<{
+    category: ExternalFactorCategory;
+    label: string;
+    tracked: boolean;
+    learned: boolean;
+    avgImpactPct: number | null;
+  }>;
 }
 
 export interface ExternalFactorsAnalytics {
   factors: Array<{
     date: string;
     factorType: string;
+    category: ExternalFactorCategory;
     description: string;
     impactPct: number;
   }>;
-  patterns: Array<{ pattern: string; insight: string }>;
+  patterns: Array<{ pattern: string; insight: string; category?: ExternalFactorCategory; confidence?: string; impactPct?: number }>;
+  learnedPatterns: LearnedPattern[];
+  byCategory: Array<{ category: ExternalFactorCategory; count: number; avgImpactPct: number }>;
+  weatherForecast: WeatherForecastDay[];
+  weatherSource: string;
+  weatherGeo: string | null;
   highlights: ExternalFactorsHighlights;
   questions: string[];
 }

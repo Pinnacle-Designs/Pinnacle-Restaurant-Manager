@@ -90,6 +90,7 @@ export const MANAGEMENT_ROUTES = [
   "/api/analytics",
   "/api/expenses",
   "/api/insights",
+  "/api/ai",
   "/api/receipts",
 ];
 

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { PageHeader } from "@/components/ui";
 import { InsightPanel } from "@/components/insights/InsightPanel";
+import { ManagerAIAssistant } from "@/components/insights/ManagerAIAssistant";
 
 interface Insight {
   id: string;
@@ -34,8 +35,12 @@ export default function InsightsPage() {
     <div>
       <PageHeader
         title="AI Insights"
-        description="Automated business analysis — pain points, risks, and recommended actions"
+        description="Ask 350+ manager questions, run automated analysis, and get actionable answers from live data"
       />
+
+      <div className="mb-8">
+        <ManagerAIAssistant />
+      </div>
 
       {loading ? (
         <p className="text-sm text-slate-500">Loading insights...</p>

@@ -1,4 +1,5 @@
 import type { AnalyticsPayload, CustomerExperienceHighlights, ExternalFactorsHighlights, FoodCostHighlights, ForecastingHighlights, LaborHighlights, MarketingHighlights, MenuEngineeringHighlights, OperationsHighlights, ProfitabilityHighlights, PurchasingHighlights, SalesHighlights } from "./types";
+import { EXTERNAL_CATEGORY_LABELS, ALL_EXTERNAL_CATEGORIES } from "@/lib/external/pattern-learning";
 
 const EMPTY_SALES_HIGHLIGHTS: SalesHighlights = {
   topSellingItem: null,
@@ -65,17 +66,44 @@ const EMPTY_PURCHASING_HIGHLIGHTS: PurchasingHighlights = {
 
 const EMPTY_FORECASTING_HIGHLIGHTS: ForecastingHighlights = {
   staffNeededNextFriday: { hours: 0, predictedSales: 0, date: "" },
+  inventoryOrderDate: "",
   inventoryOrderTomorrow: [],
+  cateringDemandNext7d: { orders: 0, sales: 0, trend: "stable" },
+  seasonalTrend: { pattern: "", insight: "", peakDay: "", liftPct: 0 },
 };
 
 const EMPTY_PROFITABILITY_HIGHLIGHTS: ProfitabilityHighlights = {
   profitLeaks: [],
   marginDrivers: [],
+  topProfitItem: null,
+  topProfitHour: null,
+  topProfitDay: null,
+  topProfitEmployee: null,
+  topProfitChannel: null,
+  topCampaign: null,
+  lowestProfitShift: null,
 };
+
+const DEFAULT_EXTERNAL_QUESTIONS = [
+  "How does weather affect sales and delivery?",
+  "Which local events, holidays, and sports games boost traffic?",
+  "What patterns has the system learned automatically?",
+];
 
 const EMPTY_EXTERNAL_HIGHLIGHTS: ExternalFactorsHighlights = {
   weatherImpact: null,
   topEvents: [],
+  learnedPatterns: [],
+  upcomingForecast: [],
+  tourismLevel: null,
+  schoolScheduleNote: null,
+  categoryCoverage: ALL_EXTERNAL_CATEGORIES.map((category) => ({
+    category,
+    label: EXTERNAL_CATEGORY_LABELS[category],
+    tracked: false,
+    learned: false,
+    avgImpactPct: null,
+  })),
 };
 
 const EMPTY_MENU_HIGHLIGHTS: MenuEngineeringHighlights = {
@@ -296,6 +324,8 @@ export function normalizeAnalyticsPayload(raw: Partial<AnalyticsPayload> & Recor
       salesForecast7d: raw.forecasting?.salesForecast7d ?? [],
       laborHoursForecast7d: raw.forecasting?.laborHoursForecast7d ?? [],
       inventoryRecommendations: raw.forecasting?.inventoryRecommendations ?? [],
+      cateringDemandForecast7d: raw.forecasting?.cateringDemandForecast7d ?? [],
+      seasonalTrends: raw.forecasting?.seasonalTrends ?? [],
       seasonalNote: raw.forecasting?.seasonalNote ?? "",
       highlights: raw.forecasting?.highlights ?? EMPTY_FORECASTING_HIGHLIGHTS,
       questions: raw.forecasting?.questions ?? [],
@@ -306,17 +336,28 @@ export function normalizeAnalyticsPayload(raw: Partial<AnalyticsPayload> & Recor
       profitMarginPct: raw.profitability?.profitMarginPct ?? 0,
       byMenuItem: raw.profitability?.byMenuItem ?? [],
       byCategory: raw.profitability?.byCategory ?? [],
+      byEmployee: raw.profitability?.byEmployee ?? [],
+      byShift: raw.profitability?.byShift ?? [],
       byDaypart: raw.profitability?.byDaypart ?? [],
-      byChannel: raw.profitability?.byChannel ?? [],
+      byHour: raw.profitability?.byHour ?? [],
       byDay: raw.profitability?.byDay ?? [],
+      byLocation: raw.profitability?.byLocation ?? [],
+      byChannel: raw.profitability?.byChannel ?? [],
+      byDeliveryProvider: raw.profitability?.byDeliveryProvider ?? [],
+      byCampaign: raw.profitability?.byCampaign ?? [],
       highlights: raw.profitability?.highlights ?? EMPTY_PROFITABILITY_HIGHLIGHTS,
       questions: raw.profitability?.questions ?? [],
     },
     externalFactors: {
       factors: raw.externalFactors?.factors ?? [],
       patterns: raw.externalFactors?.patterns ?? [],
+      learnedPatterns: raw.externalFactors?.learnedPatterns ?? [],
+      byCategory: raw.externalFactors?.byCategory ?? [],
+      weatherForecast: raw.externalFactors?.weatherForecast ?? [],
+      weatherSource: raw.externalFactors?.weatherSource ?? "",
+      weatherGeo: raw.externalFactors?.weatherGeo ?? null,
       highlights: raw.externalFactors?.highlights ?? EMPTY_EXTERNAL_HIGHLIGHTS,
-      questions: raw.externalFactors?.questions ?? [],
+      questions: raw.externalFactors?.questions ?? DEFAULT_EXTERNAL_QUESTIONS,
     },
     aiInsights: raw.aiInsights ?? [],
     coverage: raw.coverage ?? { sections: [] },

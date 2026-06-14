@@ -103,6 +103,7 @@ export function AnalyticsClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [seeding, setSeeding] = useState(false);
+  const [weatherSyncing, setWeatherSyncing] = useState(false);
 
   const loadAnalytics = useCallback(() => {
     setLoading(true);
@@ -136,6 +137,21 @@ export function AnalyticsClient() {
       setLoading(false);
     } finally {
       setSeeding(false);
+    }
+  };
+
+  const syncWeather = async () => {
+    setWeatherSyncing(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/external/weather/sync", { method: "POST" });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Weather sync failed");
+      loadAnalytics();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Weather sync failed");
+    } finally {
+      setWeatherSyncing(false);
     }
   };
 
@@ -1197,23 +1213,56 @@ export function AnalyticsClient() {
       {tab === "forecasting" && (
         <div className="space-y-6">
           <p className="text-sm text-slate-600">{data.forecasting.seasonalNote}</p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              label="7d Sales Forecast"
+              value={formatCurrency(data.forecasting.salesForecast7d.reduce((s, d) => s + d.predicted, 0))}
+            />
+            <StatCard
+              label="7d Labor Hours"
+              value={data.forecasting.laborHoursForecast7d.reduce((s, d) => s + d.hours, 0).toFixed(0)}
+            />
+            <StatCard
+              label="Catering Demand (7d)"
+              value={`${data.forecasting.highlights.cateringDemandNext7d.orders} orders`}
+              subtext={`${formatCurrency(data.forecasting.highlights.cateringDemandNext7d.sales)} · ${data.forecasting.highlights.cateringDemandNext7d.trend}`}
+            />
+            <StatCard
+              label="Peak Day"
+              value={data.forecasting.highlights.seasonalTrend.peakDay || "—"}
+              subtext={data.forecasting.highlights.seasonalTrend.liftPct !== 0 ? `${data.forecasting.highlights.seasonalTrend.liftPct > 0 ? "+" : ""}${data.forecasting.highlights.seasonalTrend.liftPct.toFixed(0)}% weekend lift` : undefined}
+            />
+          </div>
           <div className="card border-blue-100 bg-blue-50/50">
             <h3 className="font-semibold text-slate-900">Forecasting Intelligence</h3>
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
               <div className="rounded-lg border border-blue-100 bg-white p-4">
-                <p className="text-xs font-semibold uppercase text-blue-600">Staff needed next Friday</p>
+                <p className="text-xs font-semibold uppercase text-blue-600">How much staff do I need next Friday?</p>
                 <p className="mt-2 text-sm font-medium text-slate-800">
                   {data.forecasting.highlights.staffNeededNextFriday.hours.toFixed(0)} hours · {formatCurrency(data.forecasting.highlights.staffNeededNextFriday.predictedSales)} sales
                 </p>
                 <p className="mt-1 text-sm text-slate-600">{data.forecasting.highlights.staffNeededNextFriday.date}</p>
               </div>
-              <div className="rounded-lg border border-blue-100 bg-white p-4">
-                <p className="text-xs font-semibold uppercase text-blue-600">Inventory to order tomorrow</p>
-                <p className="mt-2 text-sm font-medium text-slate-800">
-                  {data.forecasting.highlights.inventoryOrderTomorrow.length > 0
-                    ? data.forecasting.highlights.inventoryOrderTomorrow.map((i) => `${i.name} (${i.quantity} ${i.unit})`).join(", ")
-                    : "No urgent orders"}
+              <div className="rounded-lg border border-blue-100 bg-white p-4 lg:col-span-2">
+                <p className="text-xs font-semibold uppercase text-blue-600">How much of every item should I order tomorrow?</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {data.forecasting.highlights.inventoryOrderDate} · {formatCurrency(data.forecasting.salesForecast7d[0]?.predicted ?? 0)} predicted sales
                 </p>
+                {data.forecasting.highlights.inventoryOrderTomorrow.length > 0 ? (
+                  <div className="mt-3 max-h-48 overflow-y-auto">
+                    <DataTable
+                      headers={["Item", "On Hand", "Order", "Unit"]}
+                      rows={data.forecasting.highlights.inventoryOrderTomorrow.map((i) => [
+                        i.name,
+                        i.onHand.toString(),
+                        i.quantity.toString(),
+                        i.unit,
+                      ])}
+                    />
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-slate-600">Add inventory items to generate tomorrow&apos;s order plan.</p>
+                )}
               </div>
             </div>
           </div>
@@ -1226,9 +1275,38 @@ export function AnalyticsClient() {
               <h3 className="font-semibold">Labor Hours Forecast (7d)</h3>
               <DataTable headers={["Date", "Hours"]} rows={data.forecasting.laborHoursForecast7d.map((f) => [f.date, f.hours.toFixed(0)])} />
             </div>
+            <div className="card">
+              <h3 className="font-semibold">Catering Demand Forecast (7d)</h3>
+              <DataTable
+                headers={["Date", "Orders", "Sales"]}
+                rows={data.forecasting.cateringDemandForecast7d.map((f) => [
+                  f.date,
+                  f.predictedOrders.toString(),
+                  formatCurrency(f.predictedSales),
+                ])}
+              />
+            </div>
+            <div className="card">
+              <h3 className="font-semibold">Seasonal Trends</h3>
+              <ul className="mt-3 space-y-2 text-sm text-slate-700">
+                {data.forecasting.seasonalTrends.map((t) => (
+                  <li key={t.label}>
+                    <strong>{t.label}:</strong> {t.insight}
+                  </li>
+                ))}
+              </ul>
+            </div>
             <div className="card lg:col-span-2">
-              <h3 className="font-semibold">Inventory Recommendations</h3>
-              <DataTable headers={["Item", "Suggested", "Unit"]} rows={data.forecasting.inventoryRecommendations.map((i) => [i.name, i.suggestedOrder, i.unit])} />
+              <h3 className="font-semibold">Tomorrow&apos;s Order Plan (All Items)</h3>
+              <DataTable
+                headers={["Item", "On Hand", "Order Qty", "Unit"]}
+                rows={data.forecasting.highlights.inventoryOrderTomorrow.map((i) => [
+                  i.name,
+                  i.onHand,
+                  i.quantity,
+                  i.unit,
+                ])}
+              />
             </div>
           </div>
           <SectionAnalysisPanel section="forecasting" questions={data.forecasting.questions} />
@@ -1237,14 +1315,22 @@ export function AnalyticsClient() {
 
       {tab === "profitability" && (
         <div className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <p className="text-sm text-slate-600">
+            Goes beyond sales, food cost, and labor — profit broken down by item, hour, day, employee, channel, and campaign.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard label="Gross Profit" value={formatCurrency(data.profitability.grossProfit)} />
             <StatCard label="Net Profit Est." value={formatCurrency(data.profitability.netProfitEstimate)} />
-            <StatCard label="Margin %" value={`${data.profitability.profitMarginPct.toFixed(1)}%`} />
+            <StatCard label="Margin %" value={`${data.profitability.profitMarginPct.toFixed(1)}%`} subtext="Most important dashboard" />
+            <StatCard
+              label="Top Profit Item"
+              value={data.profitability.highlights.topProfitItem?.name ?? "—"}
+              subtext={data.profitability.highlights.topProfitItem ? formatCurrency(data.profitability.highlights.topProfitItem.profit) : undefined}
+            />
           </div>
           <div className="card border-blue-100 bg-blue-50/50">
             <h3 className="font-semibold text-slate-900">Profitability Intelligence</h3>
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div className="mt-4 grid gap-4 lg:grid-cols-3">
               <div className="rounded-lg border border-blue-100 bg-white p-4">
                 <p className="text-xs font-semibold uppercase text-blue-600">Where is profit leaking?</p>
                 <p className="mt-2 text-sm font-medium text-slate-800">
@@ -1254,27 +1340,96 @@ export function AnalyticsClient() {
                 </p>
               </div>
               <div className="rounded-lg border border-blue-100 bg-white p-4">
-                <p className="text-xs font-semibold uppercase text-blue-600">What drives margin?</p>
+                <p className="text-xs font-semibold uppercase text-blue-600">Best profit hour & day</p>
                 <p className="mt-2 text-sm font-medium text-slate-800">
-                  {data.profitability.highlights.marginDrivers.slice(0, 3).map((d) => `${d.name} (${d.type})`).join(", ")}
+                  {data.profitability.highlights.topProfitHour
+                    ? `${data.profitability.highlights.topProfitHour.label} · ${formatCurrency(data.profitability.highlights.topProfitHour.profit)}`
+                    : "—"}
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {data.profitability.highlights.topProfitDay
+                    ? `${data.profitability.highlights.topProfitDay.date} · ${formatCurrency(data.profitability.highlights.topProfitDay.profit)}`
+                    : "No day data"}
+                </p>
+              </div>
+              <div className="rounded-lg border border-blue-100 bg-white p-4">
+                <p className="text-xs font-semibold uppercase text-blue-600">Top employee, channel & campaign</p>
+                <p className="mt-2 text-sm font-medium text-slate-800">
+                  {data.profitability.highlights.topProfitEmployee
+                    ? `${data.profitability.highlights.topProfitEmployee.name} · ${formatCurrency(data.profitability.highlights.topProfitEmployee.profit)}`
+                    : "—"}
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {data.profitability.highlights.topProfitChannel
+                    ? `${data.profitability.highlights.topProfitChannel.channel} · ${formatCurrency(data.profitability.highlights.topProfitChannel.profit)}`
+                    : "—"}
+                  {data.profitability.highlights.topCampaign
+                    ? ` · ${data.profitability.highlights.topCampaign.name}`
+                    : ""}
                 </p>
               </div>
             </div>
           </div>
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="card">
-              <h3 className="font-semibold">Profit by Item</h3>
+              <h3 className="font-semibold">Profit by Menu Item</h3>
               <DataTable headers={["Item", "Profit", "Margin %"]} rows={data.profitability.byMenuItem.map((i) => [i.name, formatCurrency(i.profit), `${i.marginPct.toFixed(0)}%`])} />
             </div>
             <div className="card">
-              <h3 className="font-semibold">Profit by Channel</h3>
-              <DataTable headers={["Channel", "Profit"]} rows={data.profitability.byChannel.map((c) => [c.channel, formatCurrency(c.profit)])} />
+              <h3 className="font-semibold">Profit by Category</h3>
+              <DataTable headers={["Category", "Profit", "Margin %"]} rows={data.profitability.byCategory.map((c) => [c.category, formatCurrency(c.profit), `${c.marginPct.toFixed(0)}%`])} />
+            </div>
+            <div className="card">
+              <h3 className="font-semibold">Profit by Hour</h3>
+              <DataTable headers={["Hour", "Profit", "Sales"]} rows={data.profitability.byHour.map((h) => [h.label, formatCurrency(h.profit), formatCurrency(h.sales)])} />
+            </div>
+            <div className="card">
+              <h3 className="font-semibold">Profit by Day</h3>
+              <DataTable headers={["Date", "Profit", "Sales"]} rows={data.profitability.byDay.map((d) => [d.date, formatCurrency(d.profit), formatCurrency(d.sales)])} />
+            </div>
+            <div className="card">
+              <h3 className="font-semibold">Profit by Employee</h3>
+              <DataTable headers={["Employee", "Role", "Profit"]} rows={data.profitability.byEmployee.map((e) => [e.name, e.role, formatCurrency(e.profit)])} />
+            </div>
+            <div className="card">
+              <h3 className="font-semibold">Profit by Shift</h3>
+              <DataTable headers={["Shift", "Profit", "Labor"]} rows={data.profitability.byShift.map((s) => [s.shift, formatCurrency(s.profit), formatCurrency(s.laborCost)])} />
             </div>
             <div className="card">
               <h3 className="font-semibold">Profit by Daypart</h3>
-              <DataTable headers={["Daypart", "Profit"]} rows={data.profitability.byDaypart.map((d) => [d.daypart, formatCurrency(d.profit)])} />
+              <DataTable headers={["Daypart", "Profit", "Margin %"]} rows={data.profitability.byDaypart.map((d) => [d.daypart, formatCurrency(d.profit), `${d.marginPct.toFixed(0)}%`])} />
             </div>
             <div className="card">
+              <h3 className="font-semibold">Profit by Location</h3>
+              <DataTable headers={["Location", "Profit", "Margin %"]} rows={data.profitability.byLocation.map((l) => [l.name, formatCurrency(l.profit), `${l.marginPct.toFixed(0)}%`])} />
+            </div>
+            <div className="card">
+              <h3 className="font-semibold">Profit by Channel</h3>
+              <DataTable headers={["Channel", "Profit", "Margin %"]} rows={data.profitability.byChannel.map((c) => [c.channel, formatCurrency(c.profit), `${c.marginPct.toFixed(0)}%`])} />
+            </div>
+            <div className="card">
+              <h3 className="font-semibold">Profit by Delivery Provider</h3>
+              <DataTable
+                headers={["Provider", "Profit", "Orders"]}
+                rows={data.profitability.byDeliveryProvider.length > 0
+                  ? data.profitability.byDeliveryProvider.map((d) => [d.provider, formatCurrency(d.profit), d.orders])
+                  : [["—", "No delivery orders", "—"]]}
+              />
+            </div>
+            <div className="card lg:col-span-2">
+              <h3 className="font-semibold">Profit by Marketing Campaign</h3>
+              <DataTable
+                headers={["Campaign", "Channel", "Profit", "Spend", "ROI %"]}
+                rows={data.profitability.byCampaign.map((c) => [
+                  c.name,
+                  c.channel,
+                  formatCurrency(c.profit),
+                  formatCurrency(c.spend),
+                  `${c.roiPct.toFixed(0)}%`,
+                ])}
+              />
+            </div>
+            <div className="card lg:col-span-2">
               <h3 className="font-semibold">Profit Leaks</h3>
               <DataTable headers={["Area", "Amount", "Reason"]} rows={data.profitability.highlights.profitLeaks.map((l) => [l.area, formatCurrency(l.amount), l.reason])} />
             </div>
@@ -1285,42 +1440,133 @@ export function AnalyticsClient() {
 
       {tab === "external" && (
         <div className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-slate-600">
+              Tracks weather, events, holidays, sports, tourism, and school schedules — learns patterns automatically.
+            </p>
+            <Button size="sm" variant="secondary" onClick={syncWeather} disabled={weatherSyncing}>
+              {weatherSyncing ? "Syncing weather..." : "Sync weather forecast"}
+            </Button>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              label="Weather source"
+              value={data.externalFactors.weatherSource || "—"}
+              subtext={data.externalFactors.weatherGeo ?? "Set location address"}
+            />
+            <StatCard
+              label="Learned patterns"
+              value={data.externalFactors.learnedPatterns.length}
+              subtext="Auto-detected from history"
+            />
+            <StatCard
+              label="Tourism level"
+              value={data.externalFactors.highlights.tourismLevel ?? "—"}
+            />
+            <StatCard
+              label="Factor categories"
+              value={data.externalFactors.byCategory.length}
+            />
+          </div>
           <div className="card border-blue-100 bg-blue-50/50">
             <h3 className="font-semibold text-slate-900">External Factors Intelligence</h3>
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div className="mt-4 grid gap-4 lg:grid-cols-3">
               <div className="rounded-lg border border-blue-100 bg-white p-4">
-                <p className="text-xs font-semibold uppercase text-blue-600">How does weather affect sales?</p>
+                <p className="text-xs font-semibold uppercase text-blue-600">How does weather affect sales and delivery?</p>
                 <p className="mt-2 text-sm font-medium text-slate-800">
                   {data.externalFactors.highlights.weatherImpact
-                    ? `${data.externalFactors.highlights.weatherImpact.avgImpactPct.toFixed(0)}% avg impact`
-                    : "Log weather to learn patterns"}
+                    ? data.externalFactors.highlights.weatherImpact.insight
+                    : "Sync weather to learn rain/delivery patterns"}
                 </p>
-                {data.externalFactors.highlights.weatherImpact && (
-                  <p className="mt-1 text-sm text-slate-600">{data.externalFactors.highlights.weatherImpact.insight}</p>
+                {data.externalFactors.highlights.weatherImpact?.deliveryShiftPct != null && (
+                  <p className="mt-1 text-sm text-slate-600">
+                    Delivery shift: {data.externalFactors.highlights.weatherImpact.deliveryShiftPct >= 0 ? "+" : ""}
+                    {data.externalFactors.highlights.weatherImpact.deliveryShiftPct.toFixed(0)}%
+                  </p>
                 )}
               </div>
               <div className="rounded-lg border border-blue-100 bg-white p-4">
-                <p className="text-xs font-semibold uppercase text-blue-600">Which events boost traffic?</p>
+                <p className="text-xs font-semibold uppercase text-blue-600">Events, holidays & sports</p>
                 <p className="mt-2 text-sm font-medium text-slate-800">
                   {data.externalFactors.highlights.topEvents.length > 0
-                    ? data.externalFactors.highlights.topEvents.map((e) => `${e.description} (+${e.impactPct.toFixed(0)}%)`).join(", ")
+                    ? data.externalFactors.highlights.topEvents.slice(0, 2).map((e) => `${e.description} (+${e.impactPct.toFixed(0)}%)`).join("; ")
                     : "No events logged"}
                 </p>
               </div>
+              <div className="rounded-lg border border-blue-100 bg-white p-4">
+                <p className="text-xs font-semibold uppercase text-blue-600">Auto-learned patterns</p>
+                <p className="mt-2 text-sm font-medium text-slate-800">
+                  {data.externalFactors.highlights.learnedPatterns.length > 0
+                    ? data.externalFactors.highlights.learnedPatterns[0]!.insight
+                    : "More order history improves pattern confidence"}
+                </p>
+                {data.externalFactors.highlights.schoolScheduleNote && (
+                  <p className="mt-1 text-sm text-slate-600">School: {data.externalFactors.highlights.schoolScheduleNote}</p>
+                )}
+              </div>
             </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {data.externalFactors.highlights.categoryCoverage.map((c) => (
+              <Badge
+                key={c.category}
+                className={
+                  c.learned
+                    ? "bg-green-100 text-green-800"
+                    : c.tracked
+                      ? "bg-blue-100 text-blue-800"
+                      : "bg-slate-100 text-slate-500"
+                }
+              >
+                {c.label} {c.learned ? "✓ learned" : c.tracked ? "✓ tracked" : "—"}
+              </Badge>
+            ))}
           </div>
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="card">
-              <h3 className="font-semibold">Recorded Factors</h3>
-              <DataTable headers={["Date", "Type", "Impact", "Description"]} rows={data.externalFactors.factors.map((f) => [f.date.split("T")[0], f.factorType, `${f.impactPct}%`, f.description])} />
+              <h3 className="font-semibold">7-Day Weather Forecast</h3>
+              <DataTable
+                headers={["Date", "Condition", "Precip %", "High/Low"]}
+                rows={data.externalFactors.weatherForecast.map((f) => [
+                  f.date,
+                  f.condition,
+                  `${f.precipitationPct}%`,
+                  `${f.tempHigh}° / ${f.tempLow}°`,
+                ])}
+              />
             </div>
             <div className="card">
-              <h3 className="font-semibold">Learned Patterns</h3>
+              <h3 className="font-semibold">Learned Patterns (Automatic)</h3>
               <ul className="mt-2 space-y-2 text-sm text-slate-600">
-                {data.externalFactors.patterns.map((p) => (
-                  <li key={p.pattern}><strong>{p.pattern}:</strong> {p.insight}</li>
-                ))}
+                {data.externalFactors.learnedPatterns.length > 0 ? (
+                  data.externalFactors.learnedPatterns.map((p) => (
+                    <li key={`${p.pattern}-${p.metric}`}>
+                      <strong>{p.pattern}</strong> ({p.confidence} confidence): {p.insight}
+                    </li>
+                  ))
+                ) : (
+                  <li>Log factors and accumulate orders — patterns emerge automatically.</li>
+                )}
               </ul>
+            </div>
+            <div className="card">
+              <h3 className="font-semibold">By Category</h3>
+              <DataTable
+                headers={["Category", "Count", "Avg Impact"]}
+                rows={data.externalFactors.byCategory.map((c) => [c.category, c.count, `${c.avgImpactPct.toFixed(0)}%`])}
+              />
+            </div>
+            <div className="card">
+              <h3 className="font-semibold">Recorded Factors</h3>
+              <DataTable
+                headers={["Date", "Category", "Impact", "Description"]}
+                rows={data.externalFactors.factors.map((f) => [
+                  f.date.split("T")[0],
+                  f.category,
+                  `${f.impactPct}%`,
+                  f.description.length > 48 ? `${f.description.slice(0, 48)}…` : f.description,
+                ])}
+              />
             </div>
           </div>
           <SectionAnalysisPanel section="external" questions={data.externalFactors.questions} />

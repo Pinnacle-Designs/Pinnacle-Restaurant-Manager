@@ -149,6 +149,7 @@ export async function seedLocationData(locationId: string) {
       { locationId, name: "Mozzarella", quantity: 3, unit: "lbs", minQuantity: 5, costPerUnit: 6.0, previousCostPerUnit: 6.1, portionSize: 0.15, yieldPct: 98, supplier: "Dairy Direct" },
       { locationId, name: "Olive oil", quantity: 2, unit: "bottles", minQuantity: 3, costPerUnit: 15.0, portionSize: 0.02, yieldPct: 100, supplier: "Mediterranean Imports" },
       { locationId, name: "Flour", quantity: 20, unit: "lbs", minQuantity: 10, costPerUnit: 1.2, previousCostPerUnit: 1.1, portionSize: 0.5, yieldPct: 100, supplier: "Bulk Foods Co" },
+      { locationId, name: "Chicken breast", quantity: 6, unit: "lbs", minQuantity: 12, costPerUnit: 4.5, previousCostPerUnit: 4.2, portionSize: 0.4, yieldPct: 90, supplier: "Farm Fresh Poultry" },
     ],
   });
 

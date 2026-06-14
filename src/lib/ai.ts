@@ -202,7 +202,7 @@ export async function generateBusinessInsights(locationId?: string): Promise<
         {
           role: "system",
           content:
-            "You are a restaurant business analyst with complete analytics across all 12 sections. Each section has keyQuestions and highlights — answer them with specific numbers. Sections: sales (what sells, busiest times, profitable channels), foodCost (disappearing product, cost drivers, recipes), labor (staffing, inefficient shifts, top performers), menuEngineering (promote, reprice, remove), marketing (generating sales, profitable channels), customerExperience (satisfaction hurts, complaint shifts), operations (bottlenecks, ticket time impact), purchasing (supplier increases, market rates), forecasting (Friday staff, tomorrow inventory), profitability (profit leaks, margin drivers), externalFactors (weather, events), executive (yesterday KPIs, alerts). Return JSON with insights array. Each insight: title, description, category (INVENTORY|STAFFING|FINANCE|OPERATIONS|MENU|CUSTOMER|FACILITY|GENERAL), severity (LOW|MEDIUM|HIGH|CRITICAL), actionable. Include insights for every section that has data.",
+            "You are a restaurant business analyst with complete analytics across all 12 sections. Each section has keyQuestions and highlights — answer them with specific numbers. Sections: sales (what sells, busiest times, profitable channels), foodCost (disappearing product, cost drivers, recipes), labor (staffing, inefficient shifts, top performers), menuEngineering (promote, reprice, remove), marketing (generating sales, profitable channels), customerExperience (satisfaction hurts, complaint shifts), operations (bottlenecks, ticket time impact), purchasing (supplier increases, market rates), forecasting (Friday staff, all-item orders, catering demand, seasonal trends), profitability (profit leaks; profit by item, category, employee, shift, daypart, hour, day, location, channel, delivery, campaign), externalFactors (weather, events, holidays, sports, tourism, school, auto-learned patterns, weather forecast), executive (yesterday KPIs, alerts). Return JSON with insights array. Each insight: title, description, category (INVENTORY|STAFFING|FINANCE|OPERATIONS|MENU|CUSTOMER|FACILITY|GENERAL), severity (LOW|MEDIUM|HIGH|CRITICAL), actionable. Include insights for every section that has data.",
         },
         {
           role: "user",
@@ -523,17 +523,32 @@ function generateRuleBasedInsights(snapshot: {
       severity: "LOW",
       actionable: "Publish the Friday schedule 5 days ahead.",
     });
-    if (fh.inventoryOrderTomorrow.length > 0) {
-      insights.push({
-        title: "How much inventory should I order tomorrow?",
-        description: fh.inventoryOrderTomorrow
-          .map((i) => `${i.name}: ${i.quantity} ${i.unit}`)
-          .join("; "),
-        category: "INVENTORY",
-        severity: fh.inventoryOrderTomorrow.length > 3 ? "HIGH" : "MEDIUM",
-        actionable: "Place vendor orders today for low-stock items before tomorrow's service.",
-      });
-    }
+    insights.push({
+      title: "How much of every item should I order tomorrow?",
+      description:
+        fh.inventoryOrderTomorrow.length > 0
+          ? fh.inventoryOrderTomorrow
+              .map((i) => `${i.name}: order ${i.quantity} ${i.unit} (${i.onHand} on hand)`)
+              .join("; ")
+          : "No inventory items tracked.",
+      category: "INVENTORY",
+      severity: fh.inventoryOrderTomorrow.filter((i) => i.quantity > 0).length > 3 ? "HIGH" : "MEDIUM",
+      actionable: "Place vendor orders today for items with the highest order quantities.",
+    });
+    insights.push({
+      title: "Catering demand forecast",
+      description: `${fh.cateringDemandNext7d.orders} orders and $${fh.cateringDemandNext7d.sales.toFixed(0)} sales projected (trend: ${fh.cateringDemandNext7d.trend}).`,
+      category: "OPERATIONS",
+      severity: fh.cateringDemandNext7d.trend === "up" ? "MEDIUM" : "LOW",
+      actionable: "Prep catering menus and assign dedicated staff for high-volume catering days.",
+    });
+    insights.push({
+      title: "Seasonal trend",
+      description: `${fh.seasonalTrend.pattern}: ${fh.seasonalTrend.insight}`,
+      category: "GENERAL",
+      severity: Math.abs(fh.seasonalTrend.liftPct) > 15 ? "MEDIUM" : "LOW",
+      actionable: `Staff and inventory up for peak day (${fh.seasonalTrend.peakDay}).`,
+    });
   }
 
   const profitability = snapshot.analytics?.profitability;
@@ -549,17 +564,33 @@ function generateRuleBasedInsights(snapshot: {
         actionable: `Tighten controls on ${leak.area.toLowerCase()}.`,
       });
     }
-    if (prh.marginDrivers.length > 0) {
-      insights.push({
-        title: "Which items, hours, and channels drive margin?",
-        description: prh.marginDrivers
-          .map((d) => `${d.name} (${d.type}): $${d.profit.toFixed(0)}`)
-          .join("; "),
-        category: "FINANCE",
-        severity: "MEDIUM",
-        actionable: "Double down on top margin drivers and reprice or remove weak performers.",
-      });
-    }
+    insights.push({
+      title: "Which menu items, hours, days, and channels drive profit?",
+      description: [
+        prh.topProfitItem ? `${prh.topProfitItem.name} ($${prh.topProfitItem.profit.toFixed(0)})` : null,
+        prh.topProfitHour ? `${prh.topProfitHour.label} ($${prh.topProfitHour.profit.toFixed(0)})` : null,
+        prh.topProfitDay ? `${prh.topProfitDay.date} ($${prh.topProfitDay.profit.toFixed(0)})` : null,
+        prh.topProfitChannel ? `${prh.topProfitChannel.channel} ($${prh.topProfitChannel.profit.toFixed(0)})` : null,
+      ]
+        .filter(Boolean)
+        .join("; ") || "Add paid orders to unlock profit breakdowns.",
+      category: "FINANCE",
+      severity: "MEDIUM",
+      actionable: "Promote high-profit items during peak hours and channels.",
+    });
+    insights.push({
+      title: "Which employees, shifts, and campaigns are most profitable?",
+      description: [
+        prh.topProfitEmployee ? `${prh.topProfitEmployee.name} ($${prh.topProfitEmployee.profit.toFixed(0)})` : null,
+        prh.lowestProfitShift ? `Weakest shift ${prh.lowestProfitShift.shift}` : null,
+        prh.topCampaign ? `${prh.topCampaign.name} ($${prh.topCampaign.profit.toFixed(0)})` : null,
+      ]
+        .filter(Boolean)
+        .join("; ") || "Schedule and campaign data needed.",
+      category: "FINANCE",
+      severity: "LOW",
+      actionable: "Staff peak-profit shifts with top performers and scale winning campaigns.",
+    });
   }
 
   const external = snapshot.analytics?.externalFactors;
@@ -567,22 +598,60 @@ function generateRuleBasedInsights(snapshot: {
     const eh = external.highlights;
     if (eh.weatherImpact) {
       insights.push({
-        title: "How does weather affect sales?",
-        description: eh.weatherImpact.insight,
+        title: "How does weather affect sales and delivery?",
+        description: `${eh.weatherImpact.insight}${eh.weatherImpact.deliveryShiftPct != null ? ` Delivery shift ~${eh.weatherImpact.deliveryShiftPct.toFixed(0)}%.` : ""}`,
         category: "GENERAL",
         severity: Math.abs(eh.weatherImpact.avgImpactPct) > 15 ? "MEDIUM" : "LOW",
-        actionable: "Adjust staffing and promotions when adverse weather is forecast.",
+        actionable: "Staff delivery on rainy forecast days and reduce dine-in prep.",
       });
     }
     if (eh.topEvents.length > 0) {
-      const ev = eh.topEvents[0]!;
       insights.push({
-        title: "Which local events boost traffic?",
-        description: `${ev.description} boosts traffic ~${ev.impactPct.toFixed(0)}%.`,
+        title: "Which local events, holidays, and sports games boost traffic?",
+        description: eh.topEvents
+          .slice(0, 3)
+          .map((ev) => `${ev.description} (+${ev.impactPct.toFixed(0)}%)`)
+          .join("; "),
         category: "GENERAL",
         severity: "LOW",
-        actionable: "Staff up and promote specials during this event window.",
+        actionable: "Staff up and promote specials during high-impact event windows.",
       });
+    }
+    if (eh.learnedPatterns.length > 0) {
+      insights.push({
+        title: "Auto-learned external patterns",
+        description: eh.learnedPatterns
+          .slice(0, 3)
+          .map((p) => p.insight)
+          .join("; "),
+        category: "GENERAL",
+        severity: "MEDIUM",
+        actionable: "Bake learned patterns into forecasting and staffing plans.",
+      });
+    }
+    if (external.weatherForecast?.length) {
+      const rainyDays = external.weatherForecast.filter((f) => f.isRainy).length;
+      if (rainyDays > 0) {
+        insights.push({
+          title: "Upcoming rainy days",
+          description: `${rainyDays} rainy day(s) forecast via ${external.weatherSource ?? "weather API"}${external.weatherGeo ? ` (${external.weatherGeo})` : ""} — plan for delivery lift.`,
+          category: "OPERATIONS",
+          severity: "MEDIUM",
+          actionable: "Add delivery drivers and promote comfort food on rainy days.",
+        });
+      }
+    }
+    for (const cov of eh.categoryCoverage?.filter((c) => c.learned) ?? []) {
+      const pattern = eh.learnedPatterns.find((p) => p.category === cov.category);
+      if (pattern) {
+        insights.push({
+          title: `${cov.label}: ${pattern.pattern}`,
+          description: pattern.insight,
+          category: "GENERAL",
+          severity: pattern.confidence === "high" ? "MEDIUM" : "LOW",
+          actionable: `Adjust staffing and inventory when ${cov.label.toLowerCase()} factors are active.`,
+        });
+      }
     }
   }
 

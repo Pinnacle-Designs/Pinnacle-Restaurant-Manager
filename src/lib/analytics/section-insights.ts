@@ -491,17 +491,31 @@ function ruleBasedSectionInsights(
         category: "STAFFING",
       });
       insights.push({
-        title: "How much inventory should I order tomorrow?",
+        title: "How much of every item should I order tomorrow?",
         description:
           h.inventoryOrderTomorrow.length > 0
-            ? h.inventoryOrderTomorrow.map((i) => `${i.name}: ${i.quantity} ${i.unit}`).join("; ")
-            : "No urgent inventory orders — stock levels are adequate.",
-        severity: h.inventoryOrderTomorrow.length > 3 ? "HIGH" : "LOW",
+            ? h.inventoryOrderTomorrow
+                .map((i) => `${i.name}: order ${i.quantity} ${i.unit} (${i.onHand} on hand)`)
+                .join("; ")
+            : "No inventory items tracked — add SKUs to generate tomorrow's order plan.",
+        severity: h.inventoryOrderTomorrow.some((i) => i.quantity > 0 && i.onHand <= 0) ? "HIGH" : "MEDIUM",
         category: "INVENTORY",
+      });
+      insights.push({
+        title: "Catering demand forecast",
+        description: `${h.cateringDemandNext7d.orders} catering orders and $${h.cateringDemandNext7d.sales.toFixed(0)} projected over 7 days (trend: ${h.cateringDemandNext7d.trend}).`,
+        severity: h.cateringDemandNext7d.trend === "up" ? "MEDIUM" : "LOW",
+        category: "OPERATIONS",
+      });
+      insights.push({
+        title: "Seasonal trend",
+        description: `${h.seasonalTrend.pattern}: ${h.seasonalTrend.insight} Peak day: ${h.seasonalTrend.peakDay}.`,
+        severity: Math.abs(h.seasonalTrend.liftPct) > 15 ? "MEDIUM" : "LOW",
+        category: "GENERAL",
       });
       const totalForecast = f.salesForecast7d.reduce((s, d) => s + d.predicted, 0);
       insights.push({
-        title: "7-day outlook",
+        title: "7-day sales outlook",
         description: `Projected $${totalForecast.toFixed(0)} sales. ${f.seasonalNote}`,
         severity: "LOW",
         category: "GENERAL",
@@ -521,16 +535,34 @@ function ruleBasedSectionInsights(
         category: "FINANCE",
       });
       insights.push({
-        title: "Which items, hours, and channels drive margin?",
-        description: h.marginDrivers
-          .map((d) => `${d.name} (${d.type}): $${d.profit.toFixed(0)}`)
-          .join("; "),
+        title: "Which menu items, hours, days, and channels drive profit?",
+        description: [
+          h.topProfitItem ? `Item: ${h.topProfitItem.name} ($${h.topProfitItem.profit.toFixed(0)})` : null,
+          h.topProfitHour ? `Hour: ${h.topProfitHour.label} ($${h.topProfitHour.profit.toFixed(0)})` : null,
+          h.topProfitDay ? `Day: ${h.topProfitDay.date} ($${h.topProfitDay.profit.toFixed(0)})` : null,
+          h.topProfitChannel ? `Channel: ${h.topProfitChannel.channel} ($${h.topProfitChannel.profit.toFixed(0)})` : null,
+        ]
+          .filter(Boolean)
+          .join("; ") || "Insufficient order data for profit breakdown.",
         severity: "MEDIUM",
         category: "FINANCE",
       });
       insights.push({
-        title: `Margin ${pr.profitMarginPct.toFixed(1)}%`,
-        description: `Gross $${pr.grossProfit.toFixed(0)}, net est. $${pr.netProfitEstimate.toFixed(0)}.`,
+        title: "Which employees, shifts, and campaigns are most profitable?",
+        description: [
+          h.topProfitEmployee ? `Employee: ${h.topProfitEmployee.name} ($${h.topProfitEmployee.profit.toFixed(0)})` : null,
+          h.lowestProfitShift ? `Weakest shift: ${h.lowestProfitShift.shift} ($${h.lowestProfitShift.profit.toFixed(0)})` : null,
+          h.topCampaign ? `Campaign: ${h.topCampaign.name} ($${h.topCampaign.profit.toFixed(0)} net)` : null,
+          pr.byDeliveryProvider[0] ? `Delivery: ${pr.byDeliveryProvider[0].provider} ($${pr.byDeliveryProvider[0].profit.toFixed(0)})` : null,
+        ]
+          .filter(Boolean)
+          .join("; ") || "Add shifts and campaigns to compare profitability.",
+        severity: "MEDIUM",
+        category: "FINANCE",
+      });
+      insights.push({
+        title: `Net margin ${pr.profitMarginPct.toFixed(1)}%`,
+        description: `Gross $${pr.grossProfit.toFixed(0)}, net est. $${pr.netProfitEstimate.toFixed(0)}. Profit by category, location (${pr.byLocation[0]?.name ?? "n/a"}), and ${pr.byMenuItem.length} menu items tracked.`,
         severity: pr.profitMarginPct < 10 ? "HIGH" : "LOW",
         category: "FINANCE",
       });
@@ -540,27 +572,60 @@ function ruleBasedSectionInsights(
       const ex = payload.externalFactors;
       const h = ex.highlights;
       insights.push({
-        title: "How does weather affect sales?",
+        title: "How does weather affect sales and delivery?",
         description: h.weatherImpact
-          ? h.weatherImpact.insight
-          : "Log weather events to learn rain/heat impact on traffic.",
+          ? `${h.weatherImpact.insight}${h.weatherImpact.deliveryShiftPct != null ? ` Delivery shift ${h.weatherImpact.deliveryShiftPct >= 0 ? "+" : ""}${h.weatherImpact.deliveryShiftPct.toFixed(0)}%.` : ""}`
+          : "Sync weather forecast from location address to learn rain/delivery patterns.",
         severity: h.weatherImpact && Math.abs(h.weatherImpact.avgImpactPct) > 15 ? "MEDIUM" : "LOW",
         category: "GENERAL",
       });
       insights.push({
-        title: "Which local events boost traffic?",
+        title: "Which local events, holidays, and sports games boost traffic?",
         description:
           h.topEvents.length > 0
-            ? h.topEvents.map((e) => `${e.description} (+${e.impactPct.toFixed(0)}%)`).join("; ")
-            : "No local events logged — add concerts, festivals, and holidays.",
+            ? h.topEvents.map((e) => `${e.description} (+${e.impactPct.toFixed(0)}%, ${e.category})`).join("; ")
+            : "No events logged — add concerts, holidays, and game nights.",
         severity: h.topEvents.some((e) => e.impactPct > 25) ? "MEDIUM" : "LOW",
         category: "GENERAL",
       });
-      for (const pattern of ex.patterns.slice(0, 1)) {
+      insights.push({
+        title: "What patterns has the system learned automatically?",
+        description:
+          h.learnedPatterns.length > 0
+            ? h.learnedPatterns.map((p) => `${p.insight} (${p.confidence} confidence, n=${p.sampleSize})`).join("; ")
+            : "Need more order history paired with external factors to auto-learn.",
+        severity: h.learnedPatterns.some((p) => p.confidence === "high") ? "MEDIUM" : "LOW",
+        category: "GENERAL",
+      });
+      if (h.tourismLevel) {
         insights.push({
-          title: pattern.pattern,
-          description: pattern.insight,
+          title: `Tourism level: ${h.tourismLevel}`,
+          description: ex.byCategory.find((c) => c.category === "tourism")
+            ? `Tourism factors avg ${ex.byCategory.find((c) => c.category === "tourism")!.avgImpactPct.toFixed(0)}% impact.`
+            : "Monitor conventions and visitor traffic.",
           severity: "LOW",
+          category: "GENERAL",
+        });
+      }
+      if (ex.weatherForecast.length > 0) {
+        const rainy = ex.weatherForecast.filter((f) => f.isRainy).length;
+        insights.push({
+          title: "Upcoming weather forecast",
+          description: `${rainy} rainy day(s) in next 7 days via ${ex.weatherSource}${ex.weatherGeo ? ` (${ex.weatherGeo})` : ""}. Staff delivery and adjust inventory.`,
+          severity: rainy > 2 ? "MEDIUM" : "LOW",
+          category: "GENERAL",
+        });
+      }
+      for (const cov of h.categoryCoverage.filter((c) => c.learned || c.tracked)) {
+        const pattern = h.learnedPatterns.find((p) => p.category === cov.category);
+        insights.push({
+          title: `${cov.label} impact`,
+          description: pattern
+            ? pattern.insight
+            : cov.avgImpactPct != null
+              ? `Tracked ${cov.label.toLowerCase()} avg ${cov.avgImpactPct >= 0 ? "+" : ""}${cov.avgImpactPct.toFixed(0)}% impact.`
+              : `${cov.label} data is being collected.`,
+          severity: pattern?.confidence === "high" ? "MEDIUM" : "LOW",
           category: "GENERAL",
         });
       }
@@ -617,7 +682,7 @@ export async function generateSectionInsights(
       messages: [
         {
           role: "system",
-          content: `You are a restaurant analytics expert analyzing the "${SECTION_LABELS[section]}" section. Answer the section's key questions using only the provided data. Return JSON with an insights array (3-5 items). Each insight: title, description, category (string), severity (LOW|MEDIUM|HIGH|CRITICAL). Be specific with numbers. Include actionable recommendations.${section === "food" ? " For food & inventory you MUST include dedicated insights that answer: (1) Where is product disappearing? — use highlights.productDisappearing, wasteByReason, wasteCost, spoilageCost; (2) Which items are driving food cost increases? — use highlights.costIncreaseDrivers and topCostDrivers; (3) Are recipes being followed? — use highlights.recipeCompliance and recipeCosts. Also reference critical metrics: food cost %, theoretical vs actual variance, inventory turnover, days on hand." : ""}${section === "labor" ? " For labor you MUST include dedicated insights that answer: (1) Are we overstaffed or understaffed? — use highlights.staffingStatus and highlights.staffingReason; (2) Which shifts are inefficient? — use highlights.inefficientShifts and byShift; (3) Which employees produce the best results? — use highlights.topPerformers and byEmployee. Also reference critical metrics: labor %, sales per labor hour, guests per labor hour, overtime %, labor variance." : ""}${section === "menu" ? " For menu engineering you MUST include dedicated insights that answer: (1) What should we promote? — use highlights.promoteItems (stars and puzzles); (2) What should we reprice? — use highlights.repriceItems (plowhorses); (3) What should we remove? — use highlights.removeItems (dogs). Reference item sales volume, contribution margin, popularity %, recipe cost, and menu mix. Classify items as stars, plowhorses, puzzles, or dogs." : ""}${section === "marketing" ? " For marketing & guest acquisition you MUST include dedicated insights that answer: (1) Is marketing actually generating sales? — use highlights.salesGenerating; (2) Which channels bring profitable customers? — use highlights.profitableChannels and campaigns. Reference marketing spend, CAC, ROAS, LTV, repeat visit rate, coupon usage, email, social, website, and Google Business metrics." : ""}${section === "customer" ? " For guest experience you MUST include dedicated insights that answer: (1) What is hurting guest satisfaction? — use highlights.satisfactionHurts, complaintCategories, sentiment; (2) Which locations or shifts create complaints? — use highlights.complaintHotspots and complaintsByDaypart. Monitor Google and OpenTable reviews. Reference star ratings, survey results, resolution times, and guest sentiment." : ""}${section === "operations" ? " For operations you MUST include dedicated insights that answer: (1) Where are bottlenecks? — use highlights.bottlenecks, ticketTimesByDaypart, ticketTimesByHour; (2) Are long ticket times hurting sales? — use highlights.ticketTimeImpact. Reference ticket times, kitchen production times, order accuracy, voids, discounts, comps, and refunds." : ""}${section === "purchasing" ? " For purchasing answer: (1) Which suppliers are increasing costs? — highlights.costIncreaseSuppliers; (2) Are we paying market rates? — highlights.marketRateStatus." : ""}${section === "forecasting" ? " For forecasting answer: (1) How much staff do I need next Friday? — highlights.staffNeededNextFriday; (2) How much inventory should I order tomorrow? — highlights.inventoryOrderTomorrow." : ""}${section === "profitability" ? " For profitability answer: (1) Where is profit leaking? — highlights.profitLeaks; (2) Which items, hours, and channels drive margin? — highlights.marginDrivers." : ""}${section === "external" ? " For external factors answer: (1) How does weather affect sales? — highlights.weatherImpact; (2) Which local events boost traffic? — highlights.topEvents." : ""}`,
+          content: `You are a restaurant analytics expert analyzing the "${SECTION_LABELS[section]}" section. Answer the section's key questions using only the provided data. Return JSON with an insights array (3-5 items). Each insight: title, description, category (string), severity (LOW|MEDIUM|HIGH|CRITICAL). Be specific with numbers. Include actionable recommendations.${section === "food" ? " For food & inventory you MUST include dedicated insights that answer: (1) Where is product disappearing? — use highlights.productDisappearing, wasteByReason, wasteCost, spoilageCost; (2) Which items are driving food cost increases? — use highlights.costIncreaseDrivers and topCostDrivers; (3) Are recipes being followed? — use highlights.recipeCompliance and recipeCosts. Also reference critical metrics: food cost %, theoretical vs actual variance, inventory turnover, days on hand." : ""}${section === "labor" ? " For labor you MUST include dedicated insights that answer: (1) Are we overstaffed or understaffed? — use highlights.staffingStatus and highlights.staffingReason; (2) Which shifts are inefficient? — use highlights.inefficientShifts and byShift; (3) Which employees produce the best results? — use highlights.topPerformers and byEmployee. Also reference critical metrics: labor %, sales per labor hour, guests per labor hour, overtime %, labor variance." : ""}${section === "menu" ? " For menu engineering you MUST include dedicated insights that answer: (1) What should we promote? — use highlights.promoteItems (stars and puzzles); (2) What should we reprice? — use highlights.repriceItems (plowhorses); (3) What should we remove? — use highlights.removeItems (dogs). Reference item sales volume, contribution margin, popularity %, recipe cost, and menu mix. Classify items as stars, plowhorses, puzzles, or dogs." : ""}${section === "marketing" ? " For marketing & guest acquisition you MUST include dedicated insights that answer: (1) Is marketing actually generating sales? — use highlights.salesGenerating; (2) Which channels bring profitable customers? — use highlights.profitableChannels and campaigns. Reference marketing spend, CAC, ROAS, LTV, repeat visit rate, coupon usage, email, social, website, and Google Business metrics." : ""}${section === "customer" ? " For guest experience you MUST include dedicated insights that answer: (1) What is hurting guest satisfaction? — use highlights.satisfactionHurts, complaintCategories, sentiment; (2) Which locations or shifts create complaints? — use highlights.complaintHotspots and complaintsByDaypart. Monitor Google and OpenTable reviews. Reference star ratings, survey results, resolution times, and guest sentiment." : ""}${section === "operations" ? " For operations you MUST include dedicated insights that answer: (1) Where are bottlenecks? — use highlights.bottlenecks, ticketTimesByDaypart, ticketTimesByHour; (2) Are long ticket times hurting sales? — use highlights.ticketTimeImpact. Reference ticket times, kitchen production times, order accuracy, voids, discounts, comps, and refunds." : ""}${section === "purchasing" ? " For purchasing answer: (1) Which suppliers are increasing costs? — highlights.costIncreaseSuppliers; (2) Are we paying market rates? — highlights.marketRateStatus." : ""}${section === "forecasting" ? " For forecasting & planning you MUST include dedicated insights that answer: (1) How much staff do I need next Friday? — highlights.staffNeededNextFriday and laborHoursForecast7d; (2) How much of every item should I order tomorrow? — highlights.inventoryOrderTomorrow (list ALL items with order quantity and on-hand). Also reference salesForecast7d (sales), laborHoursForecast7d (labor needs), inventoryOrderTomorrow (inventory needs for every SKU), cateringDemandForecast7d and highlights.cateringDemandNext7d (catering demand), and seasonalTrends / highlights.seasonalTrend (seasonal trends)." : ""}${section === "profitability" ? " For the Profitability Dashboard (most important) you MUST answer: (1) Where is profit leaking? — highlights.profitLeaks; (2) Which menu items, hours, days, and channels drive profit? — byMenuItem, byHour, byDay, byChannel, highlights.topProfitItem/Hour/Day/Channel; (3) Which employees, shifts, and campaigns are most profitable? — byEmployee, byShift, byCampaign, byDeliveryProvider, highlights.topProfitEmployee/topCampaign/lowestProfitShift. Reference ALL profit dimensions: byMenuItem, byCategory, byEmployee, byShift, byDaypart, byHour, byDay, byLocation, byChannel, byDeliveryProvider, byCampaign." : ""}${section === "external" ? " For external factors (often ignored but critical) you MUST answer ALL THREE key questions and cover ALL SIX categories (weather, event, holiday, sports, tourism, school). (1) How does weather affect sales and delivery? — highlights.weatherImpact, learnedPatterns for weather, weatherForecast; example: rainy days increase delivery ~25%. (2) Which local events, holidays, and sports games boost traffic? — highlights.topEvents, byCategory, categoryCoverage; example: concert nights +40%. (3) What patterns has the system learned automatically? — learnedPatterns with confidence and sampleSize. Reference tourismLevel, schoolScheduleNote, categoryCoverage, and weatherSource/weatherGeo." : ""}`,
         },
         {
           role: "user",

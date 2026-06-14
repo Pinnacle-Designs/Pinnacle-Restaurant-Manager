@@ -147,6 +147,9 @@ export async function seedAnalyticsSampleData(locationId: string) {
       { locationId, date: new Date(now - 3 * 86400000), factorType: "weather", description: "Rainy day — delivery +25%", impactPct: 25 },
       { locationId, date: new Date(now - 7 * 86400000), factorType: "event", description: "Concert at arena nearby", impactPct: 40 },
       { locationId, date: new Date(now - 14 * 86400000), factorType: "holiday", description: "Local festival weekend", impactPct: 18 },
+      { locationId, date: new Date(now - 10 * 86400000), factorType: "sports", description: "Home game at stadium — pre/post crowds", impactPct: 35 },
+      { locationId, date: new Date(now - 5 * 86400000), factorType: "tourism", description: "Convention center conference week", impactPct: 22 },
+      { locationId, date: new Date(now - 21 * 86400000), factorType: "school", description: "University graduation weekend", impactPct: -12 },
     ],
   });
 

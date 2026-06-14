@@ -1,11 +1,22 @@
 import { prisma } from "@/lib/prisma";
+import { geocodeLocation } from "@/lib/external/geocode";
+import { fetchWeatherForecast } from "@/lib/external/weather";
+import {
+  buildCategoryCoverage,
+  buildPatternSummaries,
+  learnExternalPatterns,
+  normalizeFactorCategory,
+} from "@/lib/external/pattern-learning";
+import { syncWeatherForecasts } from "@/lib/external/sync-weather";
 import type {
   AnalyticsPayload,
   AnalyticsInsight,
   Daypart,
   OperationsHighlights,
   ExternalFactorsHighlights,
+  ExternalFactorCategory,
   ForecastingHighlights,
+  WeatherForecastDay,
   ProfitabilityHighlights,
   PurchasingHighlights,
   CustomerExperienceHighlights,
@@ -75,6 +86,32 @@ function orderNetAmount(o: {
   return o.totalAmount - o.discountAmount - o.compAmount - o.voidAmount;
 }
 
+function estimateOrderProfit(
+  netOrder: number,
+  orderFoodCost: number,
+  laborCost: number,
+  netSales: number
+) {
+  const laborRate = netSales > 0 ? laborCost / netSales : 0.25;
+  return netOrder - orderFoodCost - netOrder * laborRate;
+}
+
+function formatDeliveryProvider(channel: string) {
+  const key = channel.toLowerCase();
+  if (/doordash/i.test(key)) return "DoorDash";
+  if (/grubhub/i.test(key)) return "Grubhub";
+  if (/uber|ubereats/i.test(key)) return "Uber Eats";
+  if (/postmates/i.test(key)) return "Postmates";
+  if (/seamless/i.test(key)) return "Seamless";
+  if (/caviar/i.test(key)) return "Caviar";
+  if (/delivery/i.test(key)) return "In-house Delivery";
+  return channel.charAt(0).toUpperCase() + channel.slice(1);
+}
+
+function isDeliveryChannel(channel: string) {
+  return /delivery|doordash|grubhub|uber|postmates|seamless|caviar/i.test(channel);
+}
+
 function portionCostFromItem(item: {
   costPerUnit: number;
   portionSize: number | null;
@@ -124,8 +161,14 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
   const yesterdayEnd = new Date(yesterdayStart);
   yesterdayEnd.setDate(yesterdayEnd.getDate() + 1);
 
+  const location = await prisma.location.findUnique({ where: { id: locationId } });
+  if (location) {
+    await syncWeatherForecasts(locationId, location).catch((err) => {
+      console.warn("Weather sync skipped:", err);
+    });
+  }
+
   const [
-    location,
     orders,
     menuItems,
     inventory,
@@ -142,7 +185,6 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
     websiteConnection,
     socialPosts,
   ] = await Promise.all([
-    prisma.location.findUnique({ where: { id: locationId } }),
     prisma.order.findMany({
       where: { locationId, createdAt: { gte: periodStart } },
       include: { items: { include: { menuItem: true } }, table: true },
@@ -193,7 +235,7 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
     (s, sh) => s + shiftHours(sh.startTime, sh.endTime) * sh.staffMember.hourlyRate,
     0
   );
-  const weeksInPeriod = PERIOD_DAYS / 7;
+  const weeksInPeriod = Math.max(PERIOD_DAYS / 7, 1);
   const weeklyOtThreshold = 40;
   const overtimeHours = staff.reduce((sum, s) => {
     const memberHours = shifts
@@ -253,6 +295,16 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
   const itemSales: Record<string, { name: string; sales: number; quantity: number }> = {};
   const categorySales: Record<string, { sales: number; quantity: number }> = {};
   const dayProfit: Record<string, number> = {};
+  const daySalesMap: Record<string, number> = {};
+  const hourProfitMap: Record<number, number> = {};
+  const daypartProfitMap: Record<Daypart, number> = {
+    breakfast: 0,
+    lunch: 0,
+    dinner: 0,
+    late: 0,
+  };
+  const categoryProfitMap: Record<string, number> = {};
+  const channelProfitMap: Record<string, number> = {};
 
   for (const o of paidOrders) {
     const hour = o.createdAt.getHours();
@@ -270,12 +322,17 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
       (s, i) => s + (i.menuItem.recipeCost || i.menuItem.price * 0.28) * i.quantity,
       0
     );
+    const orderProfit = estimateOrderProfit(netOrder, orderFoodCost, laborCost, netSales);
     channelMap[ch].sales += netOrder;
     channelMap[ch].profit += netOrder - orderFoodCost;
     channelMap[ch].orders += 1;
+    channelProfitMap[ch] = (channelProfitMap[ch] ?? 0) + orderProfit;
 
     const dk = dateKey(o.createdAt);
-    dayProfit[dk] = (dayProfit[dk] ?? 0) + o.totalAmount - orderFoodCost - o.totalAmount * 0.25;
+    dayProfit[dk] = (dayProfit[dk] ?? 0) + orderProfit;
+    daySalesMap[dk] = (daySalesMap[dk] ?? 0) + netOrder;
+    hourProfitMap[hour] = (hourProfitMap[hour] ?? 0) + orderProfit;
+    daypartProfitMap[dp] += orderProfit;
 
     for (const item of o.items) {
       const key = item.menuItemId;
@@ -289,8 +346,14 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
       if (!categorySales[cat]) categorySales[cat] = { sales: 0, quantity: 0 };
       categorySales[cat].sales += item.price * item.quantity;
       categorySales[cat].quantity += item.quantity;
+
+      const itemProfit =
+        (item.price - (item.menuItem.recipeCost || item.menuItem.price * 0.28)) * item.quantity;
+      categoryProfitMap[cat] = (categoryProfitMap[cat] ?? 0) + itemProfit;
     }
   }
+
+  const learnedPatterns = learnExternalPatterns(paidOrders, externalFactors);
 
   const totalItemsSold = Object.values(itemSales).reduce((s, i) => s + i.quantity, 0);
   const itemsBase: Omit<MenuEngineeringItem, "quadrant">[] = menuItems.map((m) => {
@@ -634,17 +697,56 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
     revenuePerSqFt,
   });
 
+  const DOW_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const salesByDow = Array(7).fill(0) as number[];
+  const cateringSalesByDow = Array(7).fill(0) as number[];
+  const cateringOrdersByDow = Array(7).fill(0) as number[];
+
+  for (const o of paidOrders) {
+    const dow = o.createdAt.getDay();
+    const net = orderNetAmount(o);
+    salesByDow[dow] += net;
+    if ((o.channel || "dine-in") === "catering") {
+      cateringSalesByDow[dow] += net;
+      cateringOrdersByDow[dow] += 1;
+    }
+  }
+
+  const avgSalesByDow = salesByDow.map((s) => s / weeksInPeriod);
+  const avgCateringSalesByDow = cateringSalesByDow.map((s) => s / weeksInPeriod);
+  const avgCateringOrdersByDow = cateringOrdersByDow.map((o) => o / weeksInPeriod);
   const avgDailySales = netSales / PERIOD_DAYS;
+
+  const deliveryPatternEarly = learnedPatterns.find((p) => p.category === "weather" && p.metric === "delivery");
+  const eventPatternBoost =
+    learnedPatterns.find((p) => (p.category === "event" || p.category === "holiday" || p.category === "sports") && p.impactPct > 0)
+      ?.impactPct ?? (externalFactors.length > 0 ? 3 : 0);
+
   const salesForecast7d = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(now);
     d.setDate(d.getDate() + i + 1);
-    return { date: dateKey(d), predicted: avgDailySales * (1 + (i % 2 === 0 ? 0.05 : -0.02)) };
+    const dow = d.getDay();
+    const base = avgSalesByDow[dow] || avgDailySales;
+    const externalBoost = 1 + eventPatternBoost / 100 / 4;
+    const rainBoost =
+      deliveryPatternEarly && deliveryPatternEarly.impactPct > 0 ? 1 + deliveryPatternEarly.impactPct / 100 / 10 : 1;
+    return { date: dateKey(d), predicted: base * externalBoost * rainBoost };
   });
 
   const laborHoursForecast7d = salesForecast7d.map((f) => ({
     date: f.date,
     hours: f.predicted > 0 ? f.predicted / (revenuePerLaborHour || 100) : scheduledHours / 7,
   }));
+
+  const cateringDemandForecast7d = salesForecast7d.map((f) => {
+    const d = new Date(`${f.date}T12:00:00`);
+    const dow = d.getDay();
+    return {
+      date: f.date,
+      predictedOrders: Math.max(0, Math.round(avgCateringOrdersByDow[dow] || 0)),
+      predictedSales: avgCateringSalesByDow[dow] || 0,
+    };
+  });
 
   const inventoryRecommendations = inventory
     .filter((i) => i.quantity <= i.minQuantity * 1.5)
@@ -653,6 +755,34 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
       suggestedOrder: Math.max(i.minQuantity * 2 - i.quantity, i.minQuantity),
       unit: i.unit,
     }));
+
+  const weekdayAvg =
+    [1, 2, 3, 4, 5].reduce((s, d) => s + avgSalesByDow[d], 0) / 5;
+  const weekendAvg = (avgSalesByDow[0] + avgSalesByDow[6]) / 2;
+  const weekendLiftPct = weekdayAvg > 0 ? ((weekendAvg - weekdayAvg) / weekdayAvg) * 100 : 0;
+  const peakDow = avgSalesByDow.indexOf(Math.max(...avgSalesByDow));
+  const seasonalTrends = [
+    {
+      label: "Weekend vs weekday",
+      insight:
+        weekendLiftPct > 5
+          ? `Weekend sales average ${weekendLiftPct.toFixed(0)}% higher than weekdays — staff and prep up Fri–Sun.`
+          : weekendLiftPct < -5
+            ? `Weekdays outperform weekends by ${Math.abs(weekendLiftPct).toFixed(0)}% — lunch and catering drive volume.`
+            : "Weekend and weekday sales are balanced — maintain consistent staffing.",
+      impactPct: weekendLiftPct,
+    },
+    {
+      label: "Peak day pattern",
+      insight: `${DOW_NAMES[peakDow]} is the strongest sales day historically ($${avgSalesByDow[peakDow].toFixed(0)} avg).`,
+      impactPct: weekdayAvg > 0 ? ((avgSalesByDow[peakDow] - weekdayAvg) / weekdayAvg) * 100 : 0,
+    },
+  ];
+  const seasonalNote =
+    externalFactors[0]?.description ??
+    (weekendLiftPct > 10
+      ? "Weekend demand runs above weekday baseline — plan extra labor and inventory."
+      : "Monitor weekend and weather-driven demand shifts.");
 
   const byMenuItemSorted = Object.values(itemSales).sort((a, b) => b.sales - a.sales);
   const byHourSorted = Object.entries(hourMap)
@@ -1358,18 +1488,181 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
   const nextFridayKey = dateKey(nextFriday);
   const fridaySalesForecast = salesForecast7d.find((f) => f.date === nextFridayKey);
   const fridayLaborForecast = laborHoursForecast7d.find((f) => f.date === nextFridayKey);
+
+  const tomorrowForecast = salesForecast7d[0];
+  const tomorrowSales = tomorrowForecast?.predicted ?? avgDailySales;
+  const tomorrowDate =
+    tomorrowForecast?.date ??
+    dateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+  const tomorrowSalesRatio = avgDailySales > 0 ? tomorrowSales / avgDailySales : 1;
+
+  const inventoryOrderTomorrow = inventory
+    .map((i) => {
+      const targetStock = Math.max(
+        i.minQuantity * 1.5,
+        Math.ceil(i.minQuantity * tomorrowSalesRatio * 1.2)
+      );
+      const quantity = Math.max(0, Math.ceil(targetStock - i.quantity));
+      return {
+        name: i.name,
+        quantity,
+        unit: i.unit,
+        onHand: i.quantity,
+      };
+    })
+    .sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name));
+
+  const totalCateringForecast = cateringDemandForecast7d.reduce((s, d) => s + d.predictedSales, 0);
+  const totalCateringOrders = cateringDemandForecast7d.reduce((s, d) => s + d.predictedOrders, 0);
+  const cateringHist = channelMap["catering"];
+  const cateringWeeklyBaseline = ((cateringHist?.sales ?? 0) / weeksInPeriod) * 7;
+  const cateringTrend: ForecastingHighlights["cateringDemandNext7d"]["trend"] =
+    totalCateringForecast > cateringWeeklyBaseline * 1.05
+      ? "up"
+      : totalCateringForecast < cateringWeeklyBaseline * 0.95
+        ? "down"
+        : "stable";
+
   const forecastingHighlights: ForecastingHighlights = {
     staffNeededNextFriday: {
       hours: fridayLaborForecast?.hours ?? scheduledHours / 7,
       predictedSales: fridaySalesForecast?.predicted ?? netSales / 7,
       date: nextFridayKey,
     },
-    inventoryOrderTomorrow: inventoryRecommendations.slice(0, 5).map((i) => ({
-      name: i.name,
-      quantity: i.suggestedOrder,
-      unit: i.unit,
-    })),
+    inventoryOrderDate: tomorrowDate,
+    inventoryOrderTomorrow,
+    cateringDemandNext7d: {
+      orders: Math.round(totalCateringOrders),
+      sales: totalCateringForecast,
+      trend: cateringTrend,
+    },
+    seasonalTrend: {
+      pattern: seasonalTrends[0]?.label ?? "Historical patterns",
+      insight: seasonalTrends[0]?.insight ?? seasonalNote,
+      peakDay: DOW_NAMES[peakDow] ?? "",
+      liftPct: weekendLiftPct,
+    },
   };
+
+  const grossProfit = netSales - actualFoodCost;
+
+  const byMenuItemProfit = menuEngineeringItems
+    .map((m) => ({
+      name: m.name,
+      profit: m.contribution,
+      marginPct: m.marginPct,
+      sales: m.price * m.quantitySold,
+    }))
+    .sort((a, b) => b.profit - a.profit);
+
+  const byCategoryProfit = Object.entries(categorySales)
+    .map(([category, v]) => ({
+      category,
+      profit: categoryProfitMap[category] ?? 0,
+      sales: v.sales,
+      marginPct: v.sales > 0 ? ((categoryProfitMap[category] ?? 0) / v.sales) * 100 : 0,
+    }))
+    .sort((a, b) => b.profit - a.profit);
+
+  const byEmployeeProfit = byEmployee
+    .map((e) => {
+      const profit = scheduledHours > 0 ? profitEstimate * (e.scheduledHours / scheduledHours) : 0;
+      return {
+        name: e.name,
+        role: e.role,
+        profit,
+        sales: e.salesAttributed,
+        marginPct: e.salesAttributed > 0 ? (profit / e.salesAttributed) * 100 : 0,
+      };
+    })
+    .sort((a, b) => b.profit - a.profit);
+
+  const byShiftProfit = (["breakfast", "lunch", "dinner", "late"] as Daypart[]).map((shift) => ({
+    shift,
+    sales: daypartMap[shift].sales,
+    laborCost: shiftLaborByDaypart[shift].laborCost,
+    profit: daypartProfitMap[shift],
+    marginPct:
+      daypartMap[shift].sales > 0 ? (daypartProfitMap[shift] / daypartMap[shift].sales) * 100 : 0,
+  }));
+
+  const byDaypartProfit = byShiftProfit.map((s) => ({
+    daypart: s.shift,
+    profit: s.profit,
+    sales: s.sales,
+    marginPct: s.marginPct,
+  }));
+
+  const byHourProfit = Object.entries(hourProfitMap)
+    .map(([hour, profit]) => {
+      const h = Number(hour);
+      const sales = hourMap[h]?.sales ?? 0;
+      return {
+        hour: h,
+        label: formatHourLabel(h),
+        profit,
+        sales,
+        orders: hourMap[h]?.orders ?? 0,
+      };
+    })
+    .sort((a, b) => a.hour - b.hour);
+
+  const byDayProfit = Object.entries(dayProfit)
+    .map(([date, profit]) => ({
+      date,
+      profit,
+      sales: daySalesMap[date] ?? 0,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-14);
+
+  const byChannelProfit = Object.entries(channelProfitMap)
+    .map(([channel, profit]) => {
+      const sales = channelMap[channel]?.sales ?? 0;
+      return {
+        channel,
+        profit,
+        sales,
+        marginPct: sales > 0 ? (profit / sales) * 100 : 0,
+      };
+    })
+    .sort((a, b) => b.profit - a.profit);
+
+  const byDeliveryProviderProfit = Object.entries(channelProfitMap)
+    .filter(([channel]) => isDeliveryChannel(channel))
+    .map(([channel, profit]) => {
+      const sales = channelMap[channel]?.sales ?? 0;
+      const orders = channelMap[channel]?.orders ?? 0;
+      return {
+        provider: formatDeliveryProvider(channel),
+        profit,
+        sales,
+        orders,
+        marginPct: sales > 0 ? (profit / sales) * 100 : 0,
+      };
+    })
+    .sort((a, b) => b.profit - a.profit);
+
+  const byCampaignProfit = campaigns
+    .map((c) => ({
+      name: c.name,
+      channel: c.channel,
+      spend: c.spend,
+      revenue: c.revenueAttributed,
+      profit: c.revenueAttributed - c.spend,
+      roiPct: c.spend > 0 ? ((c.revenueAttributed - c.spend) / c.spend) * 100 : 0,
+    }))
+    .sort((a, b) => b.profit - a.profit);
+
+  const byLocationProfit = [
+    {
+      locationId,
+      name: location?.name ?? "This location",
+      profit: profitEstimate,
+      sales: netSales,
+      marginPct: netSales > 0 ? (profitEstimate / netSales) * 100 : 0,
+    },
+  ];
 
   const profitLeaks: ProfitabilityHighlights["profitLeaks"] = [];
   if (totalVoids > 0) {
@@ -1392,45 +1685,170 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
   }
 
   const marginDrivers: ProfitabilityHighlights["marginDrivers"] = [
-    ...menuEngineeringItems
-      .sort((a, b) => b.contribution - a.contribution)
-      .slice(0, 2)
-      .map((m) => ({ name: m.name, type: "item" as const, profit: m.contribution })),
-    ...Object.entries(channelMap)
-      .sort((a, b) => b[1].profit - a[1].profit)
-      .slice(0, 2)
-      .map(([channel, v]) => ({ name: channel, type: "channel" as const, profit: v.profit })),
-    ...( ["breakfast", "lunch", "dinner", "late"] as const)
-      .map((dp) => ({ name: dp, type: "daypart" as const, profit: daypartMap[dp].sales * 0.3 }))
+    ...byMenuItemProfit.slice(0, 2).map((m) => ({ name: m.name, type: "item" as const, profit: m.profit })),
+    ...byCategoryProfit.slice(0, 1).map((c) => ({ name: c.category, type: "category" as const, profit: c.profit })),
+    ...byEmployeeProfit.slice(0, 1).map((e) => ({ name: e.name, type: "employee" as const, profit: e.profit })),
+    ...byShiftProfit.slice(0, 1).map((s) => ({ name: s.shift, type: "shift" as const, profit: s.profit })),
+    ...byDaypartProfit.slice(0, 1).map((d) => ({ name: d.daypart, type: "daypart" as const, profit: d.profit })),
+    ...byHourProfit
       .sort((a, b) => b.profit - a.profit)
-      .slice(0, 1),
-  ];
+      .slice(0, 1)
+      .map((h) => ({ name: h.label, type: "hour" as const, profit: h.profit })),
+    ...byDayProfit
+      .sort((a, b) => b.profit - a.profit)
+      .slice(0, 1)
+      .map((d) => ({ name: d.date, type: "day" as const, profit: d.profit })),
+    ...byChannelProfit.slice(0, 1).map((c) => ({ name: c.channel, type: "channel" as const, profit: c.profit })),
+    ...byLocationProfit.slice(0, 1).map((l) => ({ name: l.name, type: "location" as const, profit: l.profit })),
+    ...byDeliveryProviderProfit.slice(0, 1).map((d) => ({ name: d.provider, type: "delivery" as const, profit: d.profit })),
+    ...byCampaignProfit.slice(0, 1).map((c) => ({ name: c.name, type: "campaign" as const, profit: c.profit })),
+  ].sort((a, b) => b.profit - a.profit);
+
+  const topProfitItem = byMenuItemProfit[0] ?? null;
+  const topProfitHourEntry = [...byHourProfit].sort((a, b) => b.profit - a.profit)[0];
+  const topProfitHour = topProfitHourEntry
+    ? { hour: topProfitHourEntry.hour, label: topProfitHourEntry.label, profit: topProfitHourEntry.profit }
+    : null;
+  const topProfitDayEntry = [...byDayProfit].sort((a, b) => b.profit - a.profit)[0];
+  const topProfitDay = topProfitDayEntry ? { date: topProfitDayEntry.date, profit: topProfitDayEntry.profit } : null;
+  const topProfitEmployee = byEmployeeProfit[0]
+    ? { name: byEmployeeProfit[0].name, profit: byEmployeeProfit[0].profit }
+    : null;
+  const topProfitChannel = byChannelProfit[0]
+    ? { channel: byChannelProfit[0].channel, profit: byChannelProfit[0].profit }
+    : null;
+  const topCampaign = byCampaignProfit[0]
+    ? { name: byCampaignProfit[0].name, profit: byCampaignProfit[0].profit }
+    : null;
+  const lowestProfitShiftEntry = [...byShiftProfit].sort((a, b) => a.profit - b.profit)[0];
+  const lowestProfitShift = lowestProfitShiftEntry
+    ? { shift: lowestProfitShiftEntry.shift, profit: lowestProfitShiftEntry.profit }
+    : null;
 
   const profitabilityHighlights: ProfitabilityHighlights = {
     profitLeaks: profitLeaks.slice(0, 5),
     marginDrivers,
+    topProfitItem,
+    topProfitHour,
+    topProfitDay,
+    topProfitEmployee,
+    topProfitChannel,
+    topCampaign,
+    lowestProfitShift,
   };
 
   const weatherFactors = externalFactors.filter((f) =>
-    /weather|rain|snow|heat/i.test(`${f.factorType} ${f.description}`)
+    /weather|rain|snow|heat|forecast/i.test(`${f.factorType} ${f.description}`)
   );
-  const eventFactors = externalFactors.filter((f) =>
-    /event|festival|concert|holiday|game/i.test(`${f.factorType} ${f.description}`)
+  const eventFactors = externalFactors.filter((f) => {
+    const cat = normalizeFactorCategory(f.factorType, f.description);
+    return cat === "event" || cat === "holiday" || cat === "sports";
+  });
+  const tourismFactors = externalFactors.filter(
+    (f) => normalizeFactorCategory(f.factorType, f.description) === "tourism"
   );
+  const schoolFactors = externalFactors.filter(
+    (f) => normalizeFactorCategory(f.factorType, f.description) === "school"
+  );
+
+  const patternSummaries = buildPatternSummaries(learnedPatterns);
+  const deliveryPattern = learnedPatterns.find((p) => p.category === "weather" && p.metric === "delivery");
+
+  let weatherForecast: WeatherForecastDay[] = [];
+  let weatherSource = "";
+  let weatherGeo: string | null = null;
+  if (location) {
+    const geo = await geocodeLocation(location.address, location.name);
+    if (geo) {
+      weatherGeo = geo.label;
+      try {
+        const w = await fetchWeatherForecast(geo.lat, geo.lon);
+        weatherForecast = w.forecasts;
+        weatherSource = w.source;
+      } catch {
+        weatherSource = "unavailable";
+      }
+    }
+  }
+
+  const externalByCategoryMap = new Map<string, { count: number; totalImpact: number }>();
+  for (const f of externalFactors) {
+    const cat = normalizeFactorCategory(f.factorType, f.description);
+    const cur = externalByCategoryMap.get(cat) ?? { count: 0, totalImpact: 0 };
+    cur.count += 1;
+    cur.totalImpact += f.impactPct;
+    externalByCategoryMap.set(cat, cur);
+  }
+  const externalByCategory = [...externalByCategoryMap.entries()].map(([category, v]) => ({
+    category: category as ExternalFactorCategory,
+    count: v.count,
+    avgImpactPct: v.count > 0 ? v.totalImpact / v.count : 0,
+  }));
+
+  const tourismLevel: ExternalFactorsHighlights["tourismLevel"] =
+    tourismFactors.length >= 2
+      ? "high"
+      : tourismFactors.length === 1
+        ? "moderate"
+        : learnedPatterns.some((p) => p.category === "tourism" && p.impactPct > 10)
+          ? "moderate"
+          : null;
+
+  const schoolScheduleNote =
+    schoolFactors.length > 0
+      ? schoolFactors
+          .slice(0, 2)
+          .map((f) => f.description)
+          .join("; ")
+      : learnedPatterns.find((p) => p.category === "school")?.insight ?? null;
+
+  const categoryCoverage = buildCategoryCoverage(
+    externalByCategory,
+    learnedPatterns,
+    weatherForecast.length > 0
+  );
+
   const externalHighlights: ExternalFactorsHighlights = {
     weatherImpact:
-      weatherFactors.length > 0
+      weatherFactors.length > 0 || deliveryPattern
         ? {
             avgImpactPct:
-              weatherFactors.reduce((s, f) => s + f.impactPct, 0) / weatherFactors.length,
-            insight: `Weather events avg ${(weatherFactors.reduce((s, f) => s + f.impactPct, 0) / weatherFactors.length).toFixed(0)}% sales impact.`,
+              deliveryPattern?.impactPct ??
+              (weatherFactors.length > 0
+                ? weatherFactors.reduce((s, f) => s + f.impactPct, 0) / weatherFactors.length
+                : 0),
+            insight:
+              deliveryPattern?.insight ??
+              (weatherFactors.length > 0
+                ? `Weather events avg ${(weatherFactors.reduce((s, f) => s + f.impactPct, 0) / weatherFactors.length).toFixed(0)}% impact on operations.`
+                : "Connect weather to learn rain/delivery patterns."),
+            deliveryShiftPct: deliveryPattern?.impactPct ?? null,
           }
         : null,
     topEvents: eventFactors
       .sort((a, b) => b.impactPct - a.impactPct)
-      .slice(0, 4)
-      .map((f) => ({ description: f.description, impactPct: f.impactPct })),
+      .slice(0, 6)
+      .map((f) => ({
+        description: f.description,
+        impactPct: f.impactPct,
+        category: normalizeFactorCategory(f.factorType, f.description),
+      })),
+    learnedPatterns,
+    upcomingForecast: weatherForecast,
+    tourismLevel,
+    schoolScheduleNote,
+    categoryCoverage,
   };
+
+  const mergedAiInsights: AnalyticsInsight[] = [
+    ...aiInsights,
+    ...learnedPatterns.slice(0, 3).map((p) => ({
+      title: `External: ${p.pattern}`,
+      description: `${p.insight} (${p.confidence} confidence, n=${p.sampleSize})`,
+      severity: (p.confidence === "high" ? "MEDIUM" : "LOW") as AnalyticsInsight["severity"],
+      category: "GENERAL" as const,
+    })),
+  ].slice(0, 15);
 
   const payload: AnalyticsPayload = {
     generatedAt: now.toISOString(),
@@ -1674,61 +2092,59 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
       salesForecast7d,
       laborHoursForecast7d,
       inventoryRecommendations,
-      seasonalNote: externalFactors[0]?.description ?? "Monitor weekend and weather-driven demand shifts.",
+      cateringDemandForecast7d,
+      seasonalTrends,
+      seasonalNote,
       highlights: forecastingHighlights,
       questions: [
         "How much staff do I need next Friday?",
-        "How much inventory should I order tomorrow?",
+        "How much of every item should I order tomorrow?",
       ],
     },
     profitability: {
-      grossProfit: netSales - actualFoodCost,
+      grossProfit,
       netProfitEstimate: profitEstimate,
       profitMarginPct: netSales > 0 ? (profitEstimate / netSales) * 100 : 0,
-      byMenuItem: menuEngineeringItems
-        .map((m) => ({
-          name: m.name,
-          profit: m.contribution,
-          marginPct: m.marginPct,
-        }))
-        .slice(0, 12),
-      byCategory: Object.entries(categorySales).map(([category, v]) => ({
-        category,
-        profit: v.sales * 0.35,
-      })),
-      byDaypart: (["breakfast", "lunch", "dinner", "late"] as Daypart[]).map((dp) => ({
-        daypart: dp,
-        profit: daypartMap[dp].sales * 0.3,
-      })),
-      byChannel: Object.entries(channelMap).map(([channel, v]) => ({
-        channel,
-        profit: v.profit,
-      })),
-      byDay: Object.entries(dayProfit)
-        .map(([date, profit]) => ({ date, profit }))
-        .sort((a, b) => a.date.localeCompare(b.date))
-        .slice(-14),
+      byMenuItem: byMenuItemProfit.slice(0, 15),
+      byCategory: byCategoryProfit,
+      byEmployee: byEmployeeProfit,
+      byShift: byShiftProfit,
+      byDaypart: byDaypartProfit,
+      byHour: byHourProfit,
+      byDay: byDayProfit,
+      byLocation: byLocationProfit,
+      byChannel: byChannelProfit,
+      byDeliveryProvider: byDeliveryProviderProfit,
+      byCampaign: byCampaignProfit,
       highlights: profitabilityHighlights,
       questions: [
         "Where is profit leaking?",
-        "Which items, hours, and channels drive margin?",
+        "Which menu items, hours, days, and channels drive profit?",
+        "Which employees, shifts, and campaigns are most profitable?",
       ],
     },
     externalFactors: {
       factors: externalFactors.map((f) => ({
         date: f.date.toISOString(),
         factorType: f.factorType,
+        category: normalizeFactorCategory(f.factorType, f.description),
         description: f.description,
         impactPct: f.impactPct,
       })),
-      patterns: buildExternalPatterns(externalFactors),
+      patterns: patternSummaries,
+      learnedPatterns,
+      byCategory: externalByCategory,
+      weatherForecast,
+      weatherSource,
+      weatherGeo,
       highlights: externalHighlights,
       questions: [
-        "How does weather affect sales?",
-        "Which local events boost traffic?",
+        "How does weather affect sales and delivery?",
+        "Which local events, holidays, and sports games boost traffic?",
+        "What patterns has the system learned automatically?",
       ],
     },
-    aiInsights,
+    aiInsights: mergedAiInsights,
     coverage: {
       sections: [
         { id: "sales", label: "Sales", covered: paidOrders.length > 0 },
@@ -1741,41 +2157,13 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
         { id: "purchasing", label: "Purchasing", covered: vendorInvoices.length > 0 },
         { id: "forecasting", label: "Forecasting", covered: paidOrders.length >= 7 },
         { id: "profitability", label: "Profitability", covered: netSales > 0 },
-        { id: "external", label: "External Factors", covered: externalFactors.length > 0 },
+        { id: "external", label: "External Factors", covered: externalFactors.length > 0 || weatherForecast.length > 0 || learnedPatterns.length > 0 },
         { id: "executive", label: "Executive Dashboard", covered: true },
       ],
     },
   };
 
   return payload;
-}
-
-function buildExternalPatterns(
-  factors: Array<{ factorType: string; description: string; impactPct: number }>
-) {
-  const patterns: Array<{ pattern: string; insight: string }> = [];
-  const weather = factors.filter((f) => /weather|rain/i.test(f.factorType + f.description));
-  if (weather.length > 0) {
-    const avg = weather.reduce((s, f) => s + f.impactPct, 0) / weather.length;
-    patterns.push({
-      pattern: "Weather",
-      insight: `Rainy days correlate with ~${avg.toFixed(0)}% delivery shift`,
-    });
-  }
-  const events = factors.filter((f) => /event|concert|game|holiday/i.test(f.factorType + f.description));
-  if (events.length > 0) {
-    patterns.push({
-      pattern: "Local events",
-      insight: "Event nights show elevated sales — staff up accordingly",
-    });
-  }
-  if (patterns.length === 0) {
-    patterns.push({
-      pattern: "Data collection",
-      insight: "Add weather and event factors to improve demand forecasting",
-    });
-  }
-  return patterns;
 }
 
 function generateAnalyticsInsights(ctx: {
@@ -2055,9 +2443,17 @@ export function buildAnalyticsSnapshotForAI(payload: AnalyticsPayload) {
       profitMarginPct: payload.profitability.profitMarginPct,
       highlights: payload.profitability.highlights,
       keyQuestions: payload.profitability.questions,
-      byChannel: payload.profitability.byChannel,
+      byMenuItem: payload.profitability.byMenuItem.slice(0, 10),
+      byCategory: payload.profitability.byCategory.slice(0, 8),
+      byEmployee: payload.profitability.byEmployee.slice(0, 8),
+      byShift: payload.profitability.byShift,
       byDaypart: payload.profitability.byDaypart,
-      byMenuItem: payload.profitability.byMenuItem.slice(0, 8),
+      byHour: payload.profitability.byHour.slice(0, 12),
+      byDay: payload.profitability.byDay.slice(-7),
+      byLocation: payload.profitability.byLocation,
+      byChannel: payload.profitability.byChannel,
+      byDeliveryProvider: payload.profitability.byDeliveryProvider,
+      byCampaign: payload.profitability.byCampaign.slice(0, 8),
     },
     purchasing: {
       totalPurchases: payload.purchasing.totalPurchases,
@@ -2069,15 +2465,24 @@ export function buildAnalyticsSnapshotForAI(payload: AnalyticsPayload) {
     forecasting: {
       salesForecast7d: payload.forecasting.salesForecast7d,
       laborHoursForecast7d: payload.forecasting.laborHoursForecast7d,
+      cateringDemandForecast7d: payload.forecasting.cateringDemandForecast7d,
+      seasonalTrends: payload.forecasting.seasonalTrends,
       highlights: payload.forecasting.highlights,
       keyQuestions: payload.forecasting.questions,
       seasonalNote: payload.forecasting.seasonalNote,
+      inventoryRecommendations: payload.forecasting.inventoryRecommendations.slice(0, 8),
     },
     externalFactors: {
       highlights: payload.externalFactors.highlights,
       keyQuestions: payload.externalFactors.questions,
-      factors: payload.externalFactors.factors.slice(0, 8),
+      factors: payload.externalFactors.factors.slice(0, 12),
       patterns: payload.externalFactors.patterns,
+      learnedPatterns: payload.externalFactors.learnedPatterns,
+      byCategory: payload.externalFactors.byCategory,
+      categoryCoverage: payload.externalFactors.highlights.categoryCoverage,
+      weatherForecast: payload.externalFactors.weatherForecast,
+      weatherSource: payload.externalFactors.weatherSource,
+      weatherGeo: payload.externalFactors.weatherGeo,
     },
     executive: {
       yesterday: payload.executive.yesterday,
