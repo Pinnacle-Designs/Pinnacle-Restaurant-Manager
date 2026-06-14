@@ -129,7 +129,7 @@ export function DemoPage() {
           )}
           <iframe
             key={`${activeStop.path}-${iframeKey}`}
-            src={embedLaunchUrl(activeStop.path)}
+            src={embedLaunchUrl(activeStop.path, "full")}
             title={`Pinnacle demo — ${activeStop.label}`}
             className="h-[calc(100vh-8rem)] w-full flex-1 bg-white lg:h-[calc(100vh-7rem)]"
             onLoad={(e) => {
@@ -142,7 +142,10 @@ export function DemoPage() {
                   path !== "/embed" &&
                   path !== "/api/embed/launch" &&
                   path !== "/login" &&
-                  (search.includes("embed=1") || path === "/dashboard")
+                  (search.includes("embed=full") ||
+                    search.includes("embed=mobile") ||
+                    search.includes("embed=1") ||
+                    path === "/dashboard")
                 ) {
                   readyRef.current = true;
                   setIframeLoading(false);

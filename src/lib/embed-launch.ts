@@ -8,7 +8,7 @@ import {
 } from "@/lib/auth";
 import { seedDemoUsers } from "@/lib/demo-users";
 import { LOCATION_COOKIE_NAME } from "@/lib/location";
-import { resolveEmbedPath } from "@/lib/embed-config";
+import { resolveEmbedPath, resolveEmbedChrome, embedQueryValue } from "@/lib/embed-config";
 import { applyEmbedAuthCookies } from "@/lib/embed-cookies";
 import { setupDemoWorkspace } from "@/lib/seed-data";
 import { EMBED_SESSION_PARAM } from "@/lib/embed-session-middleware";
@@ -46,11 +46,13 @@ export async function buildEmbedLaunchResponse(
   pathParam: string | null
 ): Promise<NextResponse> {
   const path = resolveEmbedPath(pathParam);
+  const chrome = resolveEmbedChrome(request.nextUrl.searchParams.get("chrome"));
+  const embedValue = embedQueryValue(chrome);
   const forEmbed = isCrossOriginEmbedRequest(request);
   const existing = await getSessionUserFromRequest(request);
 
   if (existing) {
-    const redirectUrl = new URL(`${path}?embed=1`, request.url);
+    const redirectUrl = new URL(`${path}?embed=${embedValue}`, request.url);
     const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
     const locationId =
       request.cookies.get(LOCATION_COOKIE_NAME)?.value ?? existing.locationId ?? "";
@@ -86,7 +88,7 @@ export async function buildEmbedLaunchResponse(
   }
 
   const token = await createSessionToken(user);
-  const redirectUrl = new URL(`${path}?embed=1`, request.url);
+  const redirectUrl = new URL(`${path}?embed=${embedValue}`, request.url);
 
   // Cross-origin iframes often block Set-Cookie on redirect; pass token once in URL.
   if (forEmbed) {

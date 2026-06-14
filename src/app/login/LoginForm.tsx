@@ -77,8 +77,9 @@ export default function LoginForm() {
     const from = searchParams.get("from") || "/dashboard";
     const embed = searchParams.get("embed");
     let target = from;
-    if (embed === "1" && !from.includes("embed=1")) {
-      target = from + (from.includes("?") ? "&" : "?") + "embed=1";
+    if (embed && (embed === "mobile" || embed === "full" || embed === "1") && !from.includes("embed=")) {
+      const embedValue = embed === "1" ? "mobile" : embed;
+      target = from + (from.includes("?") ? "&" : "?") + "embed=" + embedValue;
     }
     window.location.assign(target);
   };

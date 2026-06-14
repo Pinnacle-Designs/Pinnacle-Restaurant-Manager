@@ -17,7 +17,7 @@ export function EmbedBootstrap() {
     startedRef.current = true;
 
     const path = resolveEmbedPath(pathParam);
-    const target = `${path}?embed=1`;
+    const target = `${path}?embed=mobile`;
     const crossOrigin = needsCrossOriginEmbedCookies();
 
     // Cross-origin iframes (docs site, GitHub Pages) cannot rely on fetch + client redirect.

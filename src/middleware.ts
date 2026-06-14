@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { parseSessionToken, AUTH_COOKIE_NAME } from "@/lib/session";
 import { canAccessRoute } from "@/lib/permissions";
-import { getEmbedFrameAncestors, isEmbeddableRequest } from "@/lib/embed-config";
+import { getEmbedFrameAncestors, isEmbeddableRequest, isEmbeddableEmbedParam } from "@/lib/embed-config";
 import { applyEmbedSessionParam } from "@/lib/embed-session-middleware";
 
 const PUBLIC_PATHS = [
@@ -90,9 +90,9 @@ export async function middleware(request: NextRequest) {
     }
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", pathname);
-    if (embedParam === "1") {
-      loginUrl.searchParams.set("embed", "1");
-      loginUrl.searchParams.set("from", `${pathname}?embed=1`);
+    if (isEmbeddableEmbedParam(embedParam)) {
+      loginUrl.searchParams.set("embed", embedParam!);
+      loginUrl.searchParams.set("from", `${pathname}?embed=${embedParam}`);
     }
     return applyFramePolicy(request, NextResponse.redirect(loginUrl));
   }

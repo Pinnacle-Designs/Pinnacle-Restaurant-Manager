@@ -5,15 +5,29 @@ export const EMBEDDABLE_DEMO_PATHS = DEMO_TOUR_STOPS.map((stop) => stop.path);
 
 const EMBEDDABLE_DEMO_PATH_SET = new Set<string>(EMBEDDABLE_DEMO_PATHS);
 
+export type EmbedChrome = "mobile" | "full";
+
+export function resolveEmbedChrome(raw: string | null | undefined): EmbedChrome {
+  return raw === "full" ? "full" : "mobile";
+}
+
+export function embedQueryValue(chrome: EmbedChrome): string {
+  return chrome === "full" ? "full" : "mobile";
+}
+
+export function isEmbeddableEmbedParam(embedParam: string | null): boolean {
+  return embedParam === "1" || embedParam === "mobile" || embedParam === "full";
+}
+
 export function resolveEmbedPath(raw: string | null | undefined): string {
   const path = raw?.trim() || DEMO_TOUR_STOPS[0].path;
   return EMBEDDABLE_DEMO_PATH_SET.has(path) ? path : DEMO_TOUR_STOPS[0].path;
 }
 
 /** Server-side launch — seeds demo, sets session cookie, redirects to app route. */
-export function embedLaunchUrl(targetPath?: string): string {
+export function embedLaunchUrl(targetPath?: string, chrome: EmbedChrome = "mobile"): string {
   const path = resolveEmbedPath(targetPath ?? DEMO_TOUR_STOPS[0].path);
-  return `/api/embed/launch?path=${encodeURIComponent(path)}`;
+  return `/api/embed/launch?path=${encodeURIComponent(path)}&chrome=${chrome}`;
 }
 
 /** @deprecated Prefer embedLaunchUrl — kept for /embed page fallback */
@@ -55,5 +69,9 @@ export function getEmbedFrameAncestors(request?: { nextUrl: URL }): string {
 }
 
 export function isEmbeddableRequest(pathname: string, embedParam: string | null): boolean {
-  return pathname === "/embed" || pathname === "/api/embed/launch" || embedParam === "1";
+  return (
+    pathname === "/embed" ||
+    pathname === "/api/embed/launch" ||
+    isEmbeddableEmbedParam(embedParam)
+  );
 }

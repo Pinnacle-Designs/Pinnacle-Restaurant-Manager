@@ -7,6 +7,7 @@ import { MobileNav } from "@/components/layout/MobileNav";
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { NotificationProvider } from "@/components/notifications/NotificationProvider";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { isEmbeddableEmbedParam } from "@/lib/embed-config";
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -14,13 +15,19 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const isMarketing = pathname === "/" || pathname === "/demo";
   const isLogin = pathname === "/login";
   const isEmbedRoute = pathname === "/embed";
-  const isEmbed = searchParams.get("embed") === "1";
+  const embedParam = searchParams.get("embed");
+  const isEmbed = isEmbeddableEmbedParam(embedParam);
+  const isEmbedFull = embedParam === "full";
+  const isEmbedMobile = embedParam === "mobile" || embedParam === "1";
 
   if (isLogin || isMarketing || isEmbedRoute) {
     return <>{children}</>;
   }
 
-  const mainInner = isEmbed ? (
+  const showSidebar = !isEmbed || isEmbedFull;
+  const showMobileChrome = !isEmbed || isEmbedMobile || isEmbedFull;
+
+  const mainInner = isEmbedMobile ? (
     <main className="min-h-screen flex-1 overflow-auto">
       <div className="px-2 py-3 sm:px-4 sm:py-4">{children}</div>
     </main>
@@ -34,13 +41,13 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     <AuthProvider>
       <NotificationProvider>
         <div className="flex min-h-screen">
-          {!isEmbed && <Sidebar />}
-          <div className={`flex flex-1 flex-col ${isEmbed ? "" : "pb-20 md:pb-0"}`}>
-            {!isEmbed && <MobileHeader />}
+          {showSidebar && <Sidebar />}
+          <div className={`flex flex-1 flex-col ${showMobileChrome ? "pb-20 md:pb-0" : ""}`}>
+            {showMobileChrome && <MobileHeader />}
             {mainInner}
           </div>
         </div>
-        {!isEmbed && <MobileNav />}
+        {showMobileChrome && <MobileNav />}
       </NotificationProvider>
     </AuthProvider>
   );

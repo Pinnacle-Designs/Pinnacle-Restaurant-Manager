@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -22,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { MOBILE_PRIMARY_NAV_HREFS, NAV_ITEMS } from "@/lib/constants";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { filterNavForRole } from "@/lib/permissions";
+import { EmbedNavLink } from "@/components/layout/useEmbedHref";
 
 type NavItem = { href: string; label: string; icon: string };
 
@@ -69,7 +69,7 @@ function NavLink({
 }) {
   const Icon = ICONS[item.icon];
   return (
-    <Link
+    <EmbedNavLink
       href={item.href}
       onClick={onNavigate}
       className={cn(
@@ -79,7 +79,7 @@ function NavLink({
     >
       <Icon className="h-[1.125rem] w-[1.125rem] shrink-0" />
       <span className="max-w-full truncate">{label ?? item.label}</span>
-    </Link>
+    </EmbedNavLink>
   );
 }
 
@@ -142,7 +142,7 @@ export function MobileNav() {
                 const Icon = ICONS[item.icon];
                 const isActive = pathname === item.href;
                 return (
-                  <Link
+                  <EmbedNavLink
                     key={item.href}
                     href={item.href}
                     onClick={closeMenu}
@@ -155,7 +155,7 @@ export function MobileNav() {
                   >
                     <Icon className="h-5 w-5 shrink-0" />
                     <span>{item.label}</span>
-                  </Link>
+                  </EmbedNavLink>
                 );
               })}
             </div>

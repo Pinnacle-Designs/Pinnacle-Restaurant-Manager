@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { parseSessionToken, sessionCookieOptions } from "@/lib/session";
 import { LOCATION_COOKIE_NAME } from "@/lib/location-constants";
 
-/** Edge-safe — must not import Prisma, Node fs, or other server-only modules. */
+import { isEmbeddableEmbedParam } from "@/lib/embed-config";
 
 export const EMBED_SESSION_PARAM = "_st";
 
@@ -29,7 +29,7 @@ export async function applyEmbedSessionParam(
 ): Promise<NextResponse | null> {
   const embedParam = request.nextUrl.searchParams.get("embed");
   const rawToken = request.nextUrl.searchParams.get(EMBED_SESSION_PARAM);
-  if (embedParam !== "1" || !rawToken) return null;
+  if (!rawToken || !isEmbeddableEmbedParam(embedParam)) return null;
 
   const user = await parseSessionToken(rawToken);
   if (!user) return null;

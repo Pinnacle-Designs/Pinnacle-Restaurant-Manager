@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/constants";
 import { LocationSwitcher } from "@/components/layout/LocationSwitcher";
 import { Logo } from "@/components/layout/Logo";
+import { EmbedNavLink } from "@/components/layout/useEmbedHref";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { filterNavForRole, ROLE_LABELS, ROLE_COLORS } from "@/lib/permissions";
 import { Badge } from "@/components/ui";
@@ -54,7 +55,7 @@ export function Sidebar() {
           const Icon = ICONS[item.icon];
           const isActive = pathname === item.href;
           return (
-            <Link
+            <EmbedNavLink
               key={item.href}
               href={item.href}
               className={cn(
@@ -66,7 +67,7 @@ export function Sidebar() {
             >
               <Icon className="h-5 w-5" />
               {item.label}
-            </Link>
+            </EmbedNavLink>
           );
         })}
       </nav>

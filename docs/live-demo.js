@@ -148,8 +148,22 @@
     );
   }
 
-  function embedLaunchUrl(base, path) {
-    return base + "/api/embed/launch?path=" + encodeURIComponent(path || DEFAULT_PATH);
+  function embedLaunchUrl(base, path, chrome) {
+    var url =
+      base +
+      "/api/embed/launch?path=" +
+      encodeURIComponent(path || DEFAULT_PATH) +
+      "&chrome=" +
+      (chrome === "full" ? "full" : "mobile");
+    return url;
+  }
+
+  function iframeHasEmbed(search) {
+    return (
+      search.indexOf("embed=mobile") !== -1 ||
+      search.indexOf("embed=full") !== -1 ||
+      search.indexOf("embed=1") !== -1
+    );
   }
 
   function createLoadingOverlay(message, sub) {
@@ -190,13 +204,14 @@
     if (!container || !appUrl) return null;
 
     var path = (options && options.path) || DEFAULT_PATH;
+    var chrome = (options && options.chrome) || "mobile";
     var candidates = (options && options.candidates) || [appUrl];
     var candidateIndex = Math.max(
       0,
       candidates.indexOf(appUrl) >= 0 ? candidates.indexOf(appUrl) : 0
     );
     var activeUrl = candidates[candidateIndex] || appUrl;
-    var src = embedLaunchUrl(activeUrl, path);
+    var src = embedLaunchUrl(activeUrl, path, chrome);
     var ready = false;
     var failed = false;
     var iframeKey = 0;
@@ -224,7 +239,7 @@
       if (ready || candidateIndex >= candidates.length - 1) return;
       candidateIndex += 1;
       activeUrl = candidates[candidateIndex];
-      src = embedLaunchUrl(activeUrl, path);
+      src = embedLaunchUrl(activeUrl, path, chrome);
       loadCount = 0;
       iframeKey += 1;
       iframe.src = src + "&_=" + iframeKey;
@@ -276,7 +291,7 @@
           if (
             framePath !== "/embed" &&
             framePath !== "/api/embed/launch" &&
-            (search.indexOf("embed=1") !== -1 ||
+            (iframeHasEmbed(search) ||
               framePath === "/dashboard" ||
               framePath === "/login")
           ) {
@@ -370,6 +385,7 @@
       }
       heroController = mountLiveEmbed(heroSlot, appUrl, {
         path: DEFAULT_PATH,
+        chrome: "mobile",
         candidates: buildCandidates(appUrl),
       });
     }
@@ -397,6 +413,7 @@
       if (!modal || !modalBody || !appUrl) return;
       modalController = mountLiveEmbed(modalBody, appUrl, {
         path: DEFAULT_PATH,
+        chrome: "full",
         candidates: buildCandidates(appUrl),
       });
       modal.classList.add("open");
