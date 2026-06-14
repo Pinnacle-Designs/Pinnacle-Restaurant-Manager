@@ -3,16 +3,30 @@
  * Used by Vercel (`vercel-build`) so serverless functions can copy it to /tmp.
  */
 import { execSync } from "child_process";
+import { existsSync, unlinkSync } from "fs";
 import path from "path";
 
 async function main() {
   const dbFile = path.join(process.cwd(), "prisma", "deploy.sqlite");
-  process.env.DATABASE_URL = `file:${dbFile}`;
+  const dbUrl = `file:${dbFile}`;
 
-  execSync("npx prisma db push --skip-generate", {
-    stdio: "inherit",
-    env: process.env,
-  });
+  // Always start fresh — avoids non-interactive `db push` failures when the
+  // committed deploy.sqlite schema is behind prisma/schema.prisma (e.g. new columns).
+  for (const file of [dbFile, `${dbFile}-journal`, `${dbFile}-wal`, `${dbFile}-shm`]) {
+    if (existsSync(file)) unlinkSync(file);
+  }
+
+  process.env.DATABASE_URL = dbUrl;
+
+  try {
+    execSync("npx prisma db push --skip-generate --accept-data-loss", {
+      stdio: "inherit",
+      env: { ...process.env, DATABASE_URL: dbUrl },
+    });
+  } catch (err) {
+    console.error("[db] prisma db push failed. DATABASE_URL=", dbUrl);
+    throw err;
+  }
 
   const { seedDemoUsers } = await import("../src/lib/demo-users");
   const { setupDemoWorkspace } = await import("../src/lib/seed-data");
