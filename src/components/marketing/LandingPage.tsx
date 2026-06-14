@@ -353,10 +353,16 @@ export function LandingPage() {
               Launch live demo
             </button>
             <Link
+              href="/signup"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-8 py-4 text-lg font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Create your account
+            </Link>
+            <Link
               href="/login"
               className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-8 py-4 text-lg font-semibold text-slate-700 hover:bg-slate-50"
             >
-              Sign in to your account
+              Sign in
             </Link>
           </div>
         </div>

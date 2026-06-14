@@ -15,6 +15,12 @@ export const DEMO_USERS: Array<{
   { email: "host@pinnacle.com", password: "demo1234", name: "Taylor Host", role: "HOST" },
 ];
 
+const DEMO_EMAILS = new Set(DEMO_USERS.map((u) => u.email.toLowerCase()));
+
+export function isDemoAccountEmail(email: string): boolean {
+  return DEMO_EMAILS.has(email.trim().toLowerCase());
+}
+
 /** Create or reset all demo login accounts. */
 export async function seedDemoUsers() {
   for (const user of DEMO_USERS) {

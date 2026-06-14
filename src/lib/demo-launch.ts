@@ -22,6 +22,7 @@ export async function launchDemo(
     body: JSON.stringify({
       email,
       password,
+      demo: true,
       demoMode,
       embed: options?.embed === true,
     }),

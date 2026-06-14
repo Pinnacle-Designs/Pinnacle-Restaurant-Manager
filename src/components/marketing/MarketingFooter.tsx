@@ -38,7 +38,7 @@ export function MarketingFooter() {
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Demo
+                Account
               </p>
               <ul className="mt-3 space-y-2 text-sm text-slate-600">
                 <li>
@@ -47,10 +47,24 @@ export function MarketingFooter() {
                   </Link>
                 </li>
                 <li>
-                  <span className="text-slate-400">owner@pinnacle.com</span>
+                  <Link href="/signup" className="hover:text-orange-600">
+                    Create account
+                  </Link>
+                </li>
+              </ul>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Live demo
+              </p>
+              <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                <li>
+                  <Link href="/demo" className="hover:text-orange-600">
+                    Try interactive demo
+                  </Link>
                 </li>
                 <li>
-                  <span className="text-slate-400">Password: demo1234</span>
+                  <span className="text-slate-400">owner@pinnacle.com / demo1234</span>
                 </li>
               </ul>
             </div>
