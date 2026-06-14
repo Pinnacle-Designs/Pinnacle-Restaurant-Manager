@@ -22,6 +22,16 @@
     );
   }
 
+  /** Docs and app on the same deployment (e.g. Vercel /docs). */
+  function isDocsOnAppOrigin() {
+    if (location.pathname.indexOf("/docs") !== 0) return false;
+    var cfg = window.PINNACLE_CONFIG || {};
+    var configured = (cfg.appUrl || "").replace(/\/$/, "");
+    if (configured && location.origin === configured) return true;
+    if (!isLocalHost() && location.protocol.startsWith("http")) return true;
+    return false;
+  }
+
   function localDevHost() {
     return location.hostname === "127.0.0.1" ? "127.0.0.1" : "localhost";
   }
@@ -77,7 +87,7 @@
     var cfg = window.PINNACLE_CONFIG || {};
     var configured = (cfg.appUrl || "").replace(/\/$/, "");
 
-    if (isDocsOnNextApp()) {
+    if (isDocsOnNextApp() || isDocsOnAppOrigin()) {
       return Promise.resolve(location.origin);
     }
 
@@ -114,14 +124,20 @@
     var wrap = document.createElement("div");
     wrap.className = "hero-app-fallback";
     wrap.innerHTML =
-      "<h3>Connect the live app</h3>" +
+      "<h3>Demo could not start</h3>" +
       "<p>" +
       (message ||
         "Run <code>npm run dev</code>, then open <code>http://localhost:3000/docs</code> " +
           "(or set <code>appUrl</code> in <code>docs/config.js</code>).") +
       "</p>" +
-      '<button type="button" class="btn btn-primary hero-app-retry">Retry connection</button>';
+      '<button type="button" class="btn btn-primary hero-app-retry">Retry</button>';
     return wrap;
+  }
+
+  function showEmbedError(container, message) {
+    if (!container) return;
+    container.innerHTML = "";
+    container.appendChild(createFallback(message));
   }
 
   function mountLiveEmbed(container, appUrl, options) {
@@ -136,15 +152,26 @@
     var activeUrl = candidates[candidateIndex] || appUrl;
     var src = embedLaunchUrl(activeUrl, path);
     var ready = false;
+    var failed = false;
     var iframeKey = 0;
     var loadCount = 0;
     var rotateTimer = null;
+    var errorTimer = null;
 
     function markReady(loading) {
-      if (ready) return;
+      if (ready || failed) return;
       ready = true;
       if (rotateTimer) clearTimeout(rotateTimer);
+      if (errorTimer) clearTimeout(errorTimer);
       if (loading && loading.parentNode) loading.remove();
+    }
+
+    function markFailed(loading, message) {
+      if (ready || failed) return;
+      failed = true;
+      if (rotateTimer) clearTimeout(rotateTimer);
+      if (errorTimer) clearTimeout(errorTimer);
+      showEmbedError(container, message);
     }
 
     function tryNextCandidate(iframe, loading) {
@@ -166,6 +193,7 @@
     function render() {
       container.innerHTML = "";
       ready = false;
+      failed = false;
       loadCount = 0;
       if (rotateTimer) clearTimeout(rotateTimer);
 
@@ -182,12 +210,19 @@
       iframe.setAttribute("allow", "clipboard-write");
 
       iframe.addEventListener("load", function () {
-        if (ready) return;
+        if (ready || failed) return;
         loadCount += 1;
         try {
           var frameWin = iframe.contentWindow;
           var search = frameWin && frameWin.location ? frameWin.location.search : "";
           var framePath = frameWin && frameWin.location ? frameWin.location.pathname : "";
+          if (framePath === "/api/embed/launch" && loadCount >= 2) {
+            markFailed(
+              loading,
+              "The app server returned an error starting the demo. If this is production, redeploy after the latest database fix."
+            );
+            return;
+          }
           if (
             framePath !== "/embed" &&
             framePath !== "/api/embed/launch" &&
@@ -212,6 +247,15 @@
           if (!ready) tryNextCandidate(iframe, loading);
         }, 5000);
       }
+
+      errorTimer = setTimeout(function () {
+        if (!ready && !failed) {
+          markFailed(
+            loading,
+            "Timed out connecting to the live app. Run <code>npm run dev</code> and open <code>http://localhost:3000/docs</code> (or the port shown in the terminal)."
+          );
+        }
+      }, 20000);
 
       setTimeout(function () {
         markReady(loading);

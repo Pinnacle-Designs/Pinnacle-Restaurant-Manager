@@ -1,4 +1,7 @@
 import { PrismaClient } from "@prisma/client";
+import { ensureRuntimeDatabase } from "./ensure-runtime-db";
+
+ensureRuntimeDatabase();
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;

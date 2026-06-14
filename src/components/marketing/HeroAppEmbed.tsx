@@ -21,7 +21,18 @@ export function HeroAppEmbed({
 }: HeroAppEmbedProps) {
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [iframeKey, setIframeKey] = useState(0);
   const readyRef = useRef(false);
+  const loadCountRef = useRef(0);
+
+  const retryEmbed = useCallback(() => {
+    readyRef.current = false;
+    loadCountRef.current = 0;
+    setError(null);
+    setLoading(true);
+    setIframeKey((k) => k + 1);
+  }, []);
 
   const closeModal = useCallback(() => setExpanded(false), []);
 
@@ -38,9 +49,21 @@ export function HeroAppEmbed({
     };
   }, [expanded, closeModal]);
 
+  useEffect(() => {
+    if (!loading) return;
+    const timer = window.setTimeout(() => {
+      if (!readyRef.current) {
+        setError("Demo timed out starting. Try refreshing — if this persists, the server database may need a redeploy.");
+        setLoading(false);
+      }
+    }, 20000);
+    return () => window.clearTimeout(timer);
+  }, [loading, embedSrc]);
+
   const frame = (expandedView: boolean) => (
     <iframe
-      src={embedSrc}
+      key={expandedView ? `modal-${iframeKey}` : `hero-${iframeKey}`}
+      src={`${embedSrc}${embedSrc.includes("?") ? "&" : "?"}_=${iframeKey}`}
       title={title}
       className={cn(
         "w-full border-0 bg-white",
@@ -49,17 +72,26 @@ export function HeroAppEmbed({
       style={expandedView ? undefined : { height }}
       onLoad={(e) => {
         if (readyRef.current) return;
+        loadCountRef.current += 1;
         try {
           const frame = e.currentTarget.contentWindow;
           const search = frame?.location.search ?? "";
           const path = frame?.location.pathname ?? "";
+          if (path === "/api/embed/launch" && loadCountRef.current >= 2) {
+            setError("Could not start the demo. The server returned an error.");
+            setLoading(false);
+            return;
+          }
           if (path !== "/embed" && path !== "/api/embed/launch" && search.includes("embed=1")) {
             readyRef.current = true;
             setLoading(false);
+            setError(null);
           }
         } catch {
-          readyRef.current = true;
-          setLoading(false);
+          if (loadCountRef.current >= 2) {
+            readyRef.current = true;
+            setLoading(false);
+          }
         }
       }}
       allow="clipboard-write"
@@ -99,6 +131,21 @@ export function HeroAppEmbed({
             >
               <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
               <p className="mt-3 text-xs text-slate-400">Starting demo…</p>
+            </div>
+          )}
+          {error && !loading && (
+            <div
+              className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-slate-950/95 px-6 text-center"
+              style={{ height }}
+            >
+              <p className="text-sm text-slate-300">{error}</p>
+              <button
+                type="button"
+                onClick={retryEmbed}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-200 hover:bg-white/10"
+              >
+                Retry
+              </button>
             </div>
           )}
           {frame(false)}

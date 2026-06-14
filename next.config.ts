@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: {
+    "/*": ["./prisma/deploy.sqlite"],
+  },
   images: {
     remotePatterns: [],
     unoptimized: false,

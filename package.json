@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "db:deploy-seed": "tsx scripts/seed-deploy-db.ts",
+    "vercel-build": "npm run db:deploy-seed && next build",
     "start": "next start",
     "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
     "setup": "npm install && npm run db:push",
@@ -39,6 +41,7 @@
     "eslint-config-next": "^15.2.4",
     "prisma": "^6.5.0",
     "tailwindcss": "^4.1.3",
+    "tsx": "^4.22.4",
     "typescript": "^5.8.3"
   }
 }
