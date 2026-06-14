@@ -11,6 +11,7 @@ const LINKS = [
   { href: "#analytics", label: "Analytics" },
   { href: "#command-center", label: "AI" },
   { href: "/demo", label: "Live Demo" },
+  { href: "/docs/pricing.html", label: "Pricing" },
 ];
 
 interface MarketingNavProps {

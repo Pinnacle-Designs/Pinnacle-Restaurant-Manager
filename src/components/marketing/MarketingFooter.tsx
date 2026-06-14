@@ -30,6 +30,11 @@ export function MarketingFooter() {
                   </Link>
                 </li>
                 <li>
+                  <Link href="/docs/pricing.html" className="hover:text-orange-600">
+                    Pricing
+                  </Link>
+                </li>
+                <li>
                   <Link href="/#analytics" className="hover:text-orange-600">
                     Analytics
                   </Link>
