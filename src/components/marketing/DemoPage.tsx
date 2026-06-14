@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ArrowRight,
-  ExternalLink,
   Loader2,
   Maximize2,
   Radar,
@@ -12,35 +11,22 @@ import {
 } from "lucide-react";
 import { MarketingNav } from "./MarketingNav";
 import { DEMO_TOUR_STOPS } from "@/lib/marketing-content";
-import { launchDemo } from "@/lib/demo-launch";
+import { embedBootstrapUrl } from "@/lib/embed-config";
 import { cn } from "@/lib/utils";
 
 export function DemoPage() {
-  const [ready, setReady] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [iframeLoading, setIframeLoading] = useState(true);
   const [activeStop, setActiveStop] = useState<(typeof DEMO_TOUR_STOPS)[number]>(DEMO_TOUR_STOPS[0]);
   const [iframeKey, setIframeKey] = useState(0);
 
-  const initDemo = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await launchDemo();
-      setReady(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start demo");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void initDemo();
-  }, [initDemo]);
+  const reloadIframe = () => {
+    setIframeLoading(true);
+    setIframeKey((k) => k + 1);
+  };
 
   const selectStop = (stop: (typeof DEMO_TOUR_STOPS)[number]) => {
     setActiveStop(stop);
+    setIframeLoading(true);
     setIframeKey((k) => k + 1);
   };
 
@@ -55,18 +41,18 @@ export function DemoPage() {
             <div>
               <p className="text-sm font-semibold text-white">Live interactive demo</p>
               <p className="text-xs text-slate-400">
-                Logged in as owner · sample data loaded · click modules to explore
+                Demo session runs inside the frame · click modules to explore
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => void initDemo()}
-              disabled={loading}
+              onClick={reloadIframe}
+              disabled={iframeLoading}
               className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-300 hover:bg-white/5 disabled:opacity-50"
             >
-              <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+              <RefreshCw className={cn("h-3.5 w-3.5", iframeLoading && "animate-spin")} />
               Reset demo
             </button>
             <Link
@@ -94,13 +80,13 @@ export function DemoPage() {
                   key={stop.id}
                   type="button"
                   onClick={() => selectStop(stop)}
-                  disabled={!ready}
+                  disabled={iframeLoading}
                   className={cn(
                     "flex w-full flex-col rounded-lg px-3 py-2.5 text-left transition",
                     activeStop.id === stop.id
                       ? "bg-orange-500/20 text-orange-200 ring-1 ring-orange-500/40"
                       : "text-slate-300 hover:bg-white/5",
-                    !ready && "opacity-50"
+                    iframeLoading && "opacity-50"
                   )}
                 >
                   <span className="text-sm font-medium">{stop.label}</span>
@@ -115,7 +101,7 @@ export function DemoPage() {
               </p>
               <button
                 type="button"
-                disabled={!ready}
+                disabled={iframeLoading}
                 onClick={() => selectStop(DEMO_TOUR_STOPS.find((s) => s.id === "insights")!)}
                 className="mt-2 flex items-center gap-1 text-xs font-medium text-orange-400 hover:text-orange-300 disabled:opacity-50"
               >
@@ -129,36 +115,34 @@ export function DemoPage() {
           </div>
         </aside>
 
-        {/* Live app iframe */}
+        {/* Live app iframe — bootstraps demo session via /embed, then lands on ?embed=1 */}
         <div className="relative flex flex-1 flex-col">
-          {loading && (
+          {iframeLoading && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-950/90">
               <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
               <p className="mt-4 text-sm text-slate-300">Loading demo restaurant…</p>
               <p className="mt-1 text-xs text-slate-500">Seeding menu, staff, orders & analytics</p>
             </div>
           )}
-          {error && (
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-950 p-6 text-center">
-              <p className="text-red-400">{error}</p>
-              <Link
-                href="/login"
-                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white"
-              >
-                Sign in manually
-                <ExternalLink className="h-4 w-4" />
-              </Link>
-            </div>
-          )}
-          {ready && (
-            <iframe
-              key={`${activeStop.path}-${iframeKey}`}
-              src={activeStop.path}
-              title={`Pinnacle demo — ${activeStop.label}`}
-              className="h-[calc(100vh-8rem)] w-full flex-1 bg-white lg:h-[calc(100vh-7rem)]"
-              sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads"
-            />
-          )}
+          <iframe
+            key={`${activeStop.path}-${iframeKey}`}
+            src={embedBootstrapUrl(activeStop.path)}
+            title={`Pinnacle demo — ${activeStop.label}`}
+            className="h-[calc(100vh-8rem)] w-full flex-1 bg-white lg:h-[calc(100vh-7rem)]"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads"
+            onLoad={(e) => {
+              try {
+                const frame = e.currentTarget.contentWindow;
+                const search = frame?.location.search ?? "";
+                const path = frame?.location.pathname ?? "";
+                if (path !== "/embed" && search.includes("embed=1")) {
+                  setIframeLoading(false);
+                }
+              } catch {
+                setIframeLoading(false);
+              }
+            }}
+          />
         </div>
       </div>
     </div>

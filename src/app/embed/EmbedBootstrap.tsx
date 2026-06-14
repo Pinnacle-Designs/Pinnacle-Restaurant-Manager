@@ -4,20 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { launchDemo } from "@/lib/demo-launch";
-
-const ALLOWED_PATHS = new Set([
-  "/dashboard",
-  "/insights",
-  "/analytics",
-  "/orders",
-  "/inventory",
-  "/finances",
-  "/menu",
-  "/staff",
-  "/tables",
-  "/photos",
-  "/social",
-]);
+import { resolveEmbedPath } from "@/lib/embed-config";
 
 export function EmbedBootstrap() {
   const router = useRouter();
@@ -25,8 +12,7 @@ export function EmbedBootstrap() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const raw = searchParams.get("path") || "/dashboard";
-    const path = ALLOWED_PATHS.has(raw) ? raw : "/dashboard";
+    const path = resolveEmbedPath(searchParams.get("path"));
 
     launchDemo()
       .then(() => {

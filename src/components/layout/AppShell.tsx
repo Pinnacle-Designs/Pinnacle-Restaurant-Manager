@@ -34,7 +34,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     <AuthProvider>
       <NotificationProvider>
         <div className="flex min-h-screen">
-          <Sidebar />
+          {!isEmbed && <Sidebar />}
           <div className={`flex flex-1 flex-col ${isEmbed ? "" : "pb-20 md:pb-0"}`}>
             {!isEmbed && <MobileHeader />}
             {mainInner}

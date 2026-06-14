@@ -5,19 +5,6 @@ const nextConfig: NextConfig = {
     remotePatterns: [],
     unoptimized: false,
   },
-  async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: [
-          {
-            key: "Content-Security-Policy",
-            value: "frame-ancestors *",
-          },
-        ],
-      },
-    ];
-  },
 };
 
 export default nextConfig;

@@ -46,7 +46,18 @@ export function HeroAppEmbed({
         expandedView ? "h-full min-h-0 flex-1" : "rounded-b-2xl"
       )}
       style={expandedView ? undefined : { height }}
-      onLoad={() => setLoading(false)}
+      onLoad={(e) => {
+        try {
+          const frame = e.currentTarget.contentWindow;
+          const search = frame?.location.search ?? "";
+          const path = frame?.location.pathname ?? "";
+          if (path !== "/embed" && search.includes("embed=1")) {
+            setLoading(false);
+          }
+        } catch {
+          setLoading(false);
+        }
+      }}
       allow="clipboard-write"
     />
   );
