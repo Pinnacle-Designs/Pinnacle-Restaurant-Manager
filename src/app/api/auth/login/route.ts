@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
   const token = await createSessionToken(user);
   const demoMode: DemoMode = body.demoMode === "fresh" ? "fresh" : "seeded";
   const useDemoWorkspace = body.demoMode === "seeded" || body.demoMode === "fresh";
+  const forEmbed = body.embed === true;
 
   let workspace = null;
   let workspaceError: string | undefined;
@@ -46,13 +47,14 @@ export async function POST(request: NextRequest) {
     workspace,
     workspaceError,
   });
-  response.cookies.set(sessionCookieOptions(token));
+  response.cookies.set(sessionCookieOptions(token, forEmbed));
 
   if (workspace) {
     response.cookies.set(LOCATION_COOKIE_NAME, workspace.locationId, {
       path: "/",
       maxAge: 60 * 60 * 24 * 365,
-      sameSite: "lax",
+      sameSite: forEmbed ? "none" : "lax",
+      secure: process.env.NODE_ENV === "production" || forEmbed,
     });
   }
 

@@ -25,6 +25,7 @@ function applyFramePolicy(request: NextRequest, response: NextResponse): NextRes
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const embedParam = request.nextUrl.searchParams.get("embed");
 
   if (
     pathname.startsWith("/_next") ||
@@ -50,6 +51,9 @@ export async function middleware(request: NextRequest) {
     }
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", pathname);
+    if (embedParam === "1") {
+      loginUrl.searchParams.set("embed", "1");
+    }
     return applyFramePolicy(request, NextResponse.redirect(loginUrl));
   }
 

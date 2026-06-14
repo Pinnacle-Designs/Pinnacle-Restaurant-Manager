@@ -1,27 +1,37 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { launchDemo } from "@/lib/demo-launch";
-import { resolveEmbedPath } from "@/lib/embed-config";
+import { needsCrossOriginEmbedCookies, resolveEmbedPath } from "@/lib/embed-config";
 
 export function EmbedBootstrap() {
-  const router = useRouter();
   const searchParams = useSearchParams();
+  const pathParam = searchParams.get("path");
   const [error, setError] = useState<string | null>(null);
+  const startedRef = useRef(false);
 
   useEffect(() => {
-    const path = resolveEmbedPath(searchParams.get("path"));
+    if (startedRef.current) return;
+    startedRef.current = true;
 
-    launchDemo()
+    const path = resolveEmbedPath(pathParam);
+    const target = `${path}?embed=1`;
+    const crossOrigin = needsCrossOriginEmbedCookies();
+
+    launchDemo("owner@pinnacle.com", "demo1234", "seeded", {
+      embed: crossOrigin,
+    })
       .then(() => {
-        router.replace(`${path}?embed=1`);
+        // Hard navigation — avoids client-router loops re-running this bootstrap.
+        window.location.replace(target);
       })
       .catch((err) => {
+        startedRef.current = false;
         setError(err instanceof Error ? err.message : "Demo failed to load");
       });
-  }, [router, searchParams]);
+  }, [pathParam]);
 
   if (error) {
     return (

@@ -11,14 +11,20 @@ export async function ensureDemoUsers() {
 export async function launchDemo(
   email = "owner@pinnacle.com",
   password = "demo1234",
-  demoMode: DemoMode = "seeded"
+  demoMode: DemoMode = "seeded",
+  options?: { embed?: boolean }
 ) {
   await ensureDemoUsers();
   const res = await fetch("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ email, password, demoMode }),
+    body: JSON.stringify({
+      email,
+      password,
+      demoMode,
+      embed: options?.embed === true,
+    }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Demo login failed");

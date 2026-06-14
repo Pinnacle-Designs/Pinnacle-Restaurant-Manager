@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ArrowRight,
   Loader2,
@@ -18,13 +18,16 @@ export function DemoPage() {
   const [iframeLoading, setIframeLoading] = useState(true);
   const [activeStop, setActiveStop] = useState<(typeof DEMO_TOUR_STOPS)[number]>(DEMO_TOUR_STOPS[0]);
   const [iframeKey, setIframeKey] = useState(0);
+  const readyRef = useRef(false);
 
   const reloadIframe = () => {
+    readyRef.current = false;
     setIframeLoading(true);
     setIframeKey((k) => k + 1);
   };
 
   const selectStop = (stop: (typeof DEMO_TOUR_STOPS)[number]) => {
+    readyRef.current = false;
     setActiveStop(stop);
     setIframeLoading(true);
     setIframeKey((k) => k + 1);
@@ -131,14 +134,17 @@ export function DemoPage() {
             className="h-[calc(100vh-8rem)] w-full flex-1 bg-white lg:h-[calc(100vh-7rem)]"
             sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads"
             onLoad={(e) => {
+              if (readyRef.current) return;
               try {
                 const frame = e.currentTarget.contentWindow;
                 const search = frame?.location.search ?? "";
                 const path = frame?.location.pathname ?? "";
                 if (path !== "/embed" && search.includes("embed=1")) {
+                  readyRef.current = true;
                   setIframeLoading(false);
                 }
               } catch {
+                readyRef.current = true;
                 setIframeLoading(false);
               }
             }}

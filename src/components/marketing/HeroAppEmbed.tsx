@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Maximize2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +21,7 @@ export function HeroAppEmbed({
 }: HeroAppEmbedProps) {
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
+  const readyRef = useRef(false);
 
   const closeModal = useCallback(() => setExpanded(false), []);
 
@@ -47,14 +48,17 @@ export function HeroAppEmbed({
       )}
       style={expandedView ? undefined : { height }}
       onLoad={(e) => {
+        if (readyRef.current) return;
         try {
           const frame = e.currentTarget.contentWindow;
           const search = frame?.location.search ?? "";
           const path = frame?.location.pathname ?? "";
           if (path !== "/embed" && search.includes("embed=1")) {
+            readyRef.current = true;
             setLoading(false);
           }
         } catch {
+          readyRef.current = true;
           setLoading(false);
         }
       }}

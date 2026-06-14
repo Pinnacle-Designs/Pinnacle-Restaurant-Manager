@@ -15,8 +15,24 @@ export function embedBootstrapUrl(targetPath?: string): string {
   return `/embed?path=${encodeURIComponent(path)}`;
 }
 
+/** True when this page runs inside an iframe on a different origin (needs SameSite=None cookies). */
+export function needsCrossOriginEmbedCookies(): boolean {
+  if (typeof window === "undefined" || window.self === window.top) return false;
+  try {
+    return window.parent.location.origin !== window.location.origin;
+  } catch {
+    // Parent is cross-origin if we cannot read its location.
+    return true;
+  }
+}
+
 /** CSP `frame-ancestors` value for embeddable responses (`'self'` + optional env origins). */
 export function getEmbedFrameAncestors(): string {
+  // Local marketing previews (docs/index.html, Live Server, etc.) use a different origin.
+  if (process.env.NODE_ENV === "development") {
+    return "*";
+  }
+
   const parts = ["'self'"];
   const extra = process.env.EMBED_FRAME_ANCESTORS?.trim();
   if (extra) {
