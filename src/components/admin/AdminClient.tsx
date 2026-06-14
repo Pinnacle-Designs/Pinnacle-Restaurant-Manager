@@ -1,12 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Shield, Building2, Users } from "lucide-react";
+import { Shield, Building2, Users, Mail } from "lucide-react";
 import { PageHeader, Button, Badge } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { PlanId } from "@/lib/plans";
 
-type Tab = "locations" | "users";
+type Tab = "locations" | "users" | "partnerships";
+
+interface PitchInquiry {
+  id: string;
+  name: string;
+  email: string;
+  company: string | null;
+  interest: string;
+  message: string | null;
+  createdAt: string;
+}
 
 interface LocationRow {
   id: string;
@@ -37,22 +47,27 @@ export function AdminClient() {
   const [tab, setTab] = useState<Tab>("locations");
   const [locations, setLocations] = useState<LocationRow[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [inquiries, setInquiries] = useState<PitchInquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [locRes, userRes] = await Promise.all([
+      const [locRes, userRes, pitchRes] = await Promise.all([
         fetch("/api/admin/locations"),
         fetch("/api/admin/users"),
+        fetch("/api/admin/pitch-inquiries"),
       ]);
       const locJson = await locRes.json();
       const userJson = await userRes.json();
+      const pitchJson = await pitchRes.json();
       if (!locRes.ok) throw new Error(locJson.error);
       if (!userRes.ok) throw new Error(userJson.error);
+      if (!pitchRes.ok) throw new Error(pitchJson.error);
       setLocations(locJson.locations);
       setUsers(userJson.users);
+      setInquiries(pitchJson.inquiries);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Could not load admin data");
     } finally {
@@ -104,6 +119,7 @@ export function AdminClient() {
           [
             { id: "locations" as Tab, label: "Locations", icon: Building2 },
             { id: "users" as Tab, label: "Users", icon: Users },
+            { id: "partnerships" as Tab, label: "Pitch requests", icon: Mail },
           ] as const
         ).map((item) => {
           const Icon = item.icon;
@@ -187,7 +203,7 @@ export function AdminClient() {
             </tbody>
           </table>
         </div>
-      ) : (
+      ) : tab === "users" ? (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
           <table className="min-w-full text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
@@ -245,6 +261,46 @@ export function AdminClient() {
               ))}
             </tbody>
           </table>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <p className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            Private deck requests from the public investors page. Send <code className="rounded bg-slate-200 px-1">private/pitch-deck.html</code> manually after review.
+          </p>
+          {inquiries.length === 0 ? (
+            <p className="px-4 py-8 text-center text-sm text-slate-500">No requests yet.</p>
+          ) : (
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Contact</th>
+                  <th className="px-4 py-3 font-medium">Interest</th>
+                  <th className="px-4 py-3 font-medium">Message</th>
+                  <th className="px-4 py-3 font-medium">Received</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inquiries.map((row) => (
+                  <tr key={row.id} className="border-b border-slate-100">
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-slate-900">{row.name}</p>
+                      <p className="text-xs text-slate-500">
+                        <a href={`mailto:${row.email}`} className="text-orange-600 hover:underline">
+                          {row.email}
+                        </a>
+                      </p>
+                      {row.company && <p className="text-xs text-slate-500">{row.company}</p>}
+                    </td>
+                    <td className="px-4 py-3 capitalize text-slate-700">{row.interest}</td>
+                    <td className="max-w-xs px-4 py-3 text-slate-600">{row.message ?? "—"}</td>
+                    <td className="px-4 py-3 text-slate-500">
+                      {new Date(row.createdAt).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
     </div>

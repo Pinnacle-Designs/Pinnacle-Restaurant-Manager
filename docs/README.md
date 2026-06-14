@@ -1,18 +1,27 @@
 # Marketing site (`docs/`)
 
-Static landing page and pitch materials for Pinnacle Restaurant Manager.
+Static landing page and partnership materials for Pinnacle Restaurant Manager.
 
 ## Files
 
 | File | Description |
 |------|-------------|
 | `index.html` | Main site — live demo embed, features, pricing |
-| `pitch-deck.html` | Investor pitch deck — use **Print → Save as PDF** |
+| `pitch.html` | **Public** mini pitch + request form for the private deck |
+| `pitch-request.js` | Posts form to `{appUrl}/api/pitch-request` |
 | `pricing.html` | Redirects to `index.html#pricing` |
 | `config.js` | Set `PINNACLE_CONFIG.appUrl` to your deployed app |
 | `live-demo.js` | Embeds the real app via `/api/embed/launch` |
 | `styles.css` | Site styles |
 | `assets/` | Logo and screenshots |
+
+## Private pitch deck (not public)
+
+The full investor deck lives at **`private/pitch-deck.html`** in the repo root — it is **not** in `docs/` and is not linked from the marketing site.
+
+1. Review requests in **Platform admin → Pitch requests**
+2. Open `private/pitch-deck.html` locally → Print → Save as PDF
+3. Email the PDF to qualified contacts only
 
 ## Preview locally
 
@@ -22,7 +31,8 @@ Static landing page and pitch materials for Pinnacle Restaurant Manager.
 npm run dev
 ```
 
-Visit [http://localhost:3000/docs/](http://localhost:3000/docs/)
+- Site: [http://localhost:3000/docs/](http://localhost:3000/docs/)
+- Investors: [http://localhost:3000/docs/pitch.html](http://localhost:3000/docs/pitch.html)
 
 **Option B — Live Server / static**
 
@@ -34,14 +44,10 @@ window.PINNACLE_CONFIG = {
 };
 ```
 
+The pitch request form needs the Next.js app running so `/api/pitch-request` can receive submissions.
+
 ## GitHub Pages
 
-The repo includes `.nojekyll`. Deploy the `docs/` folder as the site root. Set `config.js` `appUrl` to your production Vercel URL so signup and demo links resolve correctly.
+Deploy the `docs/` folder as the site root. Set `config.js` `appUrl` to your production Vercel URL.
 
-## Pitch deck PDF
-
-1. Open `pitch-deck.html` in a browser (via `/docs/pitch-deck.html` or locally)
-2. Click **Download PDF** or use the browser print dialog
-3. Choose **Save as PDF**
-
-Update slide content in `pitch-deck.html` when pricing or positioning changes.
+Public page = marketing (`pitch.html`). Private deck = negotiation tool (`private/` — not deployed).

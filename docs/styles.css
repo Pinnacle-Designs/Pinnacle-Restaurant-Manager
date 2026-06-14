@@ -2979,3 +2979,160 @@ body.modal-open {
   color: var(--slate-600);
 }
 
+/* Investors / mini pitch page */
+.pitch-hero {
+  padding: 4.5rem 0 3.5rem;
+  background: linear-gradient(180deg, var(--slate-950) 0%, var(--slate-900) 100%);
+  color: #fff;
+}
+
+.pitch-hero h1 {
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 800;
+  line-height: 1.1;
+  max-width: 18ch;
+  margin-top: 0.75rem;
+}
+
+.pitch-lead {
+  margin-top: 1.25rem;
+  max-width: 42rem;
+  font-size: 1.125rem;
+  color: var(--slate-300);
+  line-height: 1.7;
+}
+
+.pitch-hero .btn { margin-top: 2rem; }
+
+.pitch-grid {
+  display: grid;
+  gap: 1.25rem;
+}
+
+@media (min-width: 768px) {
+  .pitch-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+.pitch-card {
+  background: var(--slate-100);
+  border-radius: 1rem;
+  padding: 1.5rem;
+}
+
+.pitch-card h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.pitch-card p { color: var(--slate-600); font-size: 0.9375rem; }
+
+.pitch-stats {
+  list-style: none;
+  display: grid;
+  gap: 1rem;
+  margin-top: 2rem;
+  text-align: center;
+}
+
+@media (min-width: 640px) {
+  .pitch-stats { grid-template-columns: repeat(4, 1fr); }
+}
+
+.pitch-stats li {
+  background: rgba(255,255,255,0.06);
+  border-radius: 0.75rem;
+  padding: 1.25rem 1rem;
+  color: var(--slate-200);
+  font-size: 0.9375rem;
+}
+
+.pitch-stats strong {
+  display: block;
+  font-size: 1.5rem;
+  color: #fff;
+  margin-bottom: 0.25rem;
+}
+
+.pitch-request-wrap {
+  display: grid;
+  gap: 2.5rem;
+  align-items: start;
+}
+
+@media (min-width: 960px) {
+  .pitch-request-wrap { grid-template-columns: 1fr 1fr; gap: 3rem; }
+}
+
+.pitch-request-copy h2 {
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 800;
+  line-height: 1.2;
+  margin-top: 0.5rem;
+}
+
+.pitch-request-lead {
+  margin-top: 1rem;
+  color: var(--slate-600);
+  font-size: 1.0625rem;
+  line-height: 1.7;
+}
+
+.pitch-request-list {
+  margin-top: 1.5rem;
+  padding-left: 1.25rem;
+  color: var(--slate-600);
+}
+
+.pitch-request-list li { margin: 0.5rem 0; }
+
+.pitch-form {
+  background: #fff;
+  border: 1px solid var(--slate-200);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+}
+
+.pitch-form-field { margin-bottom: 1rem; }
+
+.pitch-form-field label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--slate-700);
+  margin-bottom: 0.375rem;
+}
+
+.pitch-form-field input,
+.pitch-form-field select,
+.pitch-form-field textarea {
+  width: 100%;
+  border: 1px solid var(--slate-300);
+  border-radius: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  font: inherit;
+  color: var(--slate-900);
+  background: #fff;
+}
+
+.pitch-form-field textarea { resize: vertical; min-height: 6rem; }
+
+.pitch-form-note {
+  font-size: 0.75rem;
+  color: var(--slate-500);
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.pitch-form-submit { width: 100%; }
+
+.pitch-form-status {
+  margin-top: 1rem;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.pitch-form-status.is-success { color: #15803d; }
+.pitch-form-status.is-error { color: #dc2626; }
+

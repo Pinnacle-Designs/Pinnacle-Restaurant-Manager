@@ -45,11 +45,12 @@ Plans: **Starter** ($49), **Growth** ($149), **Pro** ($299) per location/month.
 
 Owners configure under **Account → Billing & autopay**. Setup guide: **Account → Payments & support**.
 
-## Marketing & pitch deck
+## Marketing & partners
 
 - In-app landing: `/`
 - Static site: `/docs/` (also `docs/index.html` for GitHub Pages)
-- Pitch deck: `docs/pitch-deck.html` — open and **Print → Save as PDF**
+- **Public investors page:** `docs/pitch.html` → `/docs/pitch.html`
+- **Private pitch deck:** `private/pitch-deck.html` (not deployed — send manually after request)
 
 ## Demo (development)
 

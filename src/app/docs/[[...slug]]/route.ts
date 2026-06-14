@@ -16,6 +16,7 @@ const MIME: Record<string, string> = {
 
 function resolveDocsPath(segments: string[] | undefined): string | null {
   const parts = segments?.length ? segments : ["index.html"];
+  if (parts[0] === "private") return null;
   const joined = path.normalize(path.join(...parts));
   if (joined.startsWith("..")) return null;
   const full = path.join(DOCS_ROOT, joined);

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Partner with Pinnacle Restaurant Manager — licensing, investment, and acquisition inquiries." />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Investors &amp; Partners — Pinnacle Restaurant Manager</title>
+  <link rel="icon" href="./assets/logo.png" type="image/png" />
+  <link rel="stylesheet" href="styles.css" />
+  <script>
+    (function () {
+      var path = location.pathname;
+      if (path.indexOf("/docs") === 0) {
+        window.PINNACLE_DOCS_BASE = "/docs/";
+        return;
+      }
+      if (location.hostname.endsWith(".github.io")) {
+        var segs = path.split("/").filter(Boolean);
+        if (segs.length && /\.[a-z0-9]+$/i.test(segs[segs.length - 1])) segs.pop();
+        window.PINNACLE_DOCS_BASE = segs.length ? "/" + segs.join("/") + "/" : "/";
+        return;
+      }
+      window.PINNACLE_DOCS_BASE = "./";
+    })();
+  </script>
+</head>
+<body>
+
+  <header class="nav">
+    <div class="container">
+      <div class="nav-inner">
+        <a href="./index.html" class="nav-logo-link"><img src="./assets/logo-nav.svg" alt="Pinnacle Restaurant Manager" class="nav-logo" width="200" height="40" /></a>
+        <nav class="nav-links" aria-label="Main">
+          <a href="./index.html#top">Live Demo</a>
+          <a href="./index.html#features">Features</a>
+          <a href="./index.html#pricing">Pricing</a>
+          <a href="./pitch.html" aria-current="page">Investors</a>
+        </nav>
+        <div class="nav-actions">
+          <a href="./index.html#top" class="btn btn-primary">Try live demo</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="pitch-hero">
+      <div class="container">
+        <p class="eyebrow">Partnership overview</p>
+        <h1>Built for operators. Ready for strategic partners.</h1>
+        <p class="pitch-lead">
+          Pinnacle is an AI-powered restaurant management platform — orders, inventory, staff,
+          12-tab analytics, and a command center that answers profit and ops questions from live data.
+        </p>
+        <a href="#request" class="btn btn-primary btn-lg">Request private pitch deck</a>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="pitch-grid">
+          <div class="pitch-card">
+            <h3>The problem</h3>
+            <p>Restaurants juggle POS, spreadsheets, and disconnected tools. Owners lose hours reconciling numbers instead of running the floor.</p>
+          </div>
+          <div class="pitch-card">
+            <h3>Our approach</h3>
+            <p>One workspace for daily operations and business intelligence — with Stripe billing, role-based access, and an embeddable live demo.</p>
+          </div>
+          <div class="pitch-card">
+            <h3>Why now</h3>
+            <p>Self-serve signup, guided onboarding, and production-ready payments position Pinnacle for independent restaurants and multi-location groups.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-dark">
+      <div class="container">
+        <div class="section-header">
+          <p class="eyebrow">At a glance</p>
+          <h2>SaaS per location · $49–$299/mo</h2>
+          <p>Starter, Growth, and Pro tiers. Enterprise and multi-location programs available on request.</p>
+        </div>
+        <ul class="pitch-stats">
+          <li><strong>12</strong> analytics modules</li>
+          <li><strong>350+</strong> AI questions</li>
+          <li><strong>5</strong> staff roles</li>
+          <li><strong>Stripe</strong> subscription + POS integrations</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section" id="request">
+      <div class="container pitch-request-wrap">
+        <div class="pitch-request-copy">
+          <p class="eyebrow">Private materials</p>
+          <h2>Interested in licensing, investing, or acquiring Pinnacle Restaurant Manager?</h2>
+          <p class="pitch-request-lead">
+            Request the private pitch deck. We review each inquiry personally and follow up when there is a fit.
+            The full deck is not published publicly — it is shared selectively as a negotiation tool.
+          </p>
+          <ul class="pitch-request-list">
+            <li>Financial model and roadmap (private deck)</li>
+            <li>Live product demo on request</li>
+            <li>Licensing, investment, and acquisition conversations</li>
+          </ul>
+        </div>
+
+        <form class="pitch-form" id="pitch-request-form" novalidate>
+          <div class="pitch-form-field">
+            <label for="pitch-name">Full name</label>
+            <input id="pitch-name" name="name" type="text" required autocomplete="name" />
+          </div>
+          <div class="pitch-form-field">
+            <label for="pitch-email">Work email</label>
+            <input id="pitch-email" name="email" type="email" required autocomplete="email" />
+          </div>
+          <div class="pitch-form-field">
+            <label for="pitch-company">Company / fund (optional)</label>
+            <input id="pitch-company" name="company" type="text" autocomplete="organization" />
+          </div>
+          <div class="pitch-form-field">
+            <label for="pitch-interest">I am interested in</label>
+            <select id="pitch-interest" name="interest" required>
+              <option value="">Select…</option>
+              <option value="licensing">Licensing the platform</option>
+              <option value="investing">Investing</option>
+              <option value="acquiring">Acquiring Pinnacle</option>
+              <option value="other">Other partnership</option>
+            </select>
+          </div>
+          <div class="pitch-form-field">
+            <label for="pitch-message">Message (optional)</label>
+            <textarea id="pitch-message" name="message" rows="4" placeholder="Brief context helps us respond faster."></textarea>
+          </div>
+          <p class="pitch-form-note">By submitting, you agree we may contact you about this inquiry. We do not share your details with third parties.</p>
+          <button type="submit" class="btn btn-primary btn-lg pitch-form-submit">Request private pitch deck</button>
+          <p class="pitch-form-status" id="pitch-form-status" hidden></p>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p class="footer-copy">© <span id="year"></span> Pinnacle Restaurant Manager · <a href="./index.html">Back to site</a></p>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById("year").textContent = String(new Date().getFullYear());
+    (function () {
+      var base = window.PINNACLE_DOCS_BASE || "./";
+      ["config.js", "pitch-request.js"].forEach(function (file) {
+        var s = document.createElement("script");
+        s.src = base.replace(/\/?$/, "/") + file;
+        document.body.appendChild(s);
+      });
+    })();
+  </script>
+</body>
+</html>

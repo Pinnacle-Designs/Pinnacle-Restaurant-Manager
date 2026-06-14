@@ -114,7 +114,9 @@ Static marketing site with live embedded demo.
 | File | Purpose |
 |------|---------|
 | `docs/index.html` | Landing page, pricing, features |
-| `docs/pitch-deck.html` | Print-friendly pitch deck (Save as PDF) |
+| `docs/pitch.html` | Public investors page + private deck request form |
+| `docs/pitch-request.js` | Submits requests to `/api/pitch-request` |
+| `private/pitch-deck.html` | **Private** full deck — not on public site |
 | `docs/config.js` | Set `PINNACLE_CONFIG.appUrl` to your deployed app |
 | `docs/live-demo.js` | Embeds live app demo |
 
@@ -137,6 +139,7 @@ Access: `/admin` (requires `PLATFORM_ADMIN_EMAILS` or `isPlatformAdmin`)
 - View all locations (plan, billing status, active)
 - Suspend/activate locations, override plan
 - View users, enable/disable accounts, grant platform admin
+- Review **Pitch requests** from the public investors page; send `private/pitch-deck.html` manually
 
 ## Project scripts
 
