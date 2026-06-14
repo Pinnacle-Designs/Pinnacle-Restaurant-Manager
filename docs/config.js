@@ -1,12 +1,9 @@
 /**
- * GitHub Pages marketing site — link to your deployed Pinnacle app here.
- * Examples:
- *   Local:  http://localhost:3000
- *   Vercel: https://pinnacle-restaurant.vercel.app
+ * Optional — only needed if you host the full Next.js app separately
+ * and want "Sign in" / "Full app" links on the marketing site.
  *
- * For GitHub Pages embeds, set EMBED_FRAME_ANCESTORS on the deployed app
- * to your Pages origin (e.g. https://youruser.github.io).
+ * Leave appUrl empty for a fully self-contained GitHub Pages demo.
  */
 window.PINNACLE_CONFIG = {
-  appUrl: "http://localhost:3000",
+  appUrl: "",
 };

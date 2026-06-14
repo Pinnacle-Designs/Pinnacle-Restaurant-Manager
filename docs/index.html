@@ -8,14 +8,11 @@
   <title>Pinnacle Restaurant Manager — AI-Powered Restaurant Operations</title>
   <link rel="icon" href="assets/logo.png" type="image/png" />
   <link rel="stylesheet" href="styles.css" />
-  <script src="config.js"></script>
 </head>
 <body>
 
   <div class="demo-banner">
-    <strong>Full app demo in the hero</strong> — requires the app at <code>config.js → appUrl</code> (e.g. <code>npm run dev</code>).
-    Same-origin preview: <a href="http://localhost:3000" style="color:#c2410c">localhost:3000</a>
-    <a href="#" data-app-link="/embed" style="margin-left:0.5rem;color:#c2410c">Open in new tab →</a>
+    <strong>Live demo in the hero</strong> — click modules, ask the Command Center, hit Expand for a larger view. No install required.
   </div>
 
   <!-- Navigation -->
@@ -30,7 +27,7 @@
           <a href="#command-center">AI</a>
         </nav>
         <div class="nav-actions">
-          <a href="#" class="btn btn-ghost" data-app-link="/login">Sign in</a>
+          <a href="#" class="btn btn-ghost" data-app-link="/login" hidden>Sign in</a>
           <a href="#top" class="btn btn-primary">Try live demo</a>
         </div>
         <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Open menu">☰</button>
@@ -40,7 +37,7 @@
         <a href="#features">Features</a>
         <a href="#analytics">Analytics</a>
         <a href="#command-center">AI</a>
-        <a href="#" data-app-link="/login">Sign in</a>
+        <a href="#" data-app-link="/login" hidden>Sign in</a>
         <a href="#top" class="btn btn-primary" style="text-align:center">Try live demo</a>
       </nav>
     </div>
@@ -64,9 +61,9 @@
             </p>
             <div class="hero-cta">
               <a href="#top" class="btn btn-primary btn-lg">⚡ Try live demo</a>
-              <a href="#" class="btn btn-outline-light btn-lg" data-app-link="/embed">Open in new tab →</a>
+              <a href="#features" class="btn btn-outline-light btn-lg">Explore features</a>
             </div>
-            <p class="hero-note">Full app in the window → owner@pinnacle.com / demo1234</p>
+            <p class="hero-note">Interactive demo — try Command Center, Dashboard, Analytics &amp; more in the window →</p>
           </div>
 
           <div class="hero-app-embed" id="hero-app-embed-wrap">
@@ -83,10 +80,6 @@
               </button>
             </div>
             <div class="hero-app-frame-wrap">
-              <div class="hero-embed-loader" id="hero-embed-loader">
-                <div class="hero-embed-spinner"></div>
-                <p>Starting demo…</p>
-              </div>
               <div id="hero-app-embed"></div>
             </div>
           </div>
@@ -275,10 +268,10 @@
     <section class="cta">
       <div class="container">
         <h2>Try the full app now</h2>
-        <p>Use the embedded demo in the hero, expand it, or open the app in a new tab with sample data loaded.</p>
+        <p>Use the embedded demo in the hero, expand it, and explore every module — works right on this page.</p>
         <div class="cta-actions">
           <a href="#top" class="btn btn-primary btn-xl">⚡ Live demo</a>
-          <a href="#" class="btn btn-outline-dark btn-xl" data-app-link="/embed">Open in new tab</a>
+          <a href="#features" class="btn btn-outline-dark btn-xl">See all features</a>
         </div>
       </div>
     </section>
@@ -302,11 +295,11 @@
             </ul>
           </div>
           <div class="footer-col">
-            <h4>Full app demo</h4>
+            <h4>Demo accounts</h4>
             <ul>
-              <li><a href="#" data-app-link="/login">Sign in</a></li>
               <li>owner@pinnacle.com</li>
               <li>Password: demo1234</li>
+              <li><a href="#" data-app-link="/embed" hidden>Full app (hosted)</a></li>
             </ul>
           </div>
           <div class="footer-col">
@@ -342,6 +335,6 @@
     </div>
   </div>
 
-  <script src="app-embed.js"></script>
+  <script src="live-demo.js"></script>
 </body>
 </html>
