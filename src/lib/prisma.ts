@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { ensureRuntimeDatabase } from "./ensure-runtime-db";
 
 ensureRuntimeDatabase();
@@ -19,7 +19,8 @@ function hasCurrentSchema(client: PrismaClient): boolean {
     "vendorPriceHistory" in client &&
     "inventoryWaste" in client &&
     "orderPayment" in client &&
-    "orderCheck" in client
+    "orderCheck" in client &&
+    "SubscriptionPlan" in Prisma
   );
 }
 

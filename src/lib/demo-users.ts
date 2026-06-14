@@ -103,14 +103,20 @@ export async function seedPlanDemoUsers() {
   const seeded = [];
 
   for (const demo of PLAN_DEMO_USERS) {
-    let location = await prisma.location.findFirst({
-      where: { name: demo.locationName },
+    const existingUser = await prisma.user.findUnique({
+      where: { email: demo.email },
+      select: { locationId: true },
     });
+
+    let location =
+      existingUser?.locationId != null
+        ? await prisma.location.findUnique({ where: { id: existingUser.locationId } })
+        : await prisma.location.findFirst({ where: { name: demo.locationName } });
 
     if (location) {
       location = await prisma.location.update({
         where: { id: location.id },
-        data: { plan: demo.plan, active: true },
+        data: { name: demo.locationName, plan: demo.plan, active: true },
       });
     } else {
       location = await prisma.location.create({

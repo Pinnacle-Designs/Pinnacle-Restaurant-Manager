@@ -19,6 +19,7 @@ export function PlanDemoLogins({ onLogin, loading }: PlanDemoLoginsProps) {
   const [password, setPassword] = useState("demo1234");
   const [accounts, setAccounts] = useState<PlanDemoAccount[]>([]);
   const [seeding, setSeeding] = useState(false);
+  const [seedError, setSeedError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/plan-demos")
@@ -37,8 +38,17 @@ export function PlanDemoLogins({ onLogin, loading }: PlanDemoLoginsProps) {
 
   const ensureSeeded = async () => {
     setSeeding(true);
+    setSeedError(null);
     try {
-      await fetch("/api/auth/plan-demos", { method: "POST" });
+      const res = await fetch("/api/auth/plan-demos", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Could not prepare plan demo accounts");
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not prepare plan demo accounts";
+      setSeedError(message);
+      throw err;
     } finally {
       setSeeding(false);
     }
@@ -59,8 +69,12 @@ export function PlanDemoLogins({ onLogin, loading }: PlanDemoLoginsProps) {
             type="button"
             disabled={loading || seeding}
             onClick={async () => {
-              await ensureSeeded();
-              await onLogin(account.email, password);
+              try {
+                await ensureSeeded();
+                await onLogin(account.email, password);
+              } catch {
+                // onLogin or ensureSeeded surfaces errors via parent / seedError
+              }
             }}
             className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm hover:border-orange-300 hover:bg-orange-50 disabled:opacity-50"
           >
@@ -71,6 +85,7 @@ export function PlanDemoLogins({ onLogin, loading }: PlanDemoLoginsProps) {
           </button>
         ))}
       </div>
+      {seedError && <p className="mt-2 text-xs text-red-600">{seedError}</p>}
       <p className="mt-2 text-center text-xs text-slate-400">Password: {password}</p>
     </div>
   );
