@@ -33,6 +33,8 @@ export async function POST(request: NextRequest) {
       tableId: body.tableId,
       status: "PENDING",
       totalAmount: body.totalAmount || 0,
+      guestCount: body.guestCount ?? 1,
+      channel: body.channel || "dine-in",
       notes: body.notes,
       items: body.items
         ? {

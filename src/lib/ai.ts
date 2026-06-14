@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { prisma } from "./prisma";
 import { getLocationId } from "./location";
+import { computeAnalytics, buildAnalyticsSnapshotForAI } from "./analytics/compute";
 import type { InsightCategory, InsightSeverity } from "@prisma/client";
 
 const openai = process.env.OPENAI_API_KEY
@@ -139,7 +140,7 @@ export async function generateBusinessInsights(locationId?: string): Promise<
 > {
   const locId = locationId || (await getLocationId());
 
-  const [inventory, menuItems, staff, recentOrders, expenses, recentPhotos] =
+  const [inventory, menuItems, staff, recentOrders, expenses, recentPhotos, analyticsPayload] =
     await Promise.all([
       prisma.inventoryItem.findMany({ where: { locationId: locId } }),
       prisma.menuItem.findMany({ where: { locationId: locId } }),
@@ -162,6 +163,7 @@ export async function generateBusinessInsights(locationId?: string): Promise<
         take: 10,
         orderBy: { createdAt: "desc" },
       }),
+      computeAnalytics(locId),
     ]);
 
   const lowStockItems = inventory.filter((item) => item.quantity <= item.minQuantity);
@@ -186,6 +188,7 @@ export async function generateBusinessInsights(locationId?: string): Promise<
     monthlyExpenses: totalExpenses,
     profitMargin: totalRevenue - totalExpenses,
     recentPhotoCount: recentPhotos.length,
+    analytics: buildAnalyticsSnapshotForAI(analyticsPayload),
   };
 
   if (!openai) {
@@ -199,7 +202,7 @@ export async function generateBusinessInsights(locationId?: string): Promise<
         {
           role: "system",
           content:
-            "You are a restaurant business analyst. Analyze the data and identify pain points, risks, and opportunities. Return JSON with an insights array. Each insight has: title, description, category (INVENTORY|STAFFING|FINANCE|OPERATIONS|MENU|CUSTOMER|FACILITY|GENERAL), severity (LOW|MEDIUM|HIGH|CRITICAL), actionable (specific action to take). Focus on actionable pain points.",
+            "You are a restaurant business analyst with full sales, food cost, labor, menu engineering, and marketing analytics. Analyze the data and identify pain points, risks, and opportunities. You MUST answer sales questions using analytics.sales: (1) What sells? (2) When are we busiest? (3) Which channels are most profitable? You MUST answer food cost questions using analytics.foodCost: (1) Where is product disappearing? (2) Which items are driving food cost increases? (3) Are recipes being followed? You MUST answer labor questions using analytics.labor: (1) Are we overstaffed or understaffed? (2) Which shifts are inefficient? (3) Which employees produce the best results? You MUST answer menu questions using analytics.menuEngineering: (1) What should we promote? (2) What should we reprice? (3) What should we remove? You MUST answer marketing questions using analytics.marketing: (1) Is marketing actually generating sales? — use highlights.salesGenerating; (2) Which channels bring profitable customers? — use highlights.profitableChannels. Reference CAC, ROAS, LTV, repeat visit rate, coupon usage, email, social, website, and Google Business. Return JSON with an insights array. Each insight has: title, description, category (INVENTORY|STAFFING|FINANCE|OPERATIONS|MENU|CUSTOMER|FACILITY|GENERAL), severity (LOW|MEDIUM|HIGH|CRITICAL), actionable (specific action to take). Include insights for each area when data exists. Focus on actionable pain points.",
         },
         {
           role: "user",
@@ -230,6 +233,7 @@ function generateRuleBasedInsights(snapshot: {
   monthlyExpenses: number;
   profitMargin: number;
   activeStaff: number;
+  analytics?: ReturnType<typeof buildAnalyticsSnapshotForAI>;
 }): Array<{
   title: string;
   description: string;
@@ -244,6 +248,194 @@ function generateRuleBasedInsights(snapshot: {
     severity: InsightSeverity;
     actionable: string;
   }> = [];
+
+  const sales = snapshot.analytics?.sales;
+  if (sales?.highlights.topSellingItem) {
+    const item = sales.highlights.topSellingItem;
+    insights.push({
+      title: `What sells: ${item.name}`,
+      description: `${item.name} leads with $${item.sales.toFixed(0)} in sales (${item.quantity} units sold).`,
+      category: "OPERATIONS",
+      severity: "LOW",
+      actionable: "Feature this item in promotions and verify inventory par levels.",
+    });
+  }
+
+  if (sales?.highlights.busiestDaypart && sales.highlights.busiestHour) {
+    const dp = sales.highlights.busiestDaypart;
+    const hr = sales.highlights.busiestHour;
+    const hourLabel = hr.hour % 12 === 0 ? 12 : hr.hour % 12;
+    const suffix = hr.hour >= 12 ? "PM" : "AM";
+    insights.push({
+      title: `Peak traffic: ${dp.daypart} / ${hourLabel}:00 ${suffix}`,
+      description: `${dp.daypart} is the busiest daypart (${dp.orders} orders). Peak hour is ${hourLabel}:00 ${suffix} with ${hr.orders} orders.`,
+      category: "STAFFING",
+      severity: "MEDIUM",
+      actionable: "Align prep and staffing 30–60 minutes before peak daypart and hour.",
+    });
+  }
+
+  if (sales?.highlights.mostProfitableChannel) {
+    const ch = sales.highlights.mostProfitableChannel;
+    insights.push({
+      title: `Most profitable channel: ${ch.channel}`,
+      description: `${ch.channel} earns $${ch.profit.toFixed(0)} gross profit at ${ch.marginPct.toFixed(1)}% margin (${ch.orders} orders).`,
+      category: "FINANCE",
+      severity: "MEDIUM",
+      actionable: "Invest marketing in high-margin channels; review fees on low-margin delivery platforms.",
+    });
+  }
+
+  if (sales && sales.netSales > 0) {
+    insights.push({
+      title: "Sales performance snapshot",
+      description: `Net sales $${sales.netSales.toFixed(0)} over ${snapshot.analytics?.periodDays ?? 30} days. Avg check $${sales.averageCheck.toFixed(2)}, ${sales.guestCount} guests, rev/seat $${sales.revenuePerSeat.toFixed(0)}, rev/labor hr $${sales.revenuePerLaborHour.toFixed(0)}.`,
+      category: "FINANCE",
+      severity: "LOW",
+      actionable: "Track these KPIs weekly and compare against labor and food cost targets.",
+    });
+  }
+
+  const food = snapshot.analytics?.foodCost;
+  if (food?.highlights) {
+    const pd = food.highlights.productDisappearing;
+    insights.push({
+      title: "Where is product disappearing?",
+      description: `Primary loss: ${pd.primaryCause}. Waste $${pd.wasteCost.toFixed(0)}, spoilage $${pd.spoilageCost.toFixed(0)}, variance gap ${pd.varianceGapPct.toFixed(1)}%.`,
+      category: "INVENTORY",
+      severity: pd.wasteCost + pd.spoilageCost > 100 ? "HIGH" : "MEDIUM",
+      actionable: "Audit waste logs, tighten prep yields, and reconcile inventory counts weekly.",
+    });
+
+    const drivers = food.highlights.costIncreaseDrivers;
+    if (drivers.length > 0) {
+      insights.push({
+        title: "Items driving food cost increases",
+        description: drivers
+          .slice(0, 3)
+          .map((d) => `${d.name} (+${d.changePct.toFixed(1)}%)`)
+          .join(", "),
+        category: "FINANCE",
+        severity: drivers.some((d) => d.changePct > 7) ? "HIGH" : "MEDIUM",
+        actionable: "Renegotiate vendor contracts or adjust menu pricing on high-increase items.",
+      });
+    }
+
+    const rc = food.highlights.recipeCompliance;
+    if (rc.status === "drift") {
+      insights.push({
+        title: "Recipes may not be followed",
+        description: `Actual food cost ${rc.actualPct.toFixed(1)}% exceeds theoretical ${rc.theoreticalPct.toFixed(1)}% by ${Math.abs(rc.variancePct).toFixed(1)}%.${rc.topDriftItem ? ` Focus on ${rc.topDriftItem}.` : ""}`,
+        category: "MENU",
+        severity: "HIGH",
+        actionable: "Re-weigh portions, retrain kitchen staff, and spot-check plate builds during service.",
+      });
+    }
+  }
+
+  const labor = snapshot.analytics?.labor;
+  if (labor?.highlights) {
+    const lh = labor.highlights;
+    insights.push({
+      title: "Are we overstaffed or understaffed?",
+      description: `${lh.staffingStatus === "overstaffed" ? "Overstaffed" : lh.staffingStatus === "understaffed" ? "Understaffed" : "Balanced"} — ${lh.staffingReason}`,
+      category: "STAFFING",
+      severity: lh.staffingStatus !== "balanced" ? "HIGH" : "MEDIUM",
+      actionable:
+        lh.staffingStatus === "overstaffed"
+          ? "Cut hours on low-sales dayparts and rebalance shift start times."
+          : lh.staffingStatus === "understaffed"
+            ? "Add coverage during peak sales hours and cross-train staff for flexibility."
+            : "Maintain current staffing mix and monitor weekly labor %.",
+    });
+
+    if (lh.inefficientShifts.length > 0) {
+      const worst = lh.inefficientShifts[0]!;
+      insights.push({
+        title: `Inefficient shift: ${worst.label}`,
+        description: `${worst.label} runs $${worst.salesPerLaborHour.toFixed(0)} sales per labor hour at ${worst.laborPct.toFixed(1)}% labor.`,
+        category: "STAFFING",
+        severity: worst.laborPct > 35 ? "HIGH" : "MEDIUM",
+        actionable: `Reduce ${worst.label} headcount or shift hours to match demand.`,
+      });
+    }
+
+    if (lh.topPerformers.length > 0) {
+      const top = lh.topPerformers[0]!;
+      insights.push({
+        title: `Top performer: ${top.name}`,
+        description: `${top.name} (${top.role}) delivers $${top.salesPerLaborHour.toFixed(0)} sales/labor hr and ${top.guestsPerLaborHour.toFixed(1)} guests/hr.`,
+        category: "STAFFING",
+        severity: "LOW",
+        actionable: "Schedule top performers during peak hours and use them to train others.",
+      });
+    }
+  }
+
+  const menu = snapshot.analytics?.menuEngineering;
+  if (menu?.highlights) {
+    const mh = menu.highlights;
+    if (mh.promoteItems.length > 0) {
+      insights.push({
+        title: "What should we promote?",
+        description: mh.promoteItems
+          .slice(0, 3)
+          .map((i) => `${i.name} (${i.quadrant}, ${i.marginPct.toFixed(0)}% margin)`)
+          .join(", "),
+        category: "MENU",
+        severity: "LOW",
+        actionable: "Feature stars on specials boards; train staff to suggest puzzles.",
+      });
+    }
+    if (mh.repriceItems.length > 0) {
+      const top = mh.repriceItems[0]!;
+      insights.push({
+        title: "What should we reprice?",
+        description: `${top.name} at $${top.price.toFixed(2)} — popular (${top.quantitySold} sold) but only ${top.marginPct.toFixed(0)}% margin.`,
+        category: "MENU",
+        severity: "MEDIUM",
+        actionable: `Test a 5–10% price increase on ${top.name} and monitor mix shift.`,
+      });
+    }
+    if (mh.removeItems.length > 0) {
+      insights.push({
+        title: "What should we remove?",
+        description: mh.removeItems
+          .slice(0, 3)
+          .map((i) => `${i.name} ($${i.contribution.toFixed(0)} contribution)`)
+          .join(", "),
+        category: "MENU",
+        severity: mh.removeItems.length > 2 ? "MEDIUM" : "LOW",
+        actionable: "Remove or rework dogs to simplify kitchen prep and reduce inventory SKUs.",
+      });
+    }
+  }
+
+  const marketing = snapshot.analytics?.marketing;
+  if (marketing?.highlights) {
+    const mh = marketing.highlights;
+    insights.push({
+      title: "Is marketing actually generating sales?",
+      description: mh.salesGenerating.reason,
+      category: "FINANCE",
+      severity: mh.salesGenerating.status === "yes" ? "LOW" : mh.salesGenerating.status === "weak" ? "MEDIUM" : "HIGH",
+      actionable:
+        mh.salesGenerating.status === "yes"
+          ? "Scale top ROAS campaigns and maintain attribution tracking."
+          : "Pause low-ROAS campaigns and reallocate budget to proven channels.",
+    });
+
+    if (mh.profitableChannels.length > 0) {
+      const top = mh.profitableChannels[0]!;
+      insights.push({
+        title: "Most profitable customer channel",
+        description: `${top.channel} delivers $${top.profit.toFixed(0)} profit at ${top.marginPct.toFixed(1)}% margin (${top.orders} orders).`,
+        category: "FINANCE",
+        severity: "MEDIUM",
+        actionable: `Invest in ${top.channel} acquisition and compare against lower-margin channels.`,
+      });
+    }
+  }
 
   if (snapshot.lowStockItems.length > 0) {
     insights.push({

@@ -22,6 +22,8 @@ export async function POST(request: NextRequest) {
       unit: body.unit,
       minQuantity: body.minQuantity ?? 0,
       costPerUnit: body.costPerUnit ?? 0,
+      portionSize: body.portionSize ?? null,
+      yieldPct: body.yieldPct ?? 100,
       supplier: body.supplier,
       imageUrl: body.imageUrl,
     },

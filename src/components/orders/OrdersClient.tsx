@@ -39,6 +39,8 @@ interface Order {
 
 const STATUSES = ["PENDING", "PREPARING", "READY", "SERVED", "PAID", "CANCELLED"];
 
+const CHANNELS = ["dine-in", "pickup", "delivery", "catering"] as const;
+
 export function OrdersClient({
   initialOrders,
   menuItems,
@@ -61,6 +63,8 @@ export function OrdersClient({
     tableId: "",
     menuItemId: "",
     quantity: "1",
+    guestCount: "2",
+    channel: "dine-in",
     notes: "",
   });
   const [addForm, setAddForm] = useState({ menuItemId: "", quantity: "1" });
@@ -83,12 +87,14 @@ export function OrdersClient({
       const order = await apiPost<Order>("/api/orders", {
         tableId: form.tableId || null,
         totalAmount: menuItem.price * quantity,
+        guestCount: parseInt(form.guestCount) || 1,
+        channel: form.channel,
         notes: form.notes || null,
         items: [{ menuItemId: form.menuItemId, quantity, price: menuItem.price }],
       });
       setOrders((prev) => [order, ...prev]);
       setCreateModalOpen(false);
-      setForm({ tableId: "", menuItemId: "", quantity: "1", notes: "" });
+      setForm({ tableId: "", menuItemId: "", quantity: "1", guestCount: "2", channel: "dine-in", notes: "" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create order");
     } finally {
@@ -236,11 +242,23 @@ export function OrdersClient({
             <FormField label="Quantity">
               <Input type="number" min="1" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
             </FormField>
+            <FormField label="Guests">
+              <Input type="number" min="1" value={form.guestCount} onChange={(e) => setForm({ ...form, guestCount: e.target.value })} />
+            </FormField>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <FormField label="Table">
               <Select value={form.tableId} onChange={(e) => setForm({ ...form, tableId: e.target.value })}>
                 <option value="">No table</option>
                 {tables.map((t) => (
                   <option key={t.id} value={t.id}>Table {t.number}</option>
+                ))}
+              </Select>
+            </FormField>
+            <FormField label="Channel">
+              <Select value={form.channel} onChange={(e) => setForm({ ...form, channel: e.target.value })}>
+                {CHANNELS.map((c) => (
+                  <option key={c} value={c}>{c}</option>
                 ))}
               </Select>
             </FormField>

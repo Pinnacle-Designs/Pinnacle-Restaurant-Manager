@@ -100,10 +100,31 @@ export async function seedAnalyticsSampleData(locationId: string) {
 
   await prisma.vendorInvoice.createMany({
     data: [
-      { locationId, vendor: "Ocean Fresh", amount: 1250, category: "Seafood", priceChangePct: 8.2 },
-      { locationId, vendor: "Green Valley", amount: 380, category: "Produce", priceChangePct: 3.1 },
-      { locationId, vendor: "Dairy Direct", amount: 520, category: "Dairy", priceChangePct: -1.2 },
-      { locationId, vendor: "Bulk Foods Co", amount: 290, category: "Dry goods", priceChangePct: 4.5 },
+      { locationId, vendor: "Ocean Fresh", amount: 1250, category: "Seafood", priceChangePct: 8.2, invoiceDate: new Date(now - 5 * 86400000) },
+      { locationId, vendor: "Ocean Fresh", amount: 1180, category: "Seafood", priceChangePct: 4.1, invoiceDate: new Date(now - 35 * 86400000) },
+      { locationId, vendor: "Ocean Fresh", amount: 1100, category: "Seafood", priceChangePct: 2.0, invoiceDate: new Date(now - 65 * 86400000) },
+      { locationId, vendor: "Green Valley", amount: 380, category: "Produce", priceChangePct: 3.1, invoiceDate: new Date(now - 7 * 86400000) },
+      { locationId, vendor: "Green Valley", amount: 350, category: "Produce", priceChangePct: 1.5, invoiceDate: new Date(now - 37 * 86400000) },
+      { locationId, vendor: "Dairy Direct", amount: 520, category: "Dairy", priceChangePct: -1.2, invoiceDate: new Date(now - 10 * 86400000) },
+      { locationId, vendor: "Bulk Foods Co", amount: 290, category: "Dry goods", priceChangePct: 4.5, invoiceDate: new Date(now - 12 * 86400000) },
+      { locationId, vendor: "Harbor Seafood Supply", amount: 1050, category: "Seafood", priceChangePct: 1.8, invoiceDate: new Date(now - 14 * 86400000) },
+    ],
+  });
+
+  await prisma.vendorPriceHistory.createMany({
+    data: [
+      { locationId, vendor: "Ocean Fresh", itemName: "Salmon fillets", category: "Seafood", unitPrice: 12.5, unit: "lbs", effectiveDate: new Date(now - 5 * 86400000) },
+      { locationId, vendor: "Ocean Fresh", itemName: "Salmon fillets", category: "Seafood", unitPrice: 11.5, unit: "lbs", effectiveDate: new Date(now - 40 * 86400000) },
+      { locationId, vendor: "Harbor Seafood Supply", itemName: "Salmon fillets", category: "Seafood", unitPrice: 10.8, unit: "lbs", effectiveDate: new Date(now - 3 * 86400000) },
+      { locationId, vendor: "Harbor Seafood Supply", itemName: "Salmon fillets", category: "Seafood", unitPrice: 11.0, unit: "lbs", effectiveDate: new Date(now - 45 * 86400000) },
+      { locationId, vendor: "Green Valley", itemName: "Romaine lettuce", category: "Produce", unitPrice: 2.5, unit: "heads", effectiveDate: new Date(now - 7 * 86400000) },
+      { locationId, vendor: "Green Valley", itemName: "Romaine lettuce", category: "Produce", unitPrice: 2.3, unit: "heads", effectiveDate: new Date(now - 42 * 86400000) },
+      { locationId, vendor: "Farm Direct Produce", itemName: "Romaine lettuce", category: "Produce", unitPrice: 2.1, unit: "heads", effectiveDate: new Date(now - 8 * 86400000) },
+      { locationId, vendor: "Dairy Direct", itemName: "Mozzarella", category: "Dairy", unitPrice: 6.0, unit: "lbs", effectiveDate: new Date(now - 10 * 86400000) },
+      { locationId, vendor: "Dairy Direct", itemName: "Mozzarella", category: "Dairy", unitPrice: 6.1, unit: "lbs", effectiveDate: new Date(now - 50 * 86400000) },
+      { locationId, vendor: "Bulk Foods Co", itemName: "Flour", category: "Dry goods", unitPrice: 1.2, unit: "lbs", effectiveDate: new Date(now - 12 * 86400000) },
+      { locationId, vendor: "Bulk Foods Co", itemName: "Flour", category: "Dry goods", unitPrice: 1.1, unit: "lbs", effectiveDate: new Date(now - 55 * 86400000) },
+      { locationId, vendor: "Mill & Grain Co", itemName: "Flour", category: "Dry goods", unitPrice: 1.05, unit: "lbs", effectiveDate: new Date(now - 15 * 86400000) },
     ],
   });
 
@@ -112,6 +133,7 @@ export async function seedAnalyticsSampleData(locationId: string) {
       data: [
         { locationId, inventoryItemId: inventory[0].id, itemName: inventory[0].name, quantity: 2, unit: inventory[0].unit, cost: 25, reason: "spoilage" },
         { locationId, itemName: "Prep trim", quantity: 5, unit: "lbs", cost: 18, reason: "prep waste" },
+        { locationId, itemName: "Expired dairy", quantity: 1, unit: "lbs", cost: 8, reason: "spoilage" },
       ],
     });
   }
@@ -123,4 +145,38 @@ export async function seedAnalyticsSampleData(locationId: string) {
       { locationId, date: new Date(now - 14 * 86400000), factorType: "holiday", description: "Local festival weekend", impactPct: 18 },
     ],
   });
+
+  if ("websiteConnection" in prisma && prisma.websiteConnection) {
+    await prisma.websiteConnection.upsert({
+      where: { locationId },
+      create: {
+        locationId,
+        url: "https://pinnaclerestaurant.com",
+        connected: true,
+        visitors30d: 4820,
+        pageViews30d: 12450,
+        sessions30d: 6180,
+        bounceRate: 42.5,
+        avgSessionSec: 118,
+        topPages: JSON.stringify([
+          { path: "/", views: 4730 },
+          { path: "/menu", views: 2988 },
+          { path: "/reservations", views: 1992 },
+        ]),
+        referrers: JSON.stringify([
+          { source: "Google Search", pct: 42 },
+          { source: "Instagram", pct: 24 },
+          { source: "Direct", pct: 18 },
+        ]),
+        lastSyncedAt: new Date(),
+      },
+      update: {
+        connected: true,
+        visitors30d: 4820,
+        pageViews30d: 12450,
+        sessions30d: 6180,
+        lastSyncedAt: new Date(),
+      },
+    });
+  }
 }

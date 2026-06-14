@@ -15,6 +15,47 @@ export function demoLocationName(mode: DemoMode): string {
   return mode === "seeded" ? DEMO_LOCATION_SAMPLE : DEMO_LOCATION_BLANK;
 }
 
+async function seedWebsiteConnection(locationId: string) {
+  await prisma.websiteConnection.upsert({
+    where: { locationId },
+    create: {
+      locationId,
+      url: "https://pinnaclerestaurant.com",
+      connected: true,
+      visitors30d: 4820,
+      pageViews30d: 12450,
+      sessions30d: 6180,
+      bounceRate: 42.5,
+      avgSessionSec: 118,
+      topPages: JSON.stringify([
+        { path: "/", views: 4730 },
+        { path: "/menu", views: 2988 },
+        { path: "/reservations", views: 1992 },
+        { path: "/about", views: 1494 },
+        { path: "/contact", views: 1245 },
+      ]),
+      referrers: JSON.stringify([
+        { source: "Google Search", pct: 42 },
+        { source: "Instagram", pct: 24 },
+        { source: "Direct", pct: 18 },
+        { source: "Facebook", pct: 9 },
+        { source: "Other", pct: 5 },
+      ]),
+      lastSyncedAt: new Date(),
+    },
+    update: {
+      url: "https://pinnaclerestaurant.com",
+      connected: true,
+      visitors30d: 4820,
+      pageViews30d: 12450,
+      sessions30d: 6180,
+      bounceRate: 42.5,
+      avgSessionSec: 118,
+      lastSyncedAt: new Date(),
+    },
+  });
+}
+
 async function seedSocialAccounts(locationId: string) {
   const accounts = [
     {
@@ -64,44 +105,7 @@ async function seedSocialAccounts(locationId: string) {
     });
   }
 
-  await prisma.websiteConnection.upsert({
-    where: { locationId },
-    create: {
-      locationId,
-      url: "https://pinnaclerestaurant.com",
-      connected: true,
-      visitors30d: 4820,
-      pageViews30d: 12450,
-      sessions30d: 6180,
-      bounceRate: 42.5,
-      avgSessionSec: 118,
-      topPages: JSON.stringify([
-        { path: "/", views: 4730 },
-        { path: "/menu", views: 2988 },
-        { path: "/reservations", views: 1992 },
-        { path: "/about", views: 1494 },
-        { path: "/contact", views: 1245 },
-      ]),
-      referrers: JSON.stringify([
-        { source: "Google Search", pct: 42 },
-        { source: "Instagram", pct: 24 },
-        { source: "Direct", pct: 18 },
-        { source: "Facebook", pct: 9 },
-        { source: "Other", pct: 5 },
-      ]),
-      lastSyncedAt: new Date(),
-    },
-    update: {
-      url: "https://pinnaclerestaurant.com",
-      connected: true,
-      visitors30d: 4820,
-      pageViews30d: 12450,
-      sessions30d: 6180,
-      bounceRate: 42.5,
-      avgSessionSec: 118,
-      lastSyncedAt: new Date(),
-    },
-  });
+  await seedWebsiteConnection(locationId);
 }
 
 export async function seedLocationData(locationId: string) {
@@ -110,6 +114,11 @@ export async function seedLocationData(locationId: string) {
     const socialCount = await prisma.socialAccount.count({ where: { locationId } });
     if (socialCount === 0) {
       await seedSocialAccounts(locationId);
+    } else {
+      const websiteCount = await prisma.websiteConnection.count({ where: { locationId } });
+      if (websiteCount === 0) {
+        await seedWebsiteConnection(locationId);
+      }
     }
     const orderCount = await prisma.order.count({ where: { locationId } });
     if (orderCount < 5) {
@@ -135,11 +144,11 @@ export async function seedLocationData(locationId: string) {
 
   await prisma.inventoryItem.createMany({
     data: [
-      { locationId, name: "Salmon fillets", quantity: 8, unit: "lbs", minQuantity: 10, costPerUnit: 12.5, supplier: "Ocean Fresh" },
-      { locationId, name: "Romaine lettuce", quantity: 15, unit: "heads", minQuantity: 10, costPerUnit: 2.5, supplier: "Green Valley" },
-      { locationId, name: "Mozzarella", quantity: 3, unit: "lbs", minQuantity: 5, costPerUnit: 6.0, supplier: "Dairy Direct" },
-      { locationId, name: "Olive oil", quantity: 2, unit: "bottles", minQuantity: 3, costPerUnit: 15.0, supplier: "Mediterranean Imports" },
-      { locationId, name: "Flour", quantity: 20, unit: "lbs", minQuantity: 10, costPerUnit: 1.2, supplier: "Bulk Foods Co" },
+      { locationId, name: "Salmon fillets", quantity: 8, unit: "lbs", minQuantity: 10, costPerUnit: 12.5, previousCostPerUnit: 11.5, portionSize: 0.5, yieldPct: 92, supplier: "Ocean Fresh" },
+      { locationId, name: "Romaine lettuce", quantity: 15, unit: "heads", minQuantity: 10, costPerUnit: 2.5, previousCostPerUnit: 2.3, portionSize: 0.25, yieldPct: 85, supplier: "Green Valley" },
+      { locationId, name: "Mozzarella", quantity: 3, unit: "lbs", minQuantity: 5, costPerUnit: 6.0, previousCostPerUnit: 6.1, portionSize: 0.15, yieldPct: 98, supplier: "Dairy Direct" },
+      { locationId, name: "Olive oil", quantity: 2, unit: "bottles", minQuantity: 3, costPerUnit: 15.0, portionSize: 0.02, yieldPct: 100, supplier: "Mediterranean Imports" },
+      { locationId, name: "Flour", quantity: 20, unit: "lbs", minQuantity: 10, costPerUnit: 1.2, previousCostPerUnit: 1.1, portionSize: 0.5, yieldPct: 100, supplier: "Bulk Foods Co" },
     ],
   });
 

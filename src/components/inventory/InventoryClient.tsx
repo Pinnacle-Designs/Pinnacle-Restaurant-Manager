@@ -14,6 +14,8 @@ interface InventoryItem {
   unit: string;
   minQuantity: number;
   costPerUnit: number;
+  portionSize: number | null;
+  yieldPct: number;
   supplier: string | null;
 }
 
@@ -27,6 +29,8 @@ export function InventoryClient({ initialItems }: { initialItems: InventoryItem[
     unit: "lbs",
     minQuantity: "",
     costPerUnit: "",
+    portionSize: "",
+    yieldPct: "100",
     supplier: "",
   });
   const [saving, setSaving] = useState(false);
@@ -34,7 +38,7 @@ export function InventoryClient({ initialItems }: { initialItems: InventoryItem[
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: "", quantity: "", unit: "lbs", minQuantity: "", costPerUnit: "", supplier: "" });
+    setForm({ name: "", quantity: "", unit: "lbs", minQuantity: "", costPerUnit: "", portionSize: "", yieldPct: "100", supplier: "" });
     setError(null);
     setModalOpen(true);
   };
@@ -47,6 +51,8 @@ export function InventoryClient({ initialItems }: { initialItems: InventoryItem[
       unit: item.unit,
       minQuantity: String(item.minQuantity),
       costPerUnit: String(item.costPerUnit),
+      portionSize: item.portionSize != null ? String(item.portionSize) : "",
+      yieldPct: String(item.yieldPct ?? 100),
       supplier: item.supplier || "",
     });
     setError(null);
@@ -66,6 +72,8 @@ export function InventoryClient({ initialItems }: { initialItems: InventoryItem[
         unit: form.unit,
         minQuantity: parseFloat(form.minQuantity) || 0,
         costPerUnit: parseFloat(form.costPerUnit) || 0,
+        portionSize: form.portionSize ? parseFloat(form.portionSize) : null,
+        yieldPct: parseFloat(form.yieldPct) || 100,
         supplier: form.supplier || null,
       };
       if (editing) {
@@ -114,6 +122,7 @@ export function InventoryClient({ initialItems }: { initialItems: InventoryItem[
                 <th className="px-6 py-3 text-left font-medium text-slate-500">Quantity</th>
                 <th className="px-6 py-3 text-left font-medium text-slate-500">Min</th>
                 <th className="px-6 py-3 text-left font-medium text-slate-500">Cost/Unit</th>
+                <th className="px-6 py-3 text-left font-medium text-slate-500">Yield %</th>
                 <th className="px-6 py-3 text-left font-medium text-slate-500">Supplier</th>
                 <th className="px-6 py-3 text-left font-medium text-slate-500">Status</th>
                 <th className="px-6 py-3 text-right font-medium text-slate-500">Actions</th>
@@ -128,6 +137,7 @@ export function InventoryClient({ initialItems }: { initialItems: InventoryItem[
                     <td className="px-6 py-4 text-slate-600">{item.quantity} {item.unit}</td>
                     <td className="px-6 py-4 text-slate-600">{item.minQuantity} {item.unit}</td>
                     <td className="px-6 py-4 text-slate-600">{formatCurrency(item.costPerUnit)}</td>
+                    <td className="px-6 py-4 text-slate-600">{(item.yieldPct ?? 100).toFixed(0)}%</td>
                     <td className="px-6 py-4 text-slate-600">{item.supplier || "—"}</td>
                     <td className="px-6 py-4">
                       <Badge className={isLow ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-700"}>
@@ -178,6 +188,14 @@ export function InventoryClient({ initialItems }: { initialItems: InventoryItem[
             </FormField>
             <FormField label="Cost per Unit">
               <Input type="number" step="0.01" value={form.costPerUnit} onChange={(e) => setForm({ ...form, costPerUnit: e.target.value })} />
+            </FormField>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Portion Size">
+              <Input type="number" step="0.01" value={form.portionSize} onChange={(e) => setForm({ ...form, portionSize: e.target.value })} placeholder="e.g. 0.5" />
+            </FormField>
+            <FormField label="Yield %">
+              <Input type="number" step="1" min="1" max="100" value={form.yieldPct} onChange={(e) => setForm({ ...form, yieldPct: e.target.value })} />
             </FormField>
           </div>
           <FormField label="Supplier">

@@ -123,6 +123,7 @@ model Location {
   guestReviews     GuestReview[]
   vendorInvoices   VendorInvoice[]
   inventoryWaste   InventoryWaste[]
+  vendorPriceHistory VendorPriceHistory[]
   externalFactors  ExternalFactor[]
 }
 
@@ -151,6 +152,9 @@ model InventoryItem {
   unit          String
   minQuantity   Float    @default(0)
   costPerUnit   Float    @default(0)
+  previousCostPerUnit Float?
+  portionSize   Float?
+  yieldPct      Float    @default(100)
   supplier      String?
   lastRestocked DateTime?
   imageUrl      String?
@@ -393,6 +397,22 @@ model VendorInvoice {
   invoiceDate   DateTime @default(now())
   priceChangePct Float   @default(0)
   createdAt     DateTime @default(now())
+}
+
+model VendorPriceHistory {
+  id            String   @id @default(cuid())
+  locationId    String
+  location      Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  vendor        String
+  itemName      String
+  category      String
+  unitPrice     Float
+  unit          String   @default("lbs")
+  effectiveDate DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@index([locationId, vendor, itemName])
+  @@index([locationId, effectiveDate])
 }
 
 model InventoryWaste {

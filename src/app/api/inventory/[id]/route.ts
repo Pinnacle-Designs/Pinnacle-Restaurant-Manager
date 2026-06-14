@@ -8,6 +8,11 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
 
+  const existing = await prisma.inventoryItem.findUnique({ where: { id } });
+  const newCost = body.costPerUnit;
+  const costChanged =
+    newCost !== undefined && existing && newCost !== existing.costPerUnit;
+
   const item = await prisma.inventoryItem.update({
     where: { id },
     data: {
@@ -16,6 +21,9 @@ export async function PATCH(
       unit: body.unit,
       minQuantity: body.minQuantity,
       costPerUnit: body.costPerUnit,
+      previousCostPerUnit: costChanged ? existing!.costPerUnit : body.previousCostPerUnit,
+      portionSize: body.portionSize,
+      yieldPct: body.yieldPct,
       supplier: body.supplier,
       imageUrl: body.imageUrl,
     },
