@@ -2622,7 +2622,7 @@ body.modal-open {
 
 /* ===== Pricing page ===== */
 .pricing-hero {
-  padding: 4rem 0 3rem;
+  padding: 4rem 0 4.5rem;
   text-align: center;
   background: linear-gradient(135deg, var(--slate-950) 0%, var(--slate-900) 60%, var(--indigo-950) 100%);
   color: #fff;
@@ -2647,18 +2647,19 @@ body.modal-open {
   color: var(--slate-300);
 }
 
-.pricing-founding { padding-top: 0; padding-bottom: 0; margin-top: -1.5rem; }
-
 .pricing-founding-banner {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  align-items: flex-start;
+  gap: 1.25rem;
+  align-items: stretch;
+  margin: 2.5rem auto 0;
+  max-width: 52rem;
   padding: 1.5rem 1.75rem;
   border-radius: 1rem;
   border: 1px solid rgba(249, 115, 22, 0.35);
-  background: linear-gradient(135deg, rgba(249, 115, 22, 0.12), rgba(15, 23, 42, 0.04));
-  box-shadow: 0 8px 30px rgba(249, 115, 22, 0.08);
+  background: #fff7ed;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  text-align: left;
 }
 
 @media (min-width: 768px) {
@@ -2666,8 +2667,20 @@ body.modal-open {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
+    gap: 2rem;
     padding: 1.75rem 2rem;
   }
+}
+
+.pricing-founding-copy { min-width: 0; }
+
+.pricing-founding-cta {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+@media (min-width: 768px) {
+  .pricing-founding-cta { align-self: center; }
 }
 
 .pricing-founding-label {
