@@ -39,3 +39,12 @@ export const NAV_ITEMS = [
   { href: "/social", label: "Social", icon: "share-2" },
   { href: "/insights", label: "Command Center", icon: "brain" },
 ] as const;
+
+/** Bottom bar tabs on mobile — remaining items go in the More sheet */
+export const MOBILE_PRIMARY_NAV_HREFS = [
+  "/dashboard",
+  "/orders",
+  "/insights",
+  "/inventory",
+  "/analytics",
+] as const;

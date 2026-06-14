@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard,
   Camera,
@@ -14,11 +15,28 @@ import {
   LayoutGrid,
   Share2,
   BarChart3,
+  Menu,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { NAV_ITEMS } from "@/lib/constants";
+import { MOBILE_PRIMARY_NAV_HREFS, NAV_ITEMS } from "@/lib/constants";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { filterNavForRole } from "@/lib/permissions";
+
+type NavItem = { href: string; label: string; icon: string };
+
+const PRIMARY_HREF_SET = new Set<string>(MOBILE_PRIMARY_NAV_HREFS);
+
+function getMobileNavItems(items: readonly NavItem[]) {
+  const byHref = new Map(items.map((item) => [item.href, item]));
+  return MOBILE_PRIMARY_NAV_HREFS.map((href) => byHref.get(href)).filter(
+    (item): item is NavItem => !!item
+  );
+}
+
+function getMoreNavItems(items: readonly NavItem[]) {
+  return items.filter((item) => !PRIMARY_HREF_SET.has(item.href));
+}
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "layout-dashboard": LayoutDashboard,
@@ -34,33 +52,145 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "bar-chart-3": BarChart3,
 };
 
+function mobileNavLabel(item: NavItem) {
+  return item.href === "/insights" ? "AI" : item.label;
+}
+
+function NavLink({
+  item,
+  isActive,
+  label,
+  onNavigate,
+}: {
+  item: NavItem;
+  isActive: boolean;
+  label?: string;
+  onNavigate?: () => void;
+}) {
+  const Icon = ICONS[item.icon];
+  return (
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      className={cn(
+        "flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-1 text-[0.625rem]",
+        isActive ? "text-orange-600" : "text-slate-500"
+      )}
+    >
+      <Icon className="h-[1.125rem] w-[1.125rem] shrink-0" />
+      <span className="max-w-full truncate">{label ?? item.label}</span>
+    </Link>
+  );
+}
+
 export function MobileNav() {
   const pathname = usePathname();
   const { user } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const navItems = user ? filterNavForRole(user.role, NAV_ITEMS) : NAV_ITEMS;
+  const mobileNavItems = useMemo(() => getMobileNavItems(navItems), [navItems]);
+  const moreNavItems = useMemo(() => getMoreNavItems(navItems), [navItems]);
+  const isMoreNavScreen = moreNavItems.some((item) => item.href === pathname);
+
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeMenu();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [menuOpen, closeMenu]);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-white md:hidden">
-      <div className="flex justify-around py-2">
-        {navItems.slice(0, 5).map((item) => {
-          const Icon = ICONS[item.icon];
-          const isActive = pathname === item.href;
-          return (
-            <Link
+    <>
+      {menuOpen && moreNavItems.length > 0 && (
+        <div
+          id="mobile-more-menu"
+          className="fixed inset-0 z-40 md:hidden"
+          role="dialog"
+          aria-label="All modules"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 border-0 bg-slate-900/45"
+            aria-label="Close menu"
+            onClick={closeMenu}
+          />
+          <div className="absolute bottom-0 left-0 right-0 flex max-h-[70vh] min-h-48 flex-col rounded-t-2xl bg-white pb-20 shadow-[0_-8px_24px_rgba(15,23,42,0.12)]">
+            <div className="flex shrink-0 items-center justify-between gap-3 px-4 pb-2 pt-3.5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                All modules
+              </span>
+              <button
+                type="button"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700"
+                aria-label="Close menu"
+                onClick={closeMenu}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+              {moreNavItems.map((item) => {
+                const Icon = ICONS[item.icon];
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={closeMenu}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium",
+                      isActive
+                        ? "bg-orange-50 text-orange-600"
+                        : "text-slate-700 hover:bg-slate-50"
+                    )}
+                  >
+                    <Icon className="h-5 w-5 shrink-0" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-white md:hidden">
+        <div className="flex justify-around px-0.5 py-1.5">
+          {mobileNavItems.map((item) => (
+            <NavLink
               key={item.href}
-              href={item.href}
+              item={item}
+              isActive={pathname === item.href}
+              label={mobileNavLabel(item)}
+            />
+          ))}
+          {moreNavItems.length > 0 && (
+            <button
+              type="button"
+              aria-expanded={menuOpen}
+              aria-controls="mobile-more-menu"
+              aria-label="More modules"
+              onClick={() => setMenuOpen((open) => !open)}
               className={cn(
-                "flex flex-col items-center gap-0.5 px-2 py-1 text-xs",
-                isActive ? "text-orange-600" : "text-slate-500"
+                "flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-1 text-[0.625rem]",
+                menuOpen || isMoreNavScreen ? "text-orange-600" : "text-slate-500"
               )}
             >
-              <Icon className="h-5 w-5" />
-              <span className="truncate">{item.label}</span>
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
+              <Menu className="h-[1.125rem] w-[1.125rem] shrink-0" />
+              <span className="max-w-full truncate">More</span>
+            </button>
+          )}
+        </div>
+      </nav>
+    </>
   );
 }

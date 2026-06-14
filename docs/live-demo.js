@@ -17,6 +17,39 @@
     { id: "insights", label: "Command Center", icon: "brain" },
   ];
 
+  /* Mobile bottom bar — key daily tabs including AI */
+  var MOBILE_NAV_IDS = ["dashboard", "orders", "insights", "inventory", "analytics"];
+
+  function getMobileNavItems() {
+    return MOBILE_NAV_IDS.map(function (id) {
+      for (var i = 0; i < NAV.length; i++) {
+        if (NAV[i].id === id) return NAV[i];
+      }
+      return null;
+    }).filter(function (item) {
+      return !!item;
+    });
+  }
+
+  function mobileNavLabel(item) {
+    return item.id === "insights" ? "AI" : item.label;
+  }
+
+  function getMoreNavItems() {
+    return NAV.filter(function (item) {
+      return MOBILE_NAV_IDS.indexOf(item.id) === -1;
+    });
+  }
+
+  function isMoreNavScreen() {
+    return MOBILE_NAV_IDS.indexOf(state.screen) === -1;
+  }
+
+  var ICON_MENU =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>';
+  var ICON_CLOSE =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+
   var ICONS = {
     "layout-dashboard": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>',
     camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>',
@@ -163,7 +196,10 @@
     staffTab: "schedule",
     socialTab: "compose",
     location: "downtown",
+    mobileMenuOpen: false,
   };
+
+  var lastDemoContainer = null;
 
   function navIcon(name) {
     return '<span class="demo-nav-icon" aria-hidden="true">' + (ICONS[name] || "") + "</span>";
@@ -612,7 +648,13 @@
     );
   }
 
-  function renderDemo() {
+  function isDesktopLayout(container) {
+    return !!(container && container.id === "app-embed-modal-body");
+  }
+
+  function renderDemo(container) {
+    var desktop = isDesktopLayout(container);
+    var layoutClass = desktop ? "pinnacle-demo--desktop" : "pinnacle-demo--mobile";
     var navHtml = NAV.map(function (item) {
       return (
         '<button type="button" class="demo-nav-item' +
@@ -641,17 +683,55 @@
       renderSocial() +
       renderInsights();
 
-    var mobileNavHtml = NAV.slice(0, 5).map(function (item) {
+    var mobileNavHtml = getMobileNavItems().map(function (item) {
       return (
         '<button type="button" class="demo-mobile-nav-item' +
         (state.screen === item.id ? " active" : "") +
         '" data-screen="' + item.id + '">' + navIcon(item.icon) +
-        '<span>' + item.label + "</span></button>"
+        '<span>' + mobileNavLabel(item) + "</span></button>"
       );
     }).join("");
 
+    var moreNavActive = state.mobileMenuOpen || isMoreNavScreen();
+    mobileNavHtml +=
+      '<button type="button" class="demo-mobile-nav-item demo-mobile-more-toggle' +
+      (moreNavActive ? " active" : "") +
+      '" aria-expanded="' + (state.mobileMenuOpen ? "true" : "false") +
+      '" aria-controls="demo-mobile-more-menu" aria-label="More modules">' +
+      '<span class="demo-nav-icon" aria-hidden="true">' + ICON_MENU + "</span>" +
+      "<span>More</span></button>";
+
+    var moreMenuHtml = "";
+    if (desktop) {
+      moreMenuHtml = "";
+    } else {
+      var moreItemsHtml = getMoreNavItems().map(function (item) {
+        return (
+          '<button type="button" class="demo-mobile-more-item' +
+          (state.screen === item.id ? " active" : "") +
+          '" data-screen="' + item.id + '">' + navIcon(item.icon) +
+          "<span>" + item.label + "</span></button>"
+        );
+      }).join("");
+      moreMenuHtml =
+        '<div class="demo-mobile-more' + (state.mobileMenuOpen ? " open" : "") +
+        '" id="demo-mobile-more-menu" role="dialog" aria-label="All modules">' +
+        '<button type="button" class="demo-mobile-more-backdrop" aria-label="Close menu"></button>' +
+        '<div class="demo-mobile-more-panel">' +
+        '<div class="demo-mobile-more-head">' +
+        '<span>All modules</span>' +
+        '<button type="button" class="demo-mobile-more-close" aria-label="Close menu">' +
+        ICON_CLOSE +
+        "</button></div>" +
+        '<div class="demo-mobile-more-list">' + moreItemsHtml + "</div>" +
+        "</div></div>";
+    }
+
     return (
-      '<div class="pinnacle-demo" id="pinnacle-live-demo">' +
+      '<div class="pinnacle-demo ' + layoutClass + '" id="pinnacle-live-demo">' +
+      '<header class="demo-mobile-header" aria-label="App header">' +
+      '<img src="./assets/logo-nav.svg" alt="Pinnacle" class="demo-mobile-logo" width="140" height="28" />' +
+      "</header>" +
       '<aside class="demo-sidebar">' +
       '<div class="demo-sidebar-brand">' +
       '<img src="./assets/logo-nav.svg" alt="Pinnacle" class="demo-sidebar-logo" width="140" height="28" />' +
@@ -674,13 +754,31 @@
       screens +
       "</div></div>" +
       '<nav class="demo-mobile-nav" aria-label="Mobile navigation">' + mobileNavHtml + "</nav>" +
+      moreMenuHtml +
       "</div>"
     );
   }
 
-  function showScreen(screenId) {
+  function setMobileMenuOpen(container, open) {
+    state.mobileMenuOpen = open;
+    if (!container) return;
+    var menu = container.querySelector(".demo-mobile-more");
+    var toggle = container.querySelector(".demo-mobile-more-toggle");
+    if (menu) menu.classList.toggle("open", open);
+    if (toggle) {
+      toggle.classList.toggle("active", open || isMoreNavScreen());
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+  }
+
+  function showScreen(screenId, container) {
     state.screen = screenId;
-    refreshDemo();
+    state.mobileMenuOpen = false;
+    refreshDemo(container);
+  }
+
+  function toggleMobileMenu(container) {
+    setMobileMenuOpen(container, !state.mobileMenuOpen);
   }
 
   function runAnalysis(scenarioKey) {
@@ -705,23 +803,24 @@
 
   function mountDemo(container) {
     if (!container) return;
+    lastDemoContainer = container;
     var scroll = container.querySelector(".demo-main");
     var scrollTop = scroll ? scroll.scrollTop : 0;
-    container.innerHTML = renderDemo();
+    container.innerHTML = renderDemo(container);
     var newScroll = container.querySelector(".demo-main");
     if (newScroll) newScroll.scrollTop = scrollTop;
     bindDemoEvents(container);
   }
 
-  function refreshDemo() {
-    mountDemo(getDemoContainer());
+  function refreshDemo(container) {
+    mountDemo(container || lastDemoContainer || getDemoContainer());
   }
 
   function bindDemoEvents(container) {
     container.querySelectorAll(".demo-nav-item").forEach(function (btn) {
       btn.addEventListener("click", function (e) {
         e.stopPropagation();
-        showScreen(btn.getAttribute("data-screen"));
+        showScreen(btn.getAttribute("data-screen"), container);
       });
     });
 
@@ -731,7 +830,7 @@
         var goto = btn.getAttribute("data-goto");
         var scenario = btn.getAttribute("data-scenario");
         if (goto && !scenario) {
-          showScreen(goto);
+          showScreen(goto, container);
           return;
         }
         runAnalysis(scenario || state.scenarioKey);
@@ -739,10 +838,16 @@
     });
 
     container.querySelectorAll("[data-screen]").forEach(function (btn) {
-      if (btn.classList.contains("demo-nav-item") || btn.classList.contains("demo-mobile-nav-item")) return;
+      if (
+        btn.classList.contains("demo-nav-item") ||
+        btn.classList.contains("demo-mobile-nav-item") ||
+        btn.classList.contains("demo-mobile-more-item")
+      ) {
+        return;
+      }
       btn.addEventListener("click", function (e) {
         e.stopPropagation();
-        showScreen(btn.getAttribute("data-screen"));
+        showScreen(btn.getAttribute("data-screen"), container);
       });
     });
 
@@ -782,7 +887,7 @@
       tab.addEventListener("click", function (e) {
         e.stopPropagation();
         state.staffTab = tab.getAttribute("data-staff-tab");
-        refreshDemo();
+        refreshDemo(container);
       });
     });
 
@@ -790,14 +895,50 @@
       tab.addEventListener("click", function (e) {
         e.stopPropagation();
         state.socialTab = tab.getAttribute("data-social-tab");
-        refreshDemo();
+        refreshDemo(container);
       });
     });
 
-    container.querySelectorAll(".demo-mobile-nav-item").forEach(function (btn) {
+    container.querySelectorAll(".demo-mobile-nav-item[data-screen]").forEach(function (btn) {
       btn.addEventListener("click", function (e) {
         e.stopPropagation();
-        showScreen(btn.getAttribute("data-screen"));
+        showScreen(btn.getAttribute("data-screen"), container);
+      });
+    });
+
+    var moreToggle = container.querySelector(".demo-mobile-more-toggle");
+    if (moreToggle) {
+      moreToggle.addEventListener("click", function (e) {
+        e.stopPropagation();
+        e.preventDefault();
+        toggleMobileMenu(container);
+      });
+    }
+
+    container.querySelectorAll(".demo-mobile-more-backdrop").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        setMobileMenuOpen(container, false);
+      });
+    });
+
+    container.querySelectorAll(".demo-mobile-more-close").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        setMobileMenuOpen(container, false);
+      });
+    });
+
+    container.querySelectorAll(".demo-mobile-more-item").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        showScreen(btn.getAttribute("data-screen"), container);
+      });
+    });
+
+    container.querySelectorAll(".demo-mobile-more-panel").forEach(function (panel) {
+      panel.addEventListener("click", function (e) {
+        e.stopPropagation();
       });
     });
 
@@ -811,7 +952,7 @@
       tab.addEventListener("click", function (e) {
         e.stopPropagation();
         state.analyticsTab = parseInt(tab.getAttribute("data-tab"), 10) || 0;
-        refreshDemo();
+        refreshDemo(container);
       });
     });
 
