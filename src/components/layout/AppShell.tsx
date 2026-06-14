@@ -14,13 +14,15 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const isMarketing = pathname === "/" || pathname === "/demo";
   const isLogin = pathname === "/login";
+  const isSignup = pathname === "/signup";
+  const isOnboarding = pathname === "/onboarding";
   const isEmbedRoute = pathname === "/embed";
   const embedParam = searchParams.get("embed");
   const isEmbed = isEmbeddableEmbedParam(embedParam);
   const isEmbedFull = embedParam === "full";
   const isEmbedMobile = embedParam === "mobile" || embedParam === "1";
 
-  if (isLogin || isMarketing || isEmbedRoute) {
+  if (isLogin || isSignup || isOnboarding || isMarketing || isEmbedRoute) {
     return <>{children}</>;
   }
 

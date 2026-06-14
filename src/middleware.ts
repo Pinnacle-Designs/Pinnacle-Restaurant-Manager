@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { parseSessionToken, AUTH_COOKIE_NAME } from "@/lib/session";
 import { canAccessRoute } from "@/lib/permissions";
 import { canAccessPlanRoute } from "@/lib/plans";
+import { isPlatformAdmin } from "@/lib/platform-admin";
 import { getEmbedFrameAncestors, getMarketingFrameAncestors, isEmbeddableRequest, isEmbeddableEmbedParam } from "@/lib/embed-config";
 import { applyEmbedSessionParam } from "@/lib/embed-session-middleware";
 
@@ -95,6 +96,15 @@ function applyDevCors(request: NextRequest, response: NextResponse): NextRespons
   return response;
 }
 
+function isOnboardingAllowedPath(pathname: string): boolean {
+  return (
+    pathname.startsWith("/onboarding") ||
+    pathname.startsWith("/api/onboarding") ||
+    pathname.startsWith("/api/account/billing/stripe/") ||
+    pathname.startsWith("/api/auth/logout")
+  );
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const embedParam = request.nextUrl.searchParams.get("embed");
@@ -137,6 +147,35 @@ export async function middleware(request: NextRequest) {
       loginUrl.searchParams.set("from", `${pathname}?embed=${embedParam}`);
     }
     return applyFramePolicy(request, NextResponse.redirect(loginUrl));
+  }
+
+  const platformAdmin = isPlatformAdmin(user);
+
+  if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
+    if (!platformAdmin) {
+      if (pathname.startsWith("/api/")) {
+        return applyFramePolicy(
+          request,
+          NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        );
+      }
+      return applyFramePolicy(request, NextResponse.redirect(new URL("/dashboard", request.url)));
+    }
+    return applyFramePolicy(request, NextResponse.next());
+  }
+
+  if (
+    user.role === "OWNER" &&
+    user.setupComplete === false &&
+    !isOnboardingAllowedPath(pathname)
+  ) {
+    if (pathname.startsWith("/api/")) {
+      return applyFramePolicy(
+        request,
+        NextResponse.json({ error: "Complete onboarding first" }, { status: 403 })
+      );
+    }
+    return applyFramePolicy(request, NextResponse.redirect(new URL("/onboarding", request.url)));
   }
 
   if (!canAccessRoute(user.role, pathname, user.permissions)) {

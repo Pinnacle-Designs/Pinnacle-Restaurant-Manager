@@ -31,6 +31,7 @@ export async function createStripeCheckoutSession(input: {
   plan: PlanId;
   customerId?: string | null;
   customerEmail: string;
+  returnTo?: "billing" | "onboarding";
 }) {
   const stripe = getStripe();
   const planDef = PLAN_BY_ID[input.plan];
@@ -69,8 +70,14 @@ export async function createStripeCheckoutSession(input: {
       },
     },
     line_items: [lineItem],
-    success_url: `${base}/account?tab=billing&stripe=success`,
-    cancel_url: `${base}/account?tab=billing&stripe=cancel`,
+    success_url:
+      input.returnTo === "onboarding"
+        ? `${base}/onboarding?stripe=success`
+        : `${base}/account?tab=billing&stripe=success`,
+    cancel_url:
+      input.returnTo === "onboarding"
+        ? `${base}/onboarding?stripe=cancel`
+        : `${base}/account?tab=billing&stripe=cancel`,
     allow_promotion_codes: true,
   });
 }

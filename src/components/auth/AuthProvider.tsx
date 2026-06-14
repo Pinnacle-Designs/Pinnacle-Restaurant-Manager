@@ -15,6 +15,8 @@ export interface AuthUser {
   plan?: PlanId;
   avatarUrl?: string | null;
   permissions?: Permission[];
+  setupComplete?: boolean;
+  isPlatformAdmin?: boolean;
 }
 
 interface AuthContextValue {

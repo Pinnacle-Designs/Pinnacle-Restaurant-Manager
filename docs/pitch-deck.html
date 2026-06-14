@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pinnacle Restaurant Manager — Pitch Deck</title>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --accent: #ea580c;
+      --muted: #64748b;
+      --bg: #ffffff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: var(--ink);
+      background: #f1f5f9;
+      line-height: 1.5;
+    }
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background: var(--ink);
+      color: #fff;
+      font-size: 14px;
+    }
+    .toolbar button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .deck { max-width: 960px; margin: 0 auto; padding: 24px; }
+    .slide {
+      background: var(--bg);
+      border-radius: 16px;
+      min-height: 540px;
+      padding: 48px 56px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      page-break-after: always;
+    }
+    .eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+    h1 { font-size: 42px; line-height: 1.1; margin-bottom: 16px; }
+    h2 { font-size: 32px; line-height: 1.2; margin-bottom: 16px; }
+    p.lead { font-size: 20px; color: var(--muted); max-width: 36em; }
+    ul { margin-top: 20px; padding-left: 1.25rem; font-size: 18px; }
+    li { margin: 8px 0; }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-top: 24px;
+    }
+    .card {
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .card h3 { font-size: 18px; margin-bottom: 8px; }
+    .card p { font-size: 15px; color: var(--muted); }
+    .price { font-size: 36px; font-weight: 800; color: var(--accent); }
+    .footer-note { margin-top: auto; padding-top: 24px; font-size: 13px; color: var(--muted); }
+    @media print {
+      body { background: #fff; }
+      .toolbar { display: none; }
+      .deck { padding: 0; max-width: none; }
+      .slide {
+        box-shadow: none;
+        border-radius: 0;
+        margin: 0;
+        min-height: 100vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <span>Pinnacle pitch deck — print or Save as PDF</span>
+    <button type="button" onclick="window.print()">Download PDF</button>
+  </div>
+
+  <div class="deck">
+    <section class="slide">
+      <p class="eyebrow">Investor & partner overview</p>
+      <h1>Pinnacle Restaurant Manager</h1>
+      <p class="lead">AI-powered operations, analytics, and billing for independent restaurants — one app from the lunch rush to month-end P&amp;L.</p>
+      <p class="footer-note">pinnacle-restaurant-manager · Live demo at /demo</p>
+    </section>
+
+    <section class="slide">
+      <p class="eyebrow">Problem</p>
+      <h2>Restaurants run on fragmented tools</h2>
+      <ul>
+        <li>POS, spreadsheets, and chat threads don&apos;t share context</li>
+        <li>Owners can&apos;t answer &quot;what&apos;s hurting profit?&quot; without hours of digging</li>
+        <li>Staff scheduling, inventory, and finances live in separate silos</li>
+        <li>Multi-location groups lack a single operational view</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <p class="eyebrow">Solution</p>
+      <h2>One workspace for daily ops and business intelligence</h2>
+      <ul>
+        <li>Orders, menu, inventory, staff, tables, and finances in one dashboard</li>
+        <li>12-tab analytics with labor, COGS, waste, and forecast modules</li>
+        <li>AI Command Center — 350+ questions answered from live restaurant data</li>
+        <li>Stripe subscription billing + Square/Stripe Connect for guest payments</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <p class="eyebrow">Product</p>
+      <h2>Built for how restaurants actually run</h2>
+      <div class="grid-2">
+        <div class="card"><h3>Operations</h3><p>Floor plan, orders, checks, split pay, receipt OCR</p></div>
+        <div class="card"><h3>Back office</h3><p>Inventory scans, vendor tracking, expense categories</p></div>
+        <div class="card"><h3>People</h3><p>Roles, schedules, per-user permissions</p></div>
+        <div class="card"><h3>Growth</h3><p>Social posts, marketing photos, website sync</p></div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <p class="eyebrow">Differentiation</p>
+      <h2>AI that uses your data — not generic advice</h2>
+      <ul>
+        <li>Insights engine flags critical pain points with push notifications</li>
+        <li>Natural-language Q&amp;A across orders, labor, inventory, and margins</li>
+        <li>Embeddable live demo for zero-friction sales and onboarding</li>
+        <li>PWA install — home-screen app without app-store friction</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <p class="eyebrow">Business model</p>
+      <h2>SaaS per location</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Starter</h3>
+          <p class="price">$49<span style="font-size:16px;font-weight:600">/mo</span></p>
+          <p>Small diners, cafes, food trucks</p>
+        </div>
+        <div class="card">
+          <h3>Growth</h3>
+          <p class="price">$149<span style="font-size:16px;font-weight:600">/mo</span></p>
+          <p>Most independent restaurants</p>
+        </div>
+        <div class="card">
+          <h3>Pro</h3>
+          <p class="price">$299<span style="font-size:16px;font-weight:600">/mo</span></p>
+          <p>Full analytics, social, AI packs</p>
+        </div>
+        <div class="card">
+          <h3>Enterprise</h3>
+          <p class="price">Custom</p>
+          <p>Multi-location groups, SSO, dedicated support</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <p class="eyebrow">Go-to-market</p>
+      <h2>Self-serve signup → guided onboarding → Stripe autopay</h2>
+      <ul>
+        <li>Marketing site with embedded live product demo</li>
+        <li>Plan selection at signup (Starter / Growth / Pro)</li>
+        <li>4-step restaurant onboarding wizard after account creation</li>
+        <li>PCI-compliant billing via Stripe Checkout; POS via Square or Stripe Connect</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <p class="eyebrow">Traction &amp; tech</p>
+      <h2>Production-ready stack</h2>
+      <ul>
+        <li>Next.js 15 · TypeScript · Prisma · SQLite (Vercel-ready)</li>
+        <li>Role-based access, rate limits, webhook-verified payments</li>
+        <li>Platform admin panel for locations, plans, and user management</li>
+        <li>Optional OpenAI for OCR, photo analysis, and GPT insights</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <p class="eyebrow">Ask</p>
+      <h2>Partner with us</h2>
+      <p class="lead">We&apos;re onboarding founding restaurants and strategic partners. Live demo, pilot programs, and investor conversations welcome.</p>
+      <ul>
+        <li>Try the product: embedded demo on the marketing site</li>
+        <li>Contact: support@pinnacle.app (configure SUPPORT_EMAIL in production)</li>
+        <li>Stack: Node 24+ · AUTH_SECRET · Stripe webhooks at /api/webhooks/stripe</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>

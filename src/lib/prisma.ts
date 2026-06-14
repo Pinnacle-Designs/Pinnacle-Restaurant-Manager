@@ -21,7 +21,9 @@ function hasCurrentSchema(): boolean {
 
   return Boolean(
     userModel?.fields.some((f) => f.name === "avatarUrl") &&
+      userModel?.fields.some((f) => f.name === "isPlatformAdmin") &&
       locationModel?.fields.some((f) => f.name === "autopayEnabled") &&
+      locationModel?.fields.some((f) => f.name === "setupComplete") &&
       Prisma.dmmf.datamodel.models.some((m) => m.name === "RolePermissionSet")
   );
 }

@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
 import Stripe from "stripe";
-import { getStripe } from "@/lib/payments/stripe-server";
+import { getStripe, retrieveStripeSubscription } from "@/lib/payments/stripe-server";
 import {
   planFromStripeMetadata,
   syncLocationFromStripeSubscription,
   clearStripeSubscriptionForLocation,
+  markStripeSubscriptionPaymentFailed,
 } from "@/lib/payments/sync-subscription";
 import { prisma } from "@/lib/prisma";
 
@@ -63,6 +64,22 @@ export async function POST(request: NextRequest) {
         const locationId = subscription.metadata?.locationId;
         if (locationId) {
           await clearStripeSubscriptionForLocation(locationId);
+        }
+        break;
+      }
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const subscriptionId =
+          typeof invoice.subscription === "string"
+            ? invoice.subscription
+            : invoice.subscription?.id;
+        if (subscriptionId) {
+          const subscription = await retrieveStripeSubscription(subscriptionId);
+          const locationId = subscription.metadata?.locationId;
+          if (locationId) {
+            await markStripeSubscriptionPaymentFailed(locationId, subscriptionId);
+            await syncLocationFromStripeSubscription(locationId, subscriptionId);
+          }
         }
         break;
       }

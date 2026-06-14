@@ -1,59 +1,74 @@
 # Pinnacle Restaurant Manager
 
-AI-powered restaurant management — photos, inventory, staff, orders, finances, and automated business insights.
+AI-powered restaurant management — orders, inventory, staff, finances, analytics, and automated business insights.
 
-## Features
+## Requirements
 
-- **Dashboard** — Revenue, expenses, low-stock alerts, and quick actions
-- **Photo Library** — Capture/upload photos, sort by category, AI image analysis
-- **Menu / Inventory / Staff** — Full add, edit, and delete forms
-- **Tables** — Visual floor plan with status toggling (available, occupied, reserved)
-- **Orders** — Create orders, update status, link to tables
-- **Finances** — Expense tracking with **Receipt OCR** (AI extracts vendor, amount, category)
-- **AI Insights** — Automated pain point detection with **push notifications** for critical alerts
-- **Multi-location** — Switch between restaurant locations; all data scoped per location
+**Node.js 24+** — see `engines` in `package.json`.
 
-## Quick Start
+## Quick start
 
 ```bash
-npm install
-npm run db:push
-npm run dev
+npm run launch
 ```
 
 Open [http://localhost:3000](http://localhost:3000)
 
-### Seed Sample Data
+Full setup, environment variables, Stripe billing, deployment, and admin panel: **[SETUP.md](./SETUP.md)**
 
-Visit `http://localhost:3000/api/seed` to populate menu, inventory, staff, tables, and expenses for the current location.
+## Features
 
-### AI Features (Optional)
+- **Dashboard** — Revenue, expenses, low-stock alerts, quick actions
+- **Orders & POS** — Checks, split pay, cash/card/mobile payments
+- **Menu / Inventory / Staff / Tables** — Full CRUD with barcode scan
+- **Finances** — Expense tracking with receipt OCR
+- **Analytics** — 12-tab business intelligence
+- **AI Insights** — Pain point detection with push notifications
+- **Account** — Profile, team permissions, Stripe autopay, Square/Stripe Connect
+- **Onboarding** — Guided setup after signup (details → sample data → billing)
+- **Admin panel** — Platform management at `/admin` for authorized operators
 
-Add your OpenAI API key to `.env`:
-
-```
-OPENAI_API_KEY=sk-your-key-here
-```
-
-Enables photo analysis, receipt OCR, and GPT-powered business insights. Without a key, rule-based insights still work.
-
-### Push Notifications
-
-On first load, the app requests notification permission. Critical and high-severity AI insights trigger browser notifications after running analysis.
-
-## Tech Stack
-
-- Next.js 15 (App Router)
-- TypeScript · Tailwind CSS 4 · Prisma + SQLite
-- OpenAI (optional) · Service Worker notifications
-
-## Project Structure
+## Signup flow
 
 ```
-src/
-  app/           # Pages and API routes
-  components/    # UI, forms, receipt scanner, tables
-  lib/           # Database, AI, location, notifications
-prisma/          # Database schema (multi-location)
-public/uploads/  # Uploaded photos and receipts
+/signup?plan=GROWTH  →  create account  →  /onboarding  →  /dashboard
+```
+
+Plans: **Starter** ($49), **Growth** ($149), **Pro** ($299) per location/month.
+
+## Payments
+
+| Flow | Provider |
+|------|----------|
+| Subscription autopay | Stripe Checkout + Customer Portal |
+| Guest card payments | Square OAuth or Stripe Connect |
+
+Owners configure under **Account → Billing & autopay**. Setup guide: **Account → Payments & support**.
+
+## Marketing & pitch deck
+
+- In-app landing: `/`
+- Static site: `/docs/` (also `docs/index.html` for GitHub Pages)
+- Pitch deck: `docs/pitch-deck.html` — open and **Print → Save as PDF**
+
+## Demo (development)
+
+```bash
+# After seed (dev): owner@pinnacle.com / demo1234
+```
+
+Seed route: `/api/auth/seed` (disabled in production unless `ENABLE_AUTH_SEED=true`)
+
+## Tech stack
+
+Next.js 15 · TypeScript · Tailwind CSS 4 · Prisma + SQLite · Stripe · OpenAI (optional)
+
+## Project structure
+
+```
+src/app/          Pages and API routes
+src/components/   UI, onboarding, admin, account
+src/lib/          Auth, payments, permissions, AI
+docs/             Marketing site and pitch deck
+prisma/           Schema and deploy database
 ```

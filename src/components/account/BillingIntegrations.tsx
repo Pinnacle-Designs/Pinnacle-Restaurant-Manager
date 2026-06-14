@@ -353,6 +353,13 @@ export function BillingIntegrations({
           </div>
         )}
       </div>
+
+      <p className="text-sm text-slate-500">
+        Security details and setup guides:{" "}
+        <a href="/account?tab=support" className="font-medium text-orange-600 hover:text-orange-500">
+          Payments & support
+        </a>
+      </p>
     </div>
   );
 }

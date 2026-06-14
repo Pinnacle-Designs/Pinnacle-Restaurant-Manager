@@ -14,6 +14,8 @@ export interface SessionUser {
   plan?: PlanId;
   avatarUrl?: string | null;
   permissions?: Permission[];
+  setupComplete?: boolean;
+  isPlatformAdmin?: boolean;
 }
 
 function getSecret(): string {
@@ -109,6 +111,8 @@ export async function parseSessionToken(token: string): Promise<SessionUser | nu
       plan: data.plan,
       avatarUrl: data.avatarUrl,
       permissions: data.permissions,
+      setupComplete: data.setupComplete,
+      isPlatformAdmin: data.isPlatformAdmin,
     };
   } catch {
     return null;

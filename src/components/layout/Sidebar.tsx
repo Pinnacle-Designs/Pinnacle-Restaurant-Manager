@@ -17,6 +17,7 @@ import {
   Share2,
   BarChart3,
   Settings,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/constants";
@@ -75,6 +76,20 @@ export function Sidebar() {
             </EmbedNavLink>
           );
         })}
+        {user?.isPlatformAdmin && (
+          <EmbedNavLink
+            href="/admin"
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+              pathname === "/admin"
+                ? "bg-orange-500 text-white"
+                : "text-slate-300 hover:bg-slate-800 hover:text-white"
+            )}
+          >
+            <Shield className="h-5 w-5" />
+            Platform admin
+          </EmbedNavLink>
+        )}
       </nav>
       {user && (
         <div className="border-t border-slate-700 p-4">

@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import {
   Camera,
   CreditCard,
+  LifeBuoy,
   Lock,
   Shield,
   User,
@@ -19,18 +20,20 @@ import { Input, FormField } from "@/components/ui/form";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { PermissionsTab } from "@/components/account/PermissionsTab";
 import { BillingIntegrations } from "@/components/account/BillingIntegrations";
+import { PaymentSupportPanel } from "@/components/account/PaymentSupportPanel";
 import { PLAN_BY_ID } from "@/lib/plans";
 import { ROLE_LABELS, ROLE_COLORS } from "@/lib/permissions";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { PlanId } from "@/lib/plans";
 import type { AppRole } from "@prisma/client";
 
-type Tab = "profile" | "security" | "billing" | "permissions";
+type Tab = "profile" | "security" | "billing" | "support" | "permissions";
 
 const BASE_TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "profile", label: "Profile", icon: User },
   { id: "security", label: "Security", icon: Lock },
   { id: "billing", label: "Billing & autopay", icon: CreditCard },
+  { id: "support", label: "Payments & support", icon: LifeBuoy },
   { id: "permissions", label: "Team access", icon: Users },
 ];
 
@@ -656,6 +659,8 @@ export function AccountClient() {
               )}
             </div>
           )}
+
+          {tab === "support" && <PaymentSupportPanel />}
 
           {tab === "permissions" && can("manage_permissions") && <PermissionsTab />}
         </div>

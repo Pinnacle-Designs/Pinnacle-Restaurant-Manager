@@ -58,6 +58,8 @@ export async function POST(request: NextRequest) {
       address: "Add your address",
       plan,
       billingEmail: email,
+      setupComplete: false,
+      onboardingStep: 0,
     },
   });
 
@@ -78,6 +80,7 @@ export async function POST(request: NextRequest) {
     name: user.name,
     role: user.role,
     locationId: user.locationId,
+    setupComplete: false,
   });
 
   const token = await createSessionToken(sessionUser);

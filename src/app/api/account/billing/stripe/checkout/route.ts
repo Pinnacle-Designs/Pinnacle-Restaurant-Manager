@@ -35,11 +35,14 @@ export async function POST(request: NextRequest) {
   }
 
   const existing = await getProviderConnection(locationId!, "SUBSCRIPTION");
+  const body = await request.json().catch(() => ({}));
+  const returnTo = body?.returnTo === "onboarding" ? "onboarding" : "billing";
   const session = await createStripeCheckoutSession({
     locationId: locationId!,
     plan: location.plan as PlanId,
     customerId: existing?.accountId,
     customerEmail: location.billingEmail || user!.email,
+    returnTo,
   });
 
   return privateJsonResponse({ url: session.url });

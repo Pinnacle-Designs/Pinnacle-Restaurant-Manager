@@ -61,7 +61,7 @@ export function SignupFlow({ initialPlan = "GROWTH", onSuccess, onCancel, embedd
         plan={selectedPlan}
         embedded={embedded}
         onContinue={() => {
-          window.location.assign("/dashboard");
+          window.location.assign("/onboarding");
         }}
       />
     );

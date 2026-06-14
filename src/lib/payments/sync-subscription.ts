@@ -97,6 +97,18 @@ export async function clearStripeSubscriptionForLocation(locationId: string) {
   });
 }
 
+export async function markStripeSubscriptionPaymentFailed(locationId: string, subscriptionId: string) {
+  await prisma.paymentProviderConnection.updateMany({
+    where: {
+      locationId,
+      purpose: "SUBSCRIPTION",
+      provider: "STRIPE",
+      externalRef: subscriptionId,
+    },
+    data: { status: "past_due" },
+  });
+}
+
 export function planFromStripeMetadata(metadata: Record<string, string> | null | undefined): PlanId | null {
   const raw = metadata?.plan?.toUpperCase();
   if (raw === "STARTER" || raw === "GROWTH" || raw === "PRO") return raw;
