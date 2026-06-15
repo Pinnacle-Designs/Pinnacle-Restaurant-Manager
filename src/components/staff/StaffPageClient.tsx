@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Users, Calendar, Banknote, ArrowLeftRight, CalendarDays, UserPlus } from "lucide-react";
+import { Users, Calendar, Banknote, ArrowLeftRight, CalendarDays, UserPlus, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { StaffClient } from "@/components/staff/StaffClient";
@@ -10,6 +10,7 @@ import { PayrollClient } from "@/components/staff/PayrollClient";
 import { MyScheduleClient } from "@/components/staff/MyScheduleClient";
 import { ShiftSwapClient } from "@/components/staff/ShiftSwapClient";
 import { HiringClient } from "@/components/staff/HiringClient";
+import { TrainingClient } from "@/components/staff/TrainingClient";
 
 interface StaffMember {
   id: string;
@@ -23,7 +24,7 @@ interface StaffMember {
   active: boolean;
 }
 
-type Tab = "team" | "schedule" | "payroll" | "my_schedule" | "swaps" | "hiring";
+type Tab = "team" | "schedule" | "payroll" | "my_schedule" | "swaps" | "hiring" | "training";
 
 export function StaffPageClient({ initialStaff }: { initialStaff: StaffMember[] }) {
   const { can } = useAuth();
@@ -31,6 +32,7 @@ export function StaffPageClient({ initialStaff }: { initialStaff: StaffMember[] 
   const canSchedule = can("manage_schedule");
   const canPayroll = can("manage_payroll");
   const canHiring = can("manage_hiring");
+  const canTraining = can("manage_training") || can("complete_training");
   const canOwnSchedule = can("view_own_schedule");
   const canSwaps = canOwnSchedule || can("approve_shift_swaps");
 
@@ -49,6 +51,7 @@ export function StaffPageClient({ initialStaff }: { initialStaff: StaffMember[] 
   const tabs = (
     [
       { id: "hiring" as Tab, label: "Hiring", icon: UserPlus, show: canHiring },
+      { id: "training" as Tab, label: "Training", icon: GraduationCap, show: canTraining },
       { id: "payroll" as Tab, label: "Payroll", icon: Banknote, show: canPayroll },
       { id: "schedule" as Tab, label: "Schedule", icon: Calendar, show: canSchedule },
       { id: "my_schedule" as Tab, label: "My schedule", icon: CalendarDays, show: canOwnSchedule && !canSchedule },
@@ -80,6 +83,8 @@ export function StaffPageClient({ initialStaff }: { initialStaff: StaffMember[] 
 
       {tab === "hiring" && canHiring ? (
         <HiringClient />
+      ) : tab === "training" && canTraining ? (
+        <TrainingClient staff={staff} />
       ) : tab === "payroll" && canPayroll ? (
         <PayrollClient staff={staff} />
       ) : tab === "schedule" && canSchedule ? (

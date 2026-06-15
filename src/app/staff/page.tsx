@@ -22,8 +22,10 @@ export default async function StaffPage() {
         title="Staff"
         description={
           user && hasPermissionInList(user.permissions, "manage_hiring")
-            ? "Hiring pipeline, text-to-apply, payroll, schedules, and team"
-            : user && hasPermissionInList(user.permissions, "manage_payroll")
+            ? "Hiring, training & certifications, payroll, schedules, and team"
+            : user && hasPermissionInList(user.permissions, "manage_training")
+              ? "Certification tracking, compliance training, payroll, and schedules"
+              : user && hasPermissionInList(user.permissions, "manage_payroll")
             ? "Payroll, schedules, tip pooling, and team roster"
             : user && hasPermissionInList(user.permissions, "edit_staff")
               ? "Manage your team and build weekly schedules"

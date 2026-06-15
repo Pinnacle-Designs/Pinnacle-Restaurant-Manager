@@ -68,15 +68,19 @@ async function seedHiringSample(locationId: string) {
     update: {},
   });
 
-  const posting = await prisma.jobPosting.create({
-    data: {
-      locationId,
-      title: "Server — evenings",
-      role: "Server",
-      applyCode: "DEMO1",
-      active: true,
-    },
-  });
+  const posting =
+    (await prisma.jobPosting.findFirst({
+      where: { locationId, applyCode: "DEMO1" },
+    })) ??
+    (await prisma.jobPosting.create({
+      data: {
+        locationId,
+        title: "Server — evenings",
+        role: "Server",
+        applyCode: "DEMO1",
+        active: true,
+      },
+    }));
 
   const pipeline = [
     { name: "Alex Rivera", phone: "+15559001001", status: "NEW" as const, role: "Server" },
@@ -86,14 +90,21 @@ async function seedHiringSample(locationId: string) {
   ];
 
   for (const row of pipeline) {
-    const applicant = await prisma.applicant.create({
-      data: {
+    const applicant = await prisma.applicant.upsert({
+      where: { locationId_phone: { locationId, phone: row.phone } },
+      create: {
         locationId,
         name: row.name,
         phone: row.phone,
         email: `${row.name.split(" ")[0].toLowerCase()}@example.com`,
       },
+      update: { name: row.name },
     });
+
+    const existingApp = await prisma.application.findFirst({
+      where: { locationId, applicantId: applicant.id, role: row.role },
+    });
+    if (existingApp) continue;
 
     const application = await prisma.application.create({
       data: {
@@ -101,7 +112,7 @@ async function seedHiringSample(locationId: string) {
         applicantId: applicant.id,
         jobPostingId: posting.id,
         role: row.role,
-        source: row.status === "NEW" ? "SMS" : "WEB",
+        source: row.status === "NEW" ? "TEXT_APPLY" : "WEB",
         status: row.status,
         hiredAt: row.status === "HIRED" ? new Date() : null,
       },
@@ -132,6 +143,44 @@ async function seedHiringSample(locationId: string) {
         },
       });
     }
+  }
+}
+
+async function seedTrainingSample(locationId: string) {
+  const { ensureDefaultTrainingModules } = await import("@/lib/training/seed-modules");
+  const { addMonths, subMonths } = await import("date-fns");
+  await ensureDefaultTrainingModules(locationId);
+
+  const staff = await prisma.staffMember.findMany({
+    where: { locationId, active: true },
+    take: 6,
+  });
+  if (staff.length === 0) return;
+
+  const existingCerts = await prisma.staffCertification.count({ where: { locationId } });
+  if (existingCerts > 0) return;
+
+  const now = new Date();
+  const samples: { staffIndex: number; certType: string; expiresAt: Date }[] = [
+    { staffIndex: 0, certType: "servsafe_manager", expiresAt: addMonths(now, 8) },
+    { staffIndex: 1, certType: "servsafe_food_handler", expiresAt: addMonths(now, 14) },
+    { staffIndex: 2, certType: "food_handler_card", expiresAt: subMonths(now, 1) },
+    { staffIndex: 3, certType: "tips_alcohol", expiresAt: addMonths(now, 3) },
+    { staffIndex: 3, certType: "food_handler_card", expiresAt: addMonths(now, 20) },
+  ];
+
+  for (const row of samples) {
+    const member = staff[row.staffIndex % staff.length];
+    await prisma.staffCertification.create({
+      data: {
+        locationId,
+        staffMemberId: member.id,
+        certType: row.certType,
+        issuer: "ServSafe / State",
+        issuedAt: subMonths(row.expiresAt, 24),
+        expiresAt: row.expiresAt,
+      },
+    });
   }
 }
 
@@ -204,6 +253,7 @@ export async function seedLocationData(locationId: string) {
       await import("@/lib/analytics/seed-sample").then((m) => m.seedAnalyticsSampleData(locationId));
     }
     await seedHiringSample(locationId);
+    await seedTrainingSample(locationId);
     return {
       message: "Already seeded for this location",
       locationId,
@@ -263,6 +313,7 @@ export async function seedLocationData(locationId: string) {
   await seedSocialAccounts(locationId);
   await import("@/lib/analytics/seed-sample").then((m) => m.seedAnalyticsSampleData(locationId));
   await seedHiringSample(locationId);
+  await seedTrainingSample(locationId);
 
   return { message: "Seed data created successfully", locationId, alreadySeeded: false, partial: false };
 }

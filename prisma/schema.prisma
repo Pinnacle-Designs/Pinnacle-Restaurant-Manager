@@ -184,6 +184,19 @@ enum OnboardingDocType {
   DIRECT_DEPOSIT
 }
 
+enum TrainingModuleKind {
+  COMPLIANCE
+  SAFETY
+  CERTIFICATION
+}
+
+enum CertAlertLevel {
+  OK
+  EXPIRING
+  EXPIRED
+  MISSING
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -263,6 +276,10 @@ model Location {
   applications         Application[]
   smsMessages          SmsMessage[]
   onboardingPackets    OnboardingPacket[]
+  trainingSettings       TrainingSettings?
+  staffCertifications  StaffCertification[]
+  trainingModules      TrainingModule[]
+  trainingCompletions  TrainingCompletion[]
 }
 
 model PaymentProviderConnection {
@@ -367,6 +384,8 @@ model StaffMember {
   timeEntries TimeEntry[]
   swapRequestsAsRequester ShiftSwapRequest[] @relation("SwapRequester")
   swapRequestsAsCounterparty ShiftSwapRequest[] @relation("SwapCounterparty")
+  certifications StaffCertification[]
+  trainingCompletions TrainingCompletion[]
 }
 
 model Shift {
@@ -993,4 +1012,69 @@ model ExternalFactor {
   description String
   impactPct   Float    @default(0)
   createdAt   DateTime @default(now())
+}
+
+model TrainingSettings {
+  id                 String   @id @default(cuid())
+  locationId         String   @unique
+  location           Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  expirationWarnDays Int      @default(30)
+  updatedAt          DateTime @updatedAt
+}
+
+model StaffCertification {
+  id                String   @id @default(cuid())
+  locationId        String
+  location          Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  staffMemberId     String
+  staffMember       StaffMember @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+  certType          String
+  issuer            String?
+  certificateNumber String?
+  issuedAt          DateTime?
+  expiresAt         DateTime?
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([locationId, expiresAt])
+  @@index([staffMemberId])
+}
+
+model TrainingModule {
+  id               String             @id @default(cuid())
+  locationId       String
+  location         Location           @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  moduleKey        String
+  title            String
+  kind             TrainingModuleKind @default(COMPLIANCE)
+  summary          String
+  content          String
+  estimatedMinutes Int                @default(15)
+  required         Boolean            @default(true)
+  renewalMonths    Int?
+  active           Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  completions      TrainingCompletion[]
+
+  @@unique([locationId, moduleKey])
+}
+
+model TrainingCompletion {
+  id            String         @id @default(cuid())
+  locationId    String
+  location      Location       @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  moduleId      String
+  module        TrainingModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  staffMemberId String
+  staffMember   StaffMember    @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+  completedAt   DateTime       @default(now())
+  score         Int?
+  signatureName String?
+  expiresAt     DateTime?
+  createdAt     DateTime       @default(now())
+
+  @@index([staffMemberId, moduleId])
+  @@index([locationId, expiresAt])
 }
