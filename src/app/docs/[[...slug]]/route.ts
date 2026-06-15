@@ -29,6 +29,7 @@ function prepareDocsHtml(html: string): string {
   out = out.replace('href="styles.css"', 'href="/docs/styles.css"');
   out = out.replace(/href="\.\/assets\//g, 'href="/docs/assets/');
   out = out.replace(/src="\.\/assets\//g, 'src="/docs/assets/');
+  out = out.replace(/src="assets\//g, 'src="/docs/assets/');
   out = out.replace(/href="\.\/index\.html/g, 'href="/docs');
   out = out.replace(/href="\.\/pitch\.html/g, 'href="/docs/pitch.html');
   return out;
