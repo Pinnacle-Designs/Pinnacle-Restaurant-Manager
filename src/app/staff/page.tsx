@@ -25,6 +25,8 @@ export default async function StaffPage() {
             ? "Hiring, training, labor compliance, payroll, schedules, and team"
             : user && hasPermissionInList(user.permissions, "manage_compliance")
               ? "Minor labor guardrails, OSHA incident log, audit records, and schedules"
+              : user && hasPermissionInList(user.permissions, "manage_retention")
+              ? "Shift feedback, turnover analytics, payroll, and schedules"
               : user && hasPermissionInList(user.permissions, "manage_training")
               ? "Certification tracking, compliance training, payroll, and schedules"
               : user && hasPermissionInList(user.permissions, "manage_payroll")

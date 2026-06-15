@@ -19,6 +19,7 @@ export type Permission =
   | "manage_training"
   | "complete_training"
   | "manage_compliance"
+  | "manage_retention"
   | "manage_orders"
   | "manage_menu"
   | "manage_inventory"
@@ -45,6 +46,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   "manage_training",
   "complete_training",
   "manage_compliance",
+  "manage_retention",
   "manage_orders",
   "manage_menu",
   "manage_inventory",
@@ -76,6 +78,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   manage_training: "Manage training & certifications",
   complete_training: "Complete compliance training",
   manage_compliance: "Labor law & compliance",
+  manage_retention: "Retention & performance feedback",
   manage_orders: "Manage orders",
   manage_menu: "Manage menu",
   manage_inventory: "Manage inventory",
@@ -89,7 +92,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
 export const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] = [
   {
     label: "Administration",
-    permissions: ["manage_permissions", "edit_staff", "manage_schedule", "manage_payroll", "approve_shift_swaps", "manage_hiring", "manage_training", "manage_compliance"],
+    permissions: ["manage_permissions", "edit_staff", "manage_schedule", "manage_payroll", "approve_shift_swaps", "manage_hiring", "manage_training", "manage_compliance", "manage_retention"],
   },
   {
     label: "Financial",
@@ -128,6 +131,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, Permission[]> = {
     "manage_training",
     "complete_training",
     "manage_compliance",
+    "manage_retention",
     "view_own_schedule",
     "clock_in",
     "manage_orders",
@@ -175,6 +179,7 @@ const ROUTE_PERMISSION_MAP: Record<string, Permission> = {
   "/api/training/my": "complete_training",
   "/api/training/modules": "complete_training",
   "/api/compliance": "manage_compliance",
+  "/api/retention": "manage_retention",
   "/api/timeclock": "clock_in",
   "/api/shift-swaps": "view_own_schedule",
 };
@@ -185,6 +190,8 @@ function routeBase(pathname: string): string {
   if (pathname.startsWith("/api/compliance/audit-records")) return "/api/compliance";
   if (pathname.startsWith("/api/compliance/incidents")) return "/api/compliance";
   if (pathname.startsWith("/api/compliance")) return "/api/compliance";
+  if (pathname.startsWith("/api/retention/feedback")) return "/api/retention";
+  if (pathname.startsWith("/api/retention")) return "/api/retention";
   if (pathname.startsWith("/api/")) {
     const parts = pathname.split("/").filter(Boolean);
     return parts.length >= 2 ? `/${parts[0]}/${parts[1]}` : pathname;

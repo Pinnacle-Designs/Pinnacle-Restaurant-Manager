@@ -216,6 +216,12 @@ enum IncidentStatus {
   CLOSED
 }
 
+enum ShiftFeedbackKind {
+  NOTE
+  SHOUT_OUT
+  COACHING
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -301,6 +307,7 @@ model Location {
   trainingCompletions  TrainingCompletion[]
   complianceSettings   ComplianceSettings?
   incidentReports      IncidentReport[]
+  shiftFeedback        ShiftFeedback[]
 }
 
 model PaymentProviderConnection {
@@ -394,6 +401,9 @@ model StaffMember {
   isTippedEmployee Boolean @default(false)
   tipPoints  Float    @default(1)
   active     Boolean  @default(true)
+  hireDate   DateTime?
+  terminatedAt DateTime?
+  terminationReason String?
   imageUrl   String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -409,6 +419,7 @@ model StaffMember {
   certifications StaffCertification[]
   trainingCompletions TrainingCompletion[]
   incidentReports IncidentReport[]
+  shiftFeedback   ShiftFeedback[]
 }
 
 model Shift {
@@ -428,6 +439,7 @@ model Shift {
   timeEntries   TimeEntry[]
   swapRequests  ShiftSwapRequest[] @relation("SwapShift")
   offerSwapRequests ShiftSwapRequest[] @relation("SwapOffer")
+  feedback      ShiftFeedback[]
 
   @@index([locationId, date])
   @@index([staffMemberId, date])
@@ -1138,4 +1150,23 @@ model IncidentReport {
 
   @@index([locationId, reportedAt])
   @@index([locationId, status])
+}
+
+model ShiftFeedback {
+  id            String            @id @default(cuid())
+  locationId    String
+  location      Location          @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  staffMemberId String
+  staffMember   StaffMember       @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+  shiftId       String?
+  shift         Shift?            @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  authorUserId  String?
+  authorName    String
+  kind          ShiftFeedbackKind @default(NOTE)
+  content       String
+  createdAt     DateTime          @default(now())
+
+  @@index([staffMemberId, createdAt])
+  @@index([locationId, createdAt])
+  @@index([shiftId])
 }

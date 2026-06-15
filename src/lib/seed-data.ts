@@ -255,6 +255,94 @@ async function seedComplianceSample(locationId: string) {
   }
 }
 
+async function seedRetentionSample(locationId: string) {
+  const { subMonths, subDays } = await import("date-fns");
+
+  let former = await prisma.staffMember.findFirst({
+    where: { locationId, name: "Chris Alvarez (Former)" },
+  });
+  if (!former) {
+    former = await prisma.staffMember.create({
+      data: {
+        locationId,
+        name: "Chris Alvarez (Former)",
+        role: "Server",
+        email: "chris.former@example.com",
+        hourlyRate: 14,
+        active: false,
+        hireDate: subMonths(new Date(), 8),
+        terminatedAt: subMonths(new Date(), 1),
+        terminationReason: "Voluntary — schedule conflict",
+      },
+    });
+
+    for (let i = 0; i < 12; i++) {
+      const day = subDays(subMonths(new Date(), 1), i * 3);
+      day.setHours(12, 0, 0, 0);
+      await prisma.shift.create({
+        data: {
+          locationId,
+          staffMemberId: former.id,
+          date: day,
+          startTime: "17:00",
+          endTime: "23:00",
+          workRole: "Server",
+        },
+      });
+    }
+  }
+
+  let formerHost = await prisma.staffMember.findFirst({
+    where: { locationId, name: "Morgan Lee (Former)" },
+  });
+  if (!formerHost) {
+    formerHost = await prisma.staffMember.create({
+      data: {
+        locationId,
+        name: "Morgan Lee (Former)",
+        role: "Host",
+        hourlyRate: 13,
+        active: false,
+        hireDate: subMonths(new Date(), 5),
+        terminatedAt: subMonths(new Date(), 2),
+        terminationReason: "Better opportunity elsewhere",
+      },
+    });
+  }
+
+  const feedbackCount = await prisma.shiftFeedback.count({ where: { locationId } });
+  if (feedbackCount === 0) {
+    const sarah = await prisma.staffMember.findFirst({
+      where: { locationId, name: { contains: "Sarah" } },
+    });
+    const maria = await prisma.staffMember.findFirst({
+      where: { locationId, role: { contains: "Chef" } },
+    });
+    if (sarah) {
+      await prisma.shiftFeedback.create({
+        data: {
+          locationId,
+          staffMemberId: sarah.id,
+          authorName: "Demo Manager",
+          kind: "SHOUT_OUT",
+          content: "Handled a 12-top flawlessly during Friday rush — guests asked for her by name.",
+        },
+      });
+    }
+    if (maria) {
+      await prisma.shiftFeedback.create({
+        data: {
+          locationId,
+          staffMemberId: maria.id,
+          authorName: "Demo Manager",
+          kind: "NOTE",
+          content: "Strong expo communication during brunch; consider for lead cook training.",
+        },
+      });
+    }
+  }
+}
+
 async function seedSocialAccounts(locationId: string) {
   const accounts = [
     {
@@ -326,6 +414,7 @@ export async function seedLocationData(locationId: string) {
     await seedHiringSample(locationId);
     await seedTrainingSample(locationId);
     await seedComplianceSample(locationId);
+    await seedRetentionSample(locationId);
     return {
       message: "Already seeded for this location",
       locationId,
@@ -387,6 +476,7 @@ export async function seedLocationData(locationId: string) {
   await seedHiringSample(locationId);
   await seedTrainingSample(locationId);
   await seedComplianceSample(locationId);
+  await seedRetentionSample(locationId);
 
   return { message: "Seed data created successfully", locationId, alreadySeeded: false, partial: false };
 }

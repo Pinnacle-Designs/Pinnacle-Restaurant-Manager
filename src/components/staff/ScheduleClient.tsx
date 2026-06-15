@@ -9,6 +9,7 @@ import {
   Plus,
   Trash2,
   Calendar,
+  Star,
 } from "lucide-react";
 import { Button, EmptyState } from "@/components/ui";
 import { Input, Select, Textarea, FormField, Modal } from "@/components/ui/form";
@@ -26,7 +27,9 @@ import {
 } from "@/lib/schedule";
 import { JOB_ROLES } from "@/lib/payroll/job-roles";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { LaborForecastPanel } from "@/components/staff/LaborForecastPanel";
+import { ShiftFeedbackModal, formatShiftLabel } from "@/components/staff/ShiftFeedbackModal";
 
 interface StaffMember {
   id: string;
@@ -61,6 +64,8 @@ const emptyForm = {
 };
 
 export function ScheduleClient({ staff }: ScheduleClientProps) {
+  const { can } = useAuth();
+  const canFeedback = can("manage_retention");
   const [weekStart, setWeekStart] = useState(() => getWeekStart());
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,6 +77,12 @@ export function ScheduleClient({ staff }: ScheduleClientProps) {
   const [copying, setCopying] = useState(false);
   const [complianceOverride, setComplianceOverride] = useState(false);
   const [showOverrideOption, setShowOverrideOption] = useState(false);
+  const [feedbackTarget, setFeedbackTarget] = useState<{
+    staffMemberId: string;
+    staffName: string;
+    shiftId: string;
+    shiftLabel: string;
+  } | null>(null);
 
   const activeStaff = staff.filter((s) => s.active);
   const weekDays = getWeekDays(weekStart);
@@ -311,12 +322,10 @@ export function ScheduleClient({ staff }: ScheduleClientProps) {
                       <td key={day.toISOString()} className="px-1 py-2 align-top">
                         <div className="flex min-h-[64px] flex-col gap-1">
                           {cellShifts.map((shift) => (
-                            <button
+                            <div
                               key={shift.id}
-                              type="button"
-                              onClick={() => openEdit(shift)}
                               className={cn(
-                                "rounded-md border px-2 py-1.5 text-left text-xs transition-opacity hover:opacity-80",
+                                "group relative rounded-md border px-2 py-1.5 text-left text-xs",
                                 roleColor(shift.workRole || member.role),
                                 shift.complianceWarnings?.some((w) => w.severity === "block") &&
                                   "border-red-400 ring-1 ring-red-200",
@@ -326,16 +335,45 @@ export function ScheduleClient({ staff }: ScheduleClientProps) {
                               )}
                               title={shift.complianceWarnings?.map((w) => w.message).join(" ")}
                             >
-                              <div className="font-medium">
-                                {formatShiftTime(shift.startTime, shift.endTime)}
-                              </div>
-                              {shift.workRole && shift.workRole !== member.role && (
-                                <div className="text-[10px] opacity-80">as {shift.workRole}</div>
+                              <button
+                                type="button"
+                                onClick={() => openEdit(shift)}
+                                className="w-full text-left transition-opacity hover:opacity-80"
+                              >
+                                <div className="font-medium">
+                                  {formatShiftTime(shift.startTime, shift.endTime)}
+                                </div>
+                                {shift.workRole && shift.workRole !== member.role && (
+                                  <div className="text-[10px] opacity-80">as {shift.workRole}</div>
+                                )}
+                                {shift.notes && (
+                                  <div className="mt-0.5 truncate opacity-75">{shift.notes}</div>
+                                )}
+                              </button>
+                              {canFeedback && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setFeedbackTarget({
+                                      staffMemberId: member.id,
+                                      staffName: member.name,
+                                      shiftId: shift.id,
+                                      shiftLabel: formatShiftLabel({
+                                        date: shift.date,
+                                        startTime: shift.startTime,
+                                        endTime: shift.endTime,
+                                        workRole: shift.workRole,
+                                      }),
+                                    });
+                                  }}
+                                  className="absolute right-1 top-1 rounded p-0.5 text-amber-600 opacity-0 transition-opacity hover:bg-white/50 group-hover:opacity-100"
+                                  title="Leave shift feedback"
+                                >
+                                  <Star className="h-3 w-3" />
+                                </button>
                               )}
-                              {shift.notes && (
-                                <div className="mt-0.5 truncate opacity-75">{shift.notes}</div>
-                              )}
-                            </button>
+                            </div>
                           ))}
                           <button
                             type="button"
@@ -477,6 +515,12 @@ export function ScheduleClient({ staff }: ScheduleClientProps) {
           </div>
         </div>
       </Modal>
+
+      <ShiftFeedbackModal
+        open={!!feedbackTarget}
+        onClose={() => setFeedbackTarget(null)}
+        target={feedbackTarget}
+      />
     </>
   );
 }

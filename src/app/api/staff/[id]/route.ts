@@ -12,6 +12,19 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
 
+  const existing = await prisma.staffMember.findUnique({ where: { id } });
+  if (!existing) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const activeChanging = body.active !== undefined && body.active !== existing.active;
+  const terminationPatch =
+    activeChanging && body.active === false
+      ? { terminatedAt: new Date(), terminationReason: body.terminationReason ?? existing.terminationReason }
+      : activeChanging && body.active === true
+        ? { terminatedAt: null, terminationReason: null }
+        : {};
+
   const member = await prisma.staffMember.update({
     where: { id },
     data: {
@@ -24,11 +37,20 @@ export async function PATCH(
       tipPoints: body.tipPoints,
       active: body.active,
       imageUrl: body.imageUrl,
+      hireDate:
+        body.hireDate !== undefined
+          ? body.hireDate
+            ? new Date(body.hireDate)
+            : null
+          : undefined,
+      terminationReason:
+        body.terminationReason !== undefined ? body.terminationReason : undefined,
       dateOfBirth: body.dateOfBirth !== undefined
         ? body.dateOfBirth
           ? new Date(body.dateOfBirth)
           : null
         : undefined,
+      ...terminationPatch,
     },
   });
 

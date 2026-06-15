@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
       active: body.active ?? true,
       imageUrl: body.imageUrl,
       dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : null,
+      hireDate: body.hireDate ? new Date(body.hireDate) : new Date(),
     },
   });
 
