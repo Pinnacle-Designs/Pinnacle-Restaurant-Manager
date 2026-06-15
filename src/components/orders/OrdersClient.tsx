@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import Link from "next/link";
 import { Plus, Trash2, ClipboardList, ListPlus, Wallet, Zap } from "lucide-react";
 import type { CheckStatus, PaymentMethod } from "@prisma/client";
@@ -17,6 +17,7 @@ import {
   getPaymentsTotal,
   getTipsTotal,
   hasPaymentsAttached,
+  ORDER_STATUSES,
   PAYMENT_METHOD_LABELS,
 } from "@/lib/orders";
 import { PayCheckScreen, type PayableOrder } from "@/components/orders/PayCheckScreen";
@@ -26,6 +27,7 @@ import { useMenuSync } from "@/hooks/useMenuSync";
 interface Table {
   id: string;
   number: number;
+  capacity: number;
 }
 
 interface OrderPayment {
@@ -40,18 +42,20 @@ interface OrderPayment {
 interface Order extends PayableOrder {
   notes: string | null;
   checkStatus?: CheckStatus;
-  payments: OrderPayment[];
+  payments?: OrderPayment[];
 }
 
-const STATUSES = ["PENDING", "PREPARING", "READY", "SERVED", "PAID", "CANCELLED"];
+const STATUSES = [...ORDER_STATUSES];
 
 export function OrdersClient({
-  initialOrders,
+  orders,
+  setOrders,
   menuItems: initialMenuItems,
   tables,
   initialMenuRevision = 0,
 }: {
-  initialOrders: Order[];
+  orders: Order[];
+  setOrders: Dispatch<SetStateAction<Order[]>>;
   menuItems: OrderMenuItem[];
   tables: Table[];
   initialMenuRevision?: number;
@@ -62,7 +66,6 @@ export function OrdersClient({
   const canAddToCheck = can("add_to_check");
   const canTakePayment = canManage || canPlace;
 
-  const [orders, setOrders] = useState(initialOrders);
   const [menuItems, setMenuItems] = useState(initialMenuItems);
   const [menuRevision, setMenuRevision] = useState(initialMenuRevision);
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -103,6 +106,7 @@ export function OrdersClient({
             menuItemId: payload.menuItemId,
             quantity: payload.quantity,
             price: payload.price,
+            seatNumber: payload.seatNumber,
             modifiers: payload.modifiers,
             modifierSummary: payload.modifierSummary,
           },
@@ -177,11 +181,7 @@ export function OrdersClient({
       {canPlace && (
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-slate-500">
-            Use the button grid to build orders fast — or open{" "}
-            <Link href="/pos" className="font-medium text-orange-600 hover:underline">
-              Server POS
-            </Link>{" "}
-            for rush mode.
+            Add items here or use the <strong>Serve</strong> tab for rush mode.
           </p>
           <Button onClick={() => { setError(null); setCreateModalOpen(true); }}>
             <Plus className="h-4 w-4" />
@@ -256,7 +256,7 @@ export function OrdersClient({
                   <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Payments</p>
                     <ul className="mt-1 space-y-1">
-                      {order.payments.map((payment) => (
+                      {(order.payments ?? []).map((payment) => (
                         <li key={payment.id} className="flex justify-between gap-3">
                           <span>
                             {PAYMENT_METHOD_LABELS[payment.method]}
@@ -289,28 +289,30 @@ export function OrdersClient({
                   )}
                   {canPlace && (
                     <Link
-                      href="/pos"
+                      href="/orders?view=serve"
                       className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
                     >
                       <Zap className="h-3 w-3" />
-                      POS
+                      Serve
                     </Link>
                   )}
+                  {canPlace && (
+                    <Select
+                      value={order.status}
+                      onChange={(e) => updateStatus(order.id, e.target.value)}
+                      className="w-auto"
+                    >
+                      {STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
                   {canManage && (
-                    <>
-                      <Select
-                        value={order.status}
-                        onChange={(e) => updateStatus(order.id, e.target.value)}
-                        className="w-auto"
-                      >
-                        {STATUSES.map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </Select>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(order.id)}>
-                        <Trash2 className="h-3 w-3 text-red-500" />
-                      </Button>
-                    </>
+                    <Button variant="ghost" size="sm" onClick={() => handleDelete(order.id)}>
+                      <Trash2 className="h-3 w-3 text-red-500" />
+                    </Button>
                   )}
                 </div>
               </div>
@@ -338,6 +340,11 @@ export function OrdersClient({
         title="Add to check"
         mode="add"
         menuItems={menuItems}
+        orderTable={
+          activeOrder?.table
+            ? tables.find((t) => t.id === activeOrder.table!.id) ?? null
+            : null
+        }
         submitLabel="Add to check"
         saving={saving}
         error={error}

@@ -31,12 +31,12 @@ export const NAV_ITEMS = [
   { href: "/photos", label: "Photos", icon: "camera" },
   { href: "/menu", label: "Menu", icon: "utensils" },
   { href: "/boh", label: "BOH", icon: "chef-hat" },
+  { href: "/kds", label: "KDS", icon: "chef-hat" },
   { href: "/inventory", label: "Inventory", icon: "package" },
   { href: "/staff", label: "Staff", icon: "users" },
   { href: "/timeclock", label: "Time Clock", icon: "clock" },
+  { href: "/orders", label: "Orders", icon: "zap" },
   { href: "/tables", label: "Tables", icon: "layout-grid" },
-  { href: "/orders", label: "Orders", icon: "clipboard-list" },
-  { href: "/pos", label: "POS", icon: "zap" },
   { href: "/finances", label: "Finances", icon: "dollar-sign" },
   { href: "/analytics", label: "Analytics", icon: "bar-chart-3" },
   { href: "/social", label: "Social", icon: "share-2" },
@@ -46,7 +46,6 @@ export const NAV_ITEMS = [
 /** Bottom bar tabs on mobile — remaining items go in the More sheet */
 export const MOBILE_PRIMARY_NAV_HREFS = [
   "/dashboard",
-  "/pos",
   "/orders",
   "/timeclock",
   "/insights",

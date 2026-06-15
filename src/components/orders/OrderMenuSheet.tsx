@@ -7,6 +7,7 @@ import { Input, Select, Textarea, FormField, Modal } from "@/components/ui/form"
 import { cn, formatCurrency } from "@/lib/utils";
 import { PosItemGrid, type PosMenuItem } from "@/components/pos/PosItemGrid";
 import { ModifierWizard } from "@/components/pos/ModifierWizard";
+import { SeatPicker } from "@/components/orders/SeatPicker";
 import {
   resolveModifierGroupsForItem,
   shouldOpenModifierWizard,
@@ -20,6 +21,7 @@ export interface OrderMenuItem extends PosMenuItem {
 interface Table {
   id: string;
   number: number;
+  capacity: number;
 }
 
 type ModifierGroupRow = ModifierGroupConfig & {
@@ -47,6 +49,8 @@ interface OrderMenuSheetProps {
   mode: "create" | "add";
   menuItems: OrderMenuItem[];
   tables?: Table[];
+  /** Table for add-to-check — drives seat buttons from capacity */
+  orderTable?: Table | null;
   submitLabel: string;
   saving?: boolean;
   error?: string | null;
@@ -62,6 +66,7 @@ export function OrderMenuSheet({
   mode,
   menuItems,
   tables = [],
+  orderTable = null,
   submitLabel,
   saving,
   error,
@@ -78,7 +83,7 @@ export function OrderMenuSheet({
   const [guestCount, setGuestCount] = useState("2");
   const [channel, setChannel] = useState<string>("dine-in");
   const [notes, setNotes] = useState("");
-  const [seatNumber, setSeatNumber] = useState("");
+  const [seatNumber, setSeatNumber] = useState<number | null>(1);
   const [pendingItem, setPendingItem] = useState<OrderMenuItem | null>(null);
   const [pendingGroups, setPendingGroups] = useState<ModifierGroupConfig[]>([]);
   const [modifierExtras, setModifierExtras] = useState<{
@@ -113,8 +118,24 @@ export function OrderMenuSheet({
       setModifierExtras(null);
       setPendingItem(null);
       setActiveCategory("All");
+      setSeatNumber(1);
     }
   }, [open, loadPosStyles]);
+
+  const selectedTable =
+    mode === "create"
+      ? tables.find((t) => t.id === tableId) ?? null
+      : orderTable;
+
+  useEffect(() => {
+    if (selectedTable) {
+      setSeatNumber((prev) =>
+        prev && prev <= selectedTable.capacity ? prev : 1
+      );
+    } else if (mode === "create") {
+      setSeatNumber(null);
+    }
+  }, [selectedTable?.id, selectedTable?.capacity, mode]);
 
   const available = useMemo(
     () =>
@@ -166,12 +187,14 @@ export function OrderMenuSheet({
 
   const handleSubmit = () => {
     if (!selectedItem) return;
+    if (selectedTable && !seatNumber) return;
     onSubmit({
       menuItemId: selectedItem.id,
       quantity,
       price: linePrice,
       modifiers: modifierExtras?.modifiers,
       modifierSummary: modifierExtras?.modifierSummary,
+      seatNumber: seatNumber ?? undefined,
       ...(mode === "create"
         ? {
             tableId: tableId || null,
@@ -179,9 +202,7 @@ export function OrderMenuSheet({
             channel,
             notes: notes || null,
           }
-        : {
-            seatNumber: seatNumber ? parseInt(seatNumber, 10) : undefined,
-          }),
+        : {}),
     });
   };
 
@@ -195,7 +216,10 @@ export function OrderMenuSheet({
                 <div className="flex flex-wrap gap-1">
                   <button
                     type="button"
-                    onClick={() => setTableId("")}
+                    onClick={() => {
+                      setTableId("");
+                      setSeatNumber(null);
+                    }}
                     className={cn(
                       "rounded-lg px-3 py-1.5 text-sm font-medium",
                       !tableId ? "bg-orange-500 text-white" : "bg-slate-100 text-slate-600"
@@ -207,7 +231,10 @@ export function OrderMenuSheet({
                     <button
                       key={t.id}
                       type="button"
-                      onClick={() => setTableId(t.id)}
+                      onClick={() => {
+                        setTableId(t.id);
+                        setSeatNumber(1);
+                      }}
                       className={cn(
                         "rounded-lg px-3 py-1.5 text-sm font-medium",
                         tableId === t.id
@@ -248,18 +275,26 @@ export function OrderMenuSheet({
             </div>
           )}
 
-          {mode === "add" && (
-            <div className="grid shrink-0 gap-3 sm:grid-cols-2">
-              <FormField label="Seat (optional)">
-                <Input
-                  type="number"
-                  min={1}
-                  value={seatNumber}
-                  onChange={(e) => setSeatNumber(e.target.value)}
-                  placeholder="Split by seat"
-                />
-              </FormField>
-            </div>
+          {selectedTable && (
+            <FormField
+              label={
+                mode === "add"
+                  ? `Seat — Table ${selectedTable.number}`
+                  : `Seat — Table ${selectedTable.number} (${selectedTable.capacity} seats)`
+              }
+            >
+              <SeatPicker
+                capacity={selectedTable.capacity}
+                value={seatNumber}
+                onChange={setSeatNumber}
+              />
+            </FormField>
+          )}
+
+          {mode === "add" && !selectedTable && (
+            <p className="shrink-0 text-xs text-slate-500">
+              Link this check to a table to assign items by seat for split pay.
+            </p>
           )}
 
           <div className="flex shrink-0 flex-wrap gap-1">
@@ -339,7 +374,10 @@ export function OrderMenuSheet({
               <Button variant="secondary" onClick={onClose}>
                 Cancel
               </Button>
-              <Button onClick={handleSubmit} disabled={!selectedItem || saving}>
+              <Button
+                onClick={handleSubmit}
+                disabled={!selectedItem || saving || !!(selectedTable && !seatNumber)}
+              >
                 {saving ? "Saving…" : submitLabel}
               </Button>
             </div>

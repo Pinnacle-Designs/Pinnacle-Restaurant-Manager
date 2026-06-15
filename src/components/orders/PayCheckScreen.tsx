@@ -56,6 +56,11 @@ interface OrderItem {
   seatNumber?: number | null;
   checkId?: string | null;
   modifierSummary?: string | null;
+  course?: string;
+  kitchenStatus?: string;
+  routesToKitchen?: boolean;
+  parentOrderItemId?: string | null;
+  kitchenStation?: { id: string; name: string; slug?: string } | null;
   menuItem: { name: string };
 }
 

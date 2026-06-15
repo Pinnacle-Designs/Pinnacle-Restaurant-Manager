@@ -154,9 +154,23 @@ export const DISCOUNT_TYPES = [
   { id: "LOYALTY", label: "Loyalty Reward", field: "discountAmount" as const },
 ];
 
+export const ORDER_STATUSES = [
+  "PENDING",
+  "PREPARING",
+  "READY",
+  "SERVED",
+  "PAID",
+  "CANCELLED",
+] as const;
+
+export type OrderStatusValue = (typeof ORDER_STATUSES)[number];
+
 export const ORDER_INCLUDE = {
   table: true,
-  items: { include: { menuItem: true }, orderBy: { id: "asc" as const } },
+  items: {
+    include: { menuItem: true, kitchenStation: true },
+    orderBy: { id: "asc" as const },
+  },
   payments: { orderBy: { createdAt: "asc" as const } },
   checks: {
     include: {

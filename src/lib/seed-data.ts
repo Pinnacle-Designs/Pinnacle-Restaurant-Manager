@@ -416,7 +416,9 @@ export async function seedLocationData(locationId: string) {
     await seedComplianceSample(locationId);
     await seedRetentionSample(locationId);
     await import("@/lib/pos/seed-pos").then((m) => m.seedPosSample(locationId));
-  await import("@/lib/menu/seed-boh").then((m) => m.seedBohSample(locationId));
+    await import("@/lib/menu/seed-boh").then((m) => m.seedBohSample(locationId));
+    await import("@/lib/kitchen/seed-kitchen").then((m) => m.seedKitchenSample(locationId));
+    await import("@/lib/menu/seed-recipes").then((m) => m.seedMenuRecipes(locationId));
     return {
       message: "Already seeded for this location",
       locationId,
@@ -481,6 +483,8 @@ export async function seedLocationData(locationId: string) {
   await seedRetentionSample(locationId);
   await import("@/lib/pos/seed-pos").then((m) => m.seedPosSample(locationId));
   await import("@/lib/menu/seed-boh").then((m) => m.seedBohSample(locationId));
+  await import("@/lib/kitchen/seed-kitchen").then((m) => m.seedKitchenSample(locationId));
+  await import("@/lib/menu/seed-recipes").then((m) => m.seedMenuRecipes(locationId));
 
   return { message: "Seed data created successfully", locationId, alreadySeeded: false, partial: false };
 }

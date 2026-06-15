@@ -7,7 +7,6 @@ import { Input, Select, FormField, Modal } from "@/components/ui/form";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { apiPatch, apiPost, apiDelete } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { formatActiveDaypartLabel } from "@/lib/menu/dayparts";
 import { useMenuSync } from "@/hooks/useMenuSync";
 
 interface MenuItemRow {
@@ -75,7 +74,7 @@ export function BohClient() {
   useMenuSync(data?.menuRevision, load, true);
 
   const daypartLabel = useMemo(
-    () => formatActiveDaypartLabel(data?.activeDayparts ?? []),
+    () => data?.activeDayparts?.map((d) => d.name).join(" · ") || null,
     [data?.activeDayparts]
   );
 

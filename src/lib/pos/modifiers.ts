@@ -14,11 +14,14 @@ export type ModifierGroupConfig = {
   minSelect: number;
   maxSelect: number;
   sortOrder: number;
+  layout?: string;
   options: {
     id: string;
     name: string;
     priceDelta: number;
     isDefault: boolean;
+    fractionCoverage?: string | null;
+    kitchenStationId?: string | null;
   }[];
 };
 
@@ -62,8 +65,13 @@ function stripGroup(
     minSelect: g.minSelect,
     maxSelect: g.maxSelect,
     sortOrder: g.sortOrder,
+    layout: g.layout,
     options: g.options,
   };
+}
+
+export function hasFractionalPieLayout(groups: ModifierGroupConfig[]): boolean {
+  return groups.some((g) => g.layout === "FRACTIONAL_PIE");
 }
 
 export function hasRequiredModifiers(groups: ModifierGroupConfig[]): boolean {

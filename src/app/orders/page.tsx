@@ -1,10 +1,10 @@
+import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 import { getLocationId } from "@/lib/location";
 import { ORDER_INCLUDE } from "@/lib/orders";
 import { PageHeader } from "@/components/ui";
-import { OrdersClient } from "@/components/orders/OrdersClient";
-
-import { getPosMenuBundle } from "@/lib/menu/resolve-pos-menu";
+import { OrdersHubClient } from "@/components/orders/OrdersHubClient";
+import { getPosMenuBundleSafe } from "@/lib/menu/resolve-pos-menu";
 
 export default async function OrdersPage() {
   const locationId = await getLocationId();
@@ -15,7 +15,7 @@ export default async function OrdersPage() {
       orderBy: { createdAt: "desc" },
       take: 50,
     }),
-    getPosMenuBundle(locationId),
+    getPosMenuBundleSafe(locationId),
     prisma.table.findMany({ where: { locationId }, orderBy: { number: "asc" } }),
   ]);
 
@@ -35,14 +35,17 @@ export default async function OrdersPage() {
     <div>
       <PageHeader
         title="Orders"
-        description="Color-coded menu buttons for new orders and add-to-check — or use Server POS for rush service"
+        description="One screen for rush service and check management — tap Serve for the floor, Checks for payments and history"
       />
-      <OrdersClient
-        initialOrders={orders}
-        menuItems={menuItems}
-        tables={tables}
-        initialMenuRevision={menuBundle.menuRevision}
-      />
+      <Suspense fallback={<p className="text-slate-500">Loading…</p>}>
+        <OrdersHubClient
+          initialOrders={orders}
+          menuItems={menuItems}
+          tables={tables}
+          initialMenuRevision={menuBundle.menuRevision}
+          defaultView="serve"
+        />
+      </Suspense>
     </div>
   );
 }

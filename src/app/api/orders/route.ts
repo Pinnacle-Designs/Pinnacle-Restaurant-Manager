@@ -42,12 +42,14 @@ export async function POST(request: NextRequest) {
                 menuItemId: string;
                 quantity: number;
                 price: number;
+                seatNumber?: number;
                 modifiers?: unknown;
                 modifierSummary?: string;
               }) => ({
                 menuItemId: item.menuItemId,
                 quantity: item.quantity,
                 price: item.price,
+                seatNumber: item.seatNumber ?? null,
                 modifiers: item.modifiers ? JSON.stringify(item.modifiers) : null,
                 modifierSummary: item.modifierSummary ?? null,
                 kitchenStatus: "FIRED",

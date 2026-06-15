@@ -64,7 +64,7 @@ export function Sidebar() {
       </div>
       <nav className="flex-1 space-y-1 p-4">
         {navItems.map((item) => {
-          const Icon = ICONS[item.icon];
+          const Icon = ICONS[item.icon] ?? ClipboardList;
           const isActive = pathname === item.href;
           return (
             <EmbedNavLink

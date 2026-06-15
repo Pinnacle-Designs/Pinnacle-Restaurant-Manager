@@ -162,10 +162,10 @@ const NAV_PERMISSION_MAP: Record<string, Permission> = {
   "/timeclock": "clock_in",
   "/menu": "manage_menu",
   "/boh": "manage_boh",
+  "/kds": "manage_boh",
   "/inventory": "manage_inventory",
   "/tables": "manage_tables",
   "/orders": "place_orders",
-  "/pos": "place_orders",
 };
 
 const ROUTE_PERMISSION_MAP: Record<string, Permission> = {
@@ -188,6 +188,7 @@ const ROUTE_PERMISSION_MAP: Record<string, Permission> = {
   "/api/compliance": "manage_compliance",
   "/api/retention": "manage_retention",
   "/api/boh": "manage_boh",
+  "/api/kitchen": "manage_boh",
   "/api/pos": "place_orders",
   "/api/timeclock": "clock_in",
   "/api/shift-swaps": "view_own_schedule",
@@ -202,6 +203,7 @@ function routeBase(pathname: string): string {
   if (pathname.startsWith("/api/retention/feedback")) return "/api/retention";
   if (pathname.startsWith("/api/retention")) return "/api/retention";
   if (pathname.startsWith("/api/boh")) return "/api/boh";
+  if (pathname.startsWith("/api/kitchen")) return "/api/kitchen";
   if (pathname.startsWith("/api/pos/layout")) return "/api/pos";
   if (pathname.startsWith("/api/pos")) return "/api/pos";
   if (pathname.startsWith("/api/")) {

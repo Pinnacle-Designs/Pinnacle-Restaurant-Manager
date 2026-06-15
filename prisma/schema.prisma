@@ -311,7 +311,64 @@ model Location {
   modifierGroups       ModifierGroup[]
   posCategoryStyles    PosCategoryStyle[]
   menuScheduleRules    MenuScheduleRule[]
+  menuChannelConfigs   MenuChannelConfig[]
+  kitchenStations      KitchenStation[]
   menuRevision         Int      @default(0)
+}
+
+model KitchenStation {
+  id          String   @id @default(cuid())
+  locationId  String
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  name        String
+  slug        String
+  outputKind  String   @default("KDS")
+  sortOrder   Int      @default(0)
+  active      Boolean  @default(true)
+  color       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  menuItems        MenuItem[]
+  comboComponents  MenuComboComponent[]
+  modifierOptions  ModifierOption[]
+  orderItems       OrderItem[]
+
+  @@unique([locationId, slug])
+  @@index([locationId])
+}
+
+model MenuComboComponent {
+  id                String          @id @default(cuid())
+  comboItemId       String
+  comboItem         MenuItem        @relation("ComboParent", fields: [comboItemId], references: [id], onDelete: Cascade)
+  componentItemId   String
+  componentItem     MenuItem        @relation("ComboChild", fields: [componentItemId], references: [id], onDelete: Cascade)
+  quantity          Int             @default(1)
+  kitchenStationId  String?
+  kitchenStation    KitchenStation? @relation(fields: [kitchenStationId], references: [id], onDelete: SetNull)
+  sortOrder         Int             @default(0)
+
+  @@index([comboItemId])
+}
+
+/// Per-channel menu publishing — markup %, sync status, third-party store IDs.
+model MenuChannelConfig {
+  id              String   @id @default(cuid())
+  locationId      String
+  location        Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  channel         String
+  enabled         Boolean  @default(true)
+  priceMarkupPct  Float    @default(0)
+  externalStoreId String?
+  lastSyncedAt    DateTime?
+  lastSyncStatus  String?
+  lastSyncMessage String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([locationId, channel])
+  @@index([locationId])
 }
 
 model PaymentProviderConnection {
@@ -360,6 +417,7 @@ model MenuItem {
   description String?
   price       Float
   category    String
+  salesCategory String   @default("FOOD")
   recipeCost  Float    @default(0)
   available   Boolean  @default(true)
   stockCount  Int?
@@ -367,10 +425,31 @@ model MenuItem {
   imageUrl    String?
   posColor    String?
   posGridIndex Int?
+  kitchenStationId String?
+  kitchenStation   KitchenStation? @relation(fields: [kitchenStationId], references: [id], onDelete: SetNull)
+  defaultCourse    String          @default("MAIN")
+  isCombo          Boolean         @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   orderItems  OrderItem[]
   modifierGroups ModifierGroup[]
+  comboComponents MenuComboComponent[] @relation("ComboParent")
+  comboMemberships MenuComboComponent[] @relation("ComboChild")
+  recipeLines     MenuRecipeLine[]
+}
+
+/// Ingredient build — theoretical food cost and inventory depletion per plate sold.
+model MenuRecipeLine {
+  id              String        @id @default(cuid())
+  menuItemId      String
+  menuItem        MenuItem      @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  quantity        Float
+  sortOrder       Int           @default(0)
+
+  @@unique([menuItemId, inventoryItemId])
+  @@index([menuItemId])
 }
 
 model InventoryItem {
@@ -392,6 +471,7 @@ model InventoryItem {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   wasteLogs     InventoryWaste[]
+  recipeLines   MenuRecipeLine[]
 
   @@unique([locationId, barcode])
 }
@@ -854,8 +934,15 @@ model OrderItem {
   check           OrderCheck? @relation(fields: [checkId], references: [id], onDelete: SetNull)
   modifiers       String?
   modifierSummary String?
-  kitchenStatus   String      @default("PENDING")
-  firedAt         DateTime?
+  course          String      @default("MAIN")
+  kitchenStationId String?
+  kitchenStation  KitchenStation? @relation(fields: [kitchenStationId], references: [id], onDelete: SetNull)
+  parentOrderItemId String?
+  parentOrderItem   OrderItem?  @relation("ComboLines", fields: [parentOrderItemId], references: [id], onDelete: Cascade)
+  childLines        OrderItem[] @relation("ComboLines")
+  routesToKitchen   Boolean     @default(true)
+  kitchenStatus     String      @default("PENDING")
+  firedAt           DateTime?
 }
 
 model Expense {
@@ -1197,6 +1284,7 @@ model ModifierGroup {
   minSelect   Int      @default(1)
   maxSelect   Int      @default(1)
   sortOrder   Int      @default(0)
+  layout      String   @default("STANDARD")
   options     ModifierOption[]
 
   @@index([locationId, menuItemId])
@@ -1210,6 +1298,9 @@ model ModifierOption {
   priceDelta Float         @default(0)
   sortOrder  Int           @default(0)
   isDefault  Boolean       @default(false)
+  kitchenStationId String?
+  kitchenStation   KitchenStation? @relation(fields: [kitchenStationId], references: [id], onDelete: SetNull)
+  fractionCoverage String?
 }
 
 model PosCategoryStyle {

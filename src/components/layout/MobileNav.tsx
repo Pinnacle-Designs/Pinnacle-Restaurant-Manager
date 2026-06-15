@@ -73,7 +73,7 @@ function NavLink({
   label?: string;
   onNavigate?: () => void;
 }) {
-  const Icon = ICONS[item.icon];
+  const Icon = ICONS[item.icon] ?? ClipboardList;
   return (
     <EmbedNavLink
       href={item.href}
@@ -145,7 +145,7 @@ export function MobileNav() {
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
               {moreNavItems.map((item) => {
-                const Icon = ICONS[item.icon];
+                const Icon = ICONS[item.icon] ?? ClipboardList;
                 const isActive = pathname === item.href;
                 return (
                   <EmbedNavLink
