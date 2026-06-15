@@ -32,9 +32,14 @@ async function main() {
   const { setupDemoWorkspace } = await import("../src/lib/seed-data");
 
   await seedDemoUsers();
-  await setupDemoWorkspace("seeded");
+  const workspace = await setupDemoWorkspace("seeded");
 
   const { prisma } = await import("../src/lib/prisma");
+  await prisma.user.update({
+    where: { email: "owner@pinnacle.com" },
+    data: { locationId: workspace.locationId },
+  });
+
   await prisma.$disconnect();
 
   console.log(`[db] Seeded deploy database at ${dbFile}`);

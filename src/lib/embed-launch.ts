@@ -10,10 +10,14 @@ import { seedDemoUsers } from "@/lib/demo-users";
 import { LOCATION_COOKIE_NAME } from "@/lib/location";
 import { resolveEmbedPath, resolveEmbedChrome, embedQueryValue } from "@/lib/embed-config";
 import { applyEmbedAuthCookies } from "@/lib/embed-cookies";
-import { setupDemoWorkspace } from "@/lib/seed-data";
+import { demoLocationName, setupDemoWorkspace } from "@/lib/seed-data";
 import { EMBED_SESSION_PARAM } from "@/lib/embed-session-middleware";
+import { prisma } from "@/lib/prisma";
 
 export { EMBED_SESSION_PARAM };
+
+const DEMO_EMAIL = "owner@pinnacle.com";
+const DEMO_PASSWORD = "demo1234";
 
 /** True when the iframe parent is on a different origin (needs SameSite=None cookies). */
 export function isCrossOriginEmbedRequest(request: NextRequest): boolean {
@@ -39,6 +43,40 @@ export function isCrossOriginEmbedRequest(request: NextRequest): boolean {
   }
 
   return false;
+}
+
+/** Resolve demo location — deploy DB is pre-seeded at build time; only write when missing. */
+async function resolveDemoLocationId(userId: string, existingLocationId: string | null): Promise<string> {
+  if (existingLocationId) {
+    const location = await prisma.location.findUnique({
+      where: { id: existingLocationId },
+      select: { id: true },
+    });
+    if (location) return location.id;
+  }
+
+  const demoLocation = await prisma.location.findFirst({
+    where: { name: demoLocationName("seeded") },
+    select: { id: true },
+  });
+  if (demoLocation) {
+    if (!existingLocationId) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { locationId: demoLocation.id },
+      });
+    }
+    return demoLocation.id;
+  }
+
+  const workspace = await setupDemoWorkspace("seeded");
+  if (!existingLocationId) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { locationId: workspace.locationId },
+    });
+  }
+  return workspace.locationId;
 }
 
 export async function buildEmbedLaunchResponse(
@@ -69,16 +107,23 @@ export async function buildEmbedLaunchResponse(
     return response;
   }
 
-  await seedDemoUsers();
+  let user = await loginUser(DEMO_EMAIL, DEMO_PASSWORD);
+  if (!user) {
+    try {
+      await seedDemoUsers();
+    } catch (err) {
+      console.error("Embed seedDemoUsers failed:", err);
+    }
+    user = await loginUser(DEMO_EMAIL, DEMO_PASSWORD);
+  }
 
-  const user = await loginUser("owner@pinnacle.com", "demo1234");
   if (!user) {
     return NextResponse.json({ error: "Demo login failed" }, { status: 500 });
   }
 
-  let workspace;
+  let locationId: string;
   try {
-    workspace = await setupDemoWorkspace("seeded");
+    locationId = await resolveDemoLocationId(user.id, user.locationId);
   } catch (err) {
     console.error("Embed launch demo setup failed:", err);
     return NextResponse.json(
@@ -87,7 +132,17 @@ export async function buildEmbedLaunchResponse(
     );
   }
 
-  const token = await createSessionToken(user);
+  let token: string;
+  try {
+    token = await createSessionToken({ ...user, locationId });
+  } catch (err) {
+    console.error("Embed session token failed:", err);
+    return NextResponse.json(
+      { error: "Demo authentication unavailable. Check server configuration." },
+      { status: 503 }
+    );
+  }
+
   const redirectUrl = new URL(`${path}?embed=${embedValue}`, request.url);
 
   // Cross-origin iframes often block Set-Cookie on redirect; pass token once in URL.
@@ -96,6 +151,6 @@ export async function buildEmbedLaunchResponse(
   }
 
   const response = NextResponse.redirect(redirectUrl);
-  applyEmbedAuthCookies(response, request, token, workspace.locationId, forEmbed);
+  applyEmbedAuthCookies(response, request, token, locationId, forEmbed);
   return response;
 }

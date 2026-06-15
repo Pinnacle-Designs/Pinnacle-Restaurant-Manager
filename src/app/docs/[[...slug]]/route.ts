@@ -32,6 +32,11 @@ function prepareDocsHtml(html: string): string {
   out = out.replace(/src="assets\//g, 'src="/docs/assets/');
   out = out.replace(/href="\.\/index\.html/g, 'href="/docs');
   out = out.replace(/href="\.\/pitch\.html/g, 'href="/docs/pitch.html');
+  // Ensure docs scripts resolve when served at /docs (no trailing slash)
+  out = out.replace(
+    /var base = \(window\.PINNACLE_DOCS_BASE \|\| "\.\/"\)\.replace\(/g,
+    'var base = (window.PINNACLE_DOCS_BASE || (location.pathname.indexOf("/docs") === 0 ? "/docs/" : "./")).replace('
+  );
   return out;
 }
 
