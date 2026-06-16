@@ -42,7 +42,6 @@ export async function seedBackOfficeSample(locationId: string) {
         reason: sample.reason,
         wasteCategory: sample.category,
         recordedByStaffId: staffMember?.id ?? null,
-        recordedBy: staffMember?.name ?? "Kitchen lead",
         shiftId: shift?.id ?? null,
         date: subDays(new Date(), idx + 1),
       },

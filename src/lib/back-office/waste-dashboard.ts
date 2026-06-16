@@ -53,7 +53,7 @@ export async function computeWasteDashboard(
     catEntry.count += 1;
     byCategory.set(cat, catEntry);
 
-    const empName = w.recordedByStaff?.name ?? w.recordedBy ?? "Unassigned";
+    const empName = w.recordedByStaff?.name ?? "Unassigned";
     const empEntry = byEmployee.get(empName) ?? { cost: 0, count: 0 };
     empEntry.cost += w.cost;
     empEntry.count += 1;
@@ -98,7 +98,7 @@ export async function computeWasteDashboard(
       cost: w.cost,
       reason: w.reason,
       category: w.wasteCategory ?? inferCategory(w.reason),
-      employee: w.recordedByStaff?.name ?? w.recordedBy ?? null,
+      employee: w.recordedByStaff?.name ?? null,
       shift: w.shift
         ? `${w.shift.startTime}–${w.shift.endTime}`
         : null,

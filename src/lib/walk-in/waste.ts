@@ -9,7 +9,6 @@ export async function logWaste(
     quantity: number;
     unit: string;
     reason: string;
-    recordedBy?: string;
     countSessionId?: string;
     lotId?: string;
     wasteCategory?: string;
@@ -61,7 +60,6 @@ export async function logWaste(
       unit,
       cost,
       reason: data.reason,
-      recordedBy: data.recordedBy ?? null,
       countSessionId: data.countSessionId ?? null,
       lotId: data.lotId ?? null,
       wasteCategory: data.wasteCategory ?? null,

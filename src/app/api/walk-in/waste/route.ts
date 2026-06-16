@@ -16,7 +16,6 @@ export async function POST(request: NextRequest) {
     quantity: parseFloat(body.quantity),
     unit: body.unit ?? "each",
     reason: body.reason,
-    recordedBy: body.recordedBy,
     countSessionId: body.countSessionId,
     lotId: body.lotId,
   });
