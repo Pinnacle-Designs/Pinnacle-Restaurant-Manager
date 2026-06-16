@@ -811,6 +811,7 @@ model StaffMember {
   trainingCompletions TrainingCompletion[]
   incidentReports IncidentReport[]
   shiftFeedback   ShiftFeedback[]
+  wasteLogs       InventoryWaste[]
 }
 
 model Shift {
@@ -831,6 +832,7 @@ model Shift {
   swapRequests  ShiftSwapRequest[] @relation("SwapShift")
   offerSwapRequests ShiftSwapRequest[] @relation("SwapOffer")
   feedback      ShiftFeedback[]
+  wasteLogs     InventoryWaste[]
 
   @@index([locationId, date])
   @@index([staffMemberId, date])
@@ -1466,9 +1468,13 @@ model InventoryWaste {
   unit            String
   cost            Float
   reason          String
-  recordedBy      String?
   countSessionId  String?
   lotId           String?
+  wasteCategory     String?
+  recordedByStaffId String?
+  recordedByStaff   StaffMember? @relation(fields: [recordedByStaffId], references: [id], onDelete: SetNull)
+  shiftId           String?
+  shift             Shift?       @relation(fields: [shiftId], references: [id], onDelete: SetNull)
   date            DateTime       @default(now())
   createdAt       DateTime       @default(now())
 }

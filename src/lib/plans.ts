@@ -33,7 +33,7 @@ const STARTER_ROUTES = [
   "/analytics",
 ];
 
-const GROWTH_ROUTES = [...STARTER_ROUTES, "/finances", "/loading-dock"];
+const GROWTH_ROUTES = [...STARTER_ROUTES, "/finances", "/loading-dock", "/back-office"];
 
 const PRO_ROUTES = [...GROWTH_ROUTES, "/social"];
 
@@ -75,6 +75,7 @@ export const PLANS: PlanDefinition[] = [
       "Receipt OCR (limited)",
       "AI Command Center (standard)",
       "Most analytics modules",
+      "Back Office — AvT, live COGS & waste dashboards",
     ],
     maxUsers: 10,
     routes: GROWTH_ROUTES,

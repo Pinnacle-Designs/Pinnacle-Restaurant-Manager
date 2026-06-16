@@ -31,6 +31,7 @@ export async function seedDemoExtras(locationId: string) {
   await import("./purchasing/seed-purchasing").then((m) => m.seedPurchasingSample(locationId));
   await import("./walk-in/seed-walk-in").then((m) => m.seedWalkInSample(locationId));
   await import("./kitchen/seed-kitchen").then((m) => m.seedKitchenSample(locationId));
+  await import("./back-office/seed-back-office").then((m) => m.seedBackOfficeSample(locationId));
 }
 
 async function seedLocationProfile(locationId: string) {

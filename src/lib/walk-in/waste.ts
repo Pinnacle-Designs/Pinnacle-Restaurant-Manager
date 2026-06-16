@@ -12,6 +12,9 @@ export async function logWaste(
     recordedBy?: string;
     countSessionId?: string;
     lotId?: string;
+    wasteCategory?: string;
+    recordedByStaffId?: string;
+    shiftId?: string;
   }
 ) {
   let cost = 0;
@@ -61,6 +64,9 @@ export async function logWaste(
       recordedBy: data.recordedBy ?? null,
       countSessionId: data.countSessionId ?? null,
       lotId: data.lotId ?? null,
+      wasteCategory: data.wasteCategory ?? null,
+      recordedByStaffId: data.recordedByStaffId ?? null,
+      shiftId: data.shiftId ?? null,
     },
   });
 
