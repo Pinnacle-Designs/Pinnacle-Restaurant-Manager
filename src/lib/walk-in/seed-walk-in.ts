@@ -1,15 +1,18 @@
 import { addDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { defaultAlternatesForUnit } from "./unit-convert";
-import { ensureDefaultStorageZones } from "./storage-zones";
+import { ensureInventoryStorageLayout } from "./assign-inventory-zones";
 
 export async function seedWalkInSample(locationId: string) {
-  await ensureDefaultStorageZones(locationId);
+  await ensureInventoryStorageLayout(locationId);
 
   const routeCount = await prisma.countRouteStep.count({
     where: { zone: { locationId } },
   });
-  if (routeCount > 0) return;
+  if (routeCount > 0) {
+    await seedLotsOnly(locationId);
+    return;
+  }
 
   const zones = await prisma.storageZone.findMany({
     where: { locationId },
@@ -25,32 +28,33 @@ export async function seedWalkInSample(locationId: string) {
     orderBy: { name: "asc" },
   });
 
-  for (const [idx, item] of inventory.entries()) {
-    const zoneId = idx % 3 === 0 ? walkIn.id : idx % 3 === 1 ? dry.id : null;
+  for (const item of inventory) {
     const alternates = defaultAlternatesForUnit(item.unit);
     await prisma.inventoryItem.update({
       where: { id: item.id },
       data: {
-        storageZoneId: zoneId,
         alternateUnits: alternates.length ? JSON.stringify(alternates) : null,
         countByWeight: ["lbs", "oz", "kg"].includes(item.unit),
       },
     });
   }
 
-  const walkInItems = inventory.filter((_, i) => i % 3 === 0).slice(0, 12);
-  for (const [sortOrder, item] of walkInItems.entries()) {
-    await prisma.countRouteStep.create({
-      data: { zoneId: walkIn.id, inventoryItemId: item.id, sortOrder },
-    });
-  }
+  await seedLotsOnly(locationId);
+}
 
-  const dryItems = inventory.filter((_, i) => i % 3 === 1).slice(0, 8);
-  for (const [sortOrder, item] of dryItems.entries()) {
-    await prisma.countRouteStep.create({
-      data: { zoneId: dry.id, inventoryItemId: item.id, sortOrder },
-    });
-  }
+async function seedLotsOnly(locationId: string) {
+  const existing = await prisma.inventoryLot.count({ where: { locationId } });
+  if (existing > 0) return;
+
+  const zones = await prisma.storageZone.findMany({ where: { locationId } });
+  const walkIn = zones.find((z) => z.slug === "walk-in");
+  const dry = zones.find((z) => z.slug === "dry");
+  if (!walkIn || !dry) return;
+
+  const inventory = await prisma.inventoryItem.findMany({
+    where: { locationId },
+    orderBy: { name: "asc" },
+  });
 
   const now = new Date();
   for (const [idx, item] of inventory.slice(0, 6).entries()) {

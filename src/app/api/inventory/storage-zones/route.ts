@@ -3,13 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { getLocationIdFromRequest } from "@/lib/location";
 import { requirePermission } from "@/lib/api-auth";
 import { ensureDefaultStorageZones, uniqueZoneSlug } from "@/lib/walk-in/storage-zones";
+import { ensureInventoryStorageLayout } from "@/lib/walk-in/assign-inventory-zones";
 
 export async function GET(request: NextRequest) {
   const { error } = await requirePermission(request, "manage_inventory");
   if (error) return error;
 
   const locationId = await getLocationIdFromRequest(request);
-  await ensureDefaultStorageZones(locationId);
+  await ensureInventoryStorageLayout(locationId);
 
   const zones = await prisma.storageZone.findMany({
     where: { locationId },

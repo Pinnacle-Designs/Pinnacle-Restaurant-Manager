@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getLocationIdFromRequest } from "@/lib/location";
-import { ensureDefaultStorageZones, syncRouteStepForItem } from "@/lib/walk-in/storage-zones";
+import {
+  ensureInventoryStorageLayout,
+  inferStorageZoneSlug,
+} from "@/lib/walk-in/assign-inventory-zones";
+import { syncRouteStepForItem } from "@/lib/walk-in/storage-zones";
 
 export async function GET(request: NextRequest) {
   const locationId = await getLocationIdFromRequest(request);
-  await ensureDefaultStorageZones(locationId);
+  await ensureInventoryStorageLayout(locationId);
   const items = await prisma.inventoryItem.findMany({
     where: { locationId },
-    include: { storageZone: { select: { id: true, name: true } } },
+    include: { storageZone: { select: { id: true, name: true, slug: true } } },
     orderBy: { name: "asc" },
   });
   return NextResponse.json(items);
@@ -16,7 +20,20 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const locationId = await getLocationIdFromRequest(request);
+  await ensureInventoryStorageLayout(locationId);
   const body = await request.json();
+
+  let storageZoneId: string | null = body.storageZoneId ?? null;
+  if (!storageZoneId && body.name) {
+    const slug = inferStorageZoneSlug({
+      name: String(body.name),
+      barcode: body.barcode ? String(body.barcode) : null,
+      unit: String(body.unit ?? "lbs"),
+    });
+    const zone = await prisma.storageZone.findFirst({ where: { locationId, slug } });
+    storageZoneId = zone?.id ?? null;
+  }
+
   const item = await prisma.inventoryItem.create({
     data: {
       locationId,
@@ -30,7 +47,7 @@ export async function POST(request: NextRequest) {
       supplier: body.supplier,
       imageUrl: body.imageUrl,
       barcode: body.barcode ? String(body.barcode).replace(/\D/g, "") || null : null,
-      storageZoneId: body.storageZoneId ?? null,
+      storageZoneId,
     },
     include: { storageZone: { select: { id: true, name: true, slug: true } } },
   });

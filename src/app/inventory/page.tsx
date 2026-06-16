@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getLocationId } from "@/lib/location";
 import { PageHeader } from "@/components/ui";
 import { InventoryClient } from "@/components/inventory/InventoryClient";
-import { ensureDefaultStorageZones } from "@/lib/walk-in/storage-zones";
+import { ensureInventoryStorageLayout } from "@/lib/walk-in/assign-inventory-zones";
 import { Suspense } from "react";
 
 export default async function InventoryPage({
@@ -11,7 +11,7 @@ export default async function InventoryPage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const locationId = await getLocationId();
-  await ensureDefaultStorageZones(locationId);
+  await ensureInventoryStorageLayout(locationId);
 
   const { tab } = await searchParams;
   const [items, zones] = await Promise.all([

@@ -5,14 +5,14 @@ import { requirePermission } from "@/lib/api-auth";
 import { startCountSession, getRouteForZone } from "@/lib/walk-in/count-session";
 import { getFifoAlerts } from "@/lib/walk-in/fifo";
 import { parseAlternateUnits } from "@/lib/walk-in/unit-convert";
-import { ensureDefaultStorageZones } from "@/lib/walk-in/storage-zones";
+import { ensureInventoryStorageLayout } from "@/lib/walk-in/assign-inventory-zones";
 
 export async function GET(request: NextRequest) {
   const { error } = await requirePermission(request, "manage_inventory");
   if (error) return error;
 
   const locationId = await getLocationIdFromRequest(request);
-  await ensureDefaultStorageZones(locationId);
+  await ensureInventoryStorageLayout(locationId);
 
   const [zones, sessions, alerts] = await Promise.all([
     prisma.storageZone.findMany({

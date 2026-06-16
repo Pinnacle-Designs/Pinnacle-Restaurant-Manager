@@ -134,6 +134,14 @@ export function InventoryItemsByZone({
     [items, zones]
   );
 
+  if (sections.length === 0 && items.length > 0) {
+    return (
+      <p className="text-sm text-slate-600">
+        Loading storage zones… refresh if items do not appear grouped.
+      </p>
+    );
+  }
+
   if (sections.length === 0) return null;
 
   return (
