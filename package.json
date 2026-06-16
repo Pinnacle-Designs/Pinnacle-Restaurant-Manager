@@ -24,6 +24,8 @@
   },
   "dependencies": {
     "@prisma/client": "^6.5.0",
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.1",
     "@zxing/browser": "^0.2.0",
     "@zxing/library": "^0.22.0",
     "clsx": "^2.1.1",

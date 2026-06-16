@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePermission, stripSalaries } from "@/lib/api-auth";
+import { hashClockPin, isValidClockPin } from "@/lib/timeclock/clock-pin";
 
 export async function PATCH(
   request: NextRequest,
@@ -24,6 +25,20 @@ export async function PATCH(
       : activeChanging && body.active === true
         ? { terminatedAt: null, terminationReason: null }
         : {};
+
+  let clockPinPatch: { clockPinHash?: string | null } = {};
+  if (body.clockPin !== undefined) {
+    if (body.clockPin === "" || body.clockPin === null) {
+      clockPinPatch = { clockPinHash: null };
+    } else if (!isValidClockPin(String(body.clockPin))) {
+      return NextResponse.json(
+        { error: "Clock PIN must be 4–6 digits" },
+        { status: 400 }
+      );
+    } else {
+      clockPinPatch = { clockPinHash: hashClockPin(String(body.clockPin)) };
+    }
+  }
 
   const member = await prisma.staffMember.update({
     where: { id },
@@ -51,6 +66,7 @@ export async function PATCH(
           : null
         : undefined,
       ...terminationPatch,
+      ...clockPinPatch,
     },
   });
 

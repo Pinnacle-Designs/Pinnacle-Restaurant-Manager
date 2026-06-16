@@ -3,10 +3,11 @@
  * payroll, training, photos, insights, menu channels, etc.) for Smoky Oak BBQ.
  */
 import { prisma } from "./prisma";
-import { subDays, subHours, addDays, addHours, startOfWeek } from "date-fns";
+import { subDays, subHours, addDays, addHours, startOfWeek, startOfDay, format } from "date-fns";
 import { ensureMenuChannelConfigs } from "./menu/publish";
 import { ensureKitchenStations } from "./kitchen/stations";
 import { getOrCreatePayrollSettings } from "./payroll/load-context";
+import { hashClockPin } from "./timeclock/clock-pin";
 
 const LIVE_ORDER_MARKER = "DEMO_LIVE_SERVICE";
 
@@ -24,6 +25,8 @@ export async function seedDemoExtras(locationId: string) {
   await seedSocialPosts(locationId);
   await seedHiringSms(locationId);
   await seedTrainingCompletions(locationId);
+  await seedStaffClockPins(locationId);
+  await seedForgottenClockOutDemo(locationId);
   await seedTimeEntries(locationId);
   await seedShiftSwap(locationId);
   await seedPayrollSamples(locationId);
@@ -47,6 +50,10 @@ async function seedLocationProfile(locationId: string) {
       longitude: -97.7431,
       geoFenceRadiusM: 150,
       geoClockInRequired: true,
+      punchPhotoRequired: true,
+      punchVerificationMode: "PHOTO_OR_BIOMETRIC",
+      earlyClockInBufferMins: 15,
+      blockUnscheduledPunch: false,
       targetLaborPct: 28,
       autopayEnabled: true,
       billingEmail: "marcus@smokyoakbbq.com",
@@ -774,6 +781,83 @@ async function seedTrainingCompletions(locationId: string) {
   }
 }
 
+async function seedStaffClockPins(locationId: string) {
+  const withoutPin = await prisma.staffMember.findMany({
+    where: { locationId, clockPinHash: null, active: true },
+    select: { id: true },
+  });
+  if (withoutPin.length === 0) return;
+
+  const hash = hashClockPin("1234");
+  await prisma.staffMember.updateMany({
+    where: { id: { in: withoutPin.map((s) => s.id) } },
+    data: { clockPinHash: hash },
+  });
+}
+
+async function seedForgottenClockOutDemo(locationId: string) {
+  let dishwasher = await prisma.staffMember.findFirst({
+    where: { locationId, role: { contains: "Dish" } },
+  });
+
+  if (!dishwasher) {
+    dishwasher = await prisma.staffMember.create({
+      data: {
+        locationId,
+        name: "Jordan Lee",
+        role: "Dishwasher",
+        hourlyRate: 16.5,
+        active: true,
+        clockPinHash: hashClockPin("1234"),
+      },
+    });
+  }
+
+  const now = new Date();
+  const scheduledEnd = subHours(now, 2);
+  const shiftStart = subHours(scheduledEnd, 4);
+  const shiftDate = startOfDay(shiftStart);
+
+  let shift = await prisma.shift.findFirst({
+    where: {
+      locationId,
+      staffMemberId: dishwasher.id,
+      date: shiftDate,
+      endTime: format(scheduledEnd, "HH:mm"),
+    },
+  });
+
+  if (!shift) {
+    shift = await prisma.shift.create({
+      data: {
+        locationId,
+        staffMemberId: dishwasher.id,
+        date: shiftDate,
+        startTime: format(shiftStart, "HH:mm"),
+        endTime: format(scheduledEnd, "HH:mm"),
+        workRole: "Dishwasher",
+        notes: "Demo: forgotten clock-out warning",
+      },
+    });
+  }
+
+  const existingOpen = await prisma.timeEntry.findFirst({
+    where: { locationId, staffMemberId: dishwasher.id, clockOutAt: null },
+  });
+
+  if (!existingOpen) {
+    await prisma.timeEntry.create({
+      data: {
+        locationId,
+        staffMemberId: dishwasher.id,
+        shiftId: shift.id,
+        clockInAt: shiftStart,
+        geoVerifiedIn: true,
+      },
+    });
+  }
+}
+
 async function seedTimeEntries(locationId: string) {
   const count = await prisma.timeEntry.count({ where: { locationId } });
   if (count > 0) return;
@@ -833,6 +917,7 @@ async function seedTimeEntries(locationId: string) {
         geoVerifiedOut: true,
         mealBreakTaken: true,
         restBreakTaken: true,
+        approvalStatus: "PENDING",
       },
     });
   }
@@ -846,6 +931,8 @@ async function seedTimeEntries(locationId: string) {
         clockOutAt: subHours(subDays(new Date(), 2), -7),
         geoVerifiedIn: true,
         geoVerifiedOut: true,
+        approvalStatus: "APPROVED",
+        approvedAt: subDays(new Date(), 1),
       },
     });
   }

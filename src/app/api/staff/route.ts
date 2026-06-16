@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getLocationIdFromRequest } from "@/lib/location";
 import { getSessionUserFromRequest } from "@/lib/auth";
 import { requirePermission, stripSalaries, unauthorizedResponse } from "@/lib/api-auth";
+import { hashClockPin, isValidClockPin } from "@/lib/timeclock/clock-pin";
 
 export async function GET(request: NextRequest) {
   const user = await getSessionUserFromRequest(request);
@@ -22,6 +23,14 @@ export async function POST(request: NextRequest) {
 
   const locationId = await getLocationIdFromRequest(request);
   const body = await request.json();
+
+  let clockPinHash: string | null = null;
+  const pin = body.clockPin ? String(body.clockPin) : "1234";
+  if (!isValidClockPin(pin)) {
+    return NextResponse.json({ error: "Clock PIN must be 4–6 digits" }, { status: 400 });
+  }
+  clockPinHash = hashClockPin(pin);
+
   const member = await prisma.staffMember.create({
     data: {
       locationId,
@@ -36,6 +45,7 @@ export async function POST(request: NextRequest) {
       imageUrl: body.imageUrl,
       dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : null,
       hireDate: body.hireDate ? new Date(body.hireDate) : new Date(),
+      clockPinHash,
     },
   });
 

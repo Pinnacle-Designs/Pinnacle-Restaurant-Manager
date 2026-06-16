@@ -1692,7 +1692,7 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
   }
 
   try {
-    const { getPoReceivingSummary } = await import("@/lib/purchasing/po-receiving-status");
+    const { getPoReceivingSummary } = await import("@/lib/purchasing/po-receiving-summary");
     const poRecv = await getPoReceivingSummary(locationId);
     purchasingHighlights.poReceiving = {
       pendingCount: poRecv.pendingCount,

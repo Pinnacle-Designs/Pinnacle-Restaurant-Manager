@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 import { getLocationId } from "@/lib/location";
 import { getEnrichedSessionUser } from "@/lib/location-plan";
@@ -36,7 +37,9 @@ export default async function StaffPage() {
               : "View your team roster"
         }
       />
-      <StaffPageClient initialStaff={safeStaff} />
+      <Suspense fallback={null}>
+        <StaffPageClient initialStaff={safeStaff} />
+      </Suspense>
     </div>
   );
 }

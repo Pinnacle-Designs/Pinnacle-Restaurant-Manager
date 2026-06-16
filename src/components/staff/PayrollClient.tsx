@@ -12,6 +12,7 @@ import {
 import { Button, Badge, EmptyState } from "@/components/ui";
 import { Input, Select, FormField } from "@/components/ui/form";
 import { apiPost } from "@/lib/api";
+import { ForgottenClockOutAlert } from "@/components/staff/ForgottenClockOutAlert";
 import { formatCurrency, cn } from "@/lib/utils";
 import { JOB_ROLES, TIPPED_JOB_ROLES } from "@/lib/payroll/job-roles";
 import { getDefaultPayPeriod } from "@/lib/payroll/compute";
@@ -245,6 +246,7 @@ export function PayrollClient({ staff }: { staff: StaffMember[] }) {
 
       {section === "preview" && (
         <div className="space-y-4">
+          <ForgottenClockOutAlert variant="banner" />
           {loading || !preview ? (
             <p className="text-sm text-slate-500">Calculating payroll…</p>
           ) : (

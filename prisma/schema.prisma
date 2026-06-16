@@ -248,6 +248,21 @@ model User {
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  webAuthnCredentials WebAuthnCredential[]
+}
+
+model WebAuthnCredential {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId String   @unique
+  publicKey    String
+  counter      Int      @default(0)
+  deviceLabel  String?
+  createdAt    DateTime @default(now())
+  lastUsedAt   DateTime?
+
+  @@index([userId])
 }
 
 model Location {
@@ -271,6 +286,11 @@ model Location {
   longitude      Float?
   geoFenceRadiusM Int     @default(150)
   geoClockInRequired Boolean @default(true)
+  punchPhotoRequired Boolean @default(true)
+  punchVerificationMode String @default("PHOTO_OR_BIOMETRIC")
+  earlyClockInBufferMins Int @default(15)
+  forgottenClockOutGraceMins Int @default(30)
+  blockUnscheduledPunch Boolean @default(false)
   targetLaborPct Float   @default(30)
   mealBreakMinutes Int   @default(30)
   restBreakMinutes Int   @default(10)
@@ -810,6 +830,7 @@ model StaffMember {
   terminatedAt DateTime?
   terminationReason String?
   imageUrl   String?
+  clockPinHash String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   shifts     Shift[]
@@ -869,15 +890,27 @@ model TimeEntry {
   clockOutLng     Float?
   geoVerifiedIn   Boolean     @default(false)
   geoVerifiedOut  Boolean     @default(false)
+  clockInPhotoUrl String?
+  clockOutPhotoUrl String?
+  identityVerifiedIn Boolean  @default(false)
+  identityVerifiedOut Boolean @default(false)
+  identityMethodIn String?
+  identityMethodOut String?
   mealBreakTaken  Boolean?
   restBreakTaken  Boolean?
   breakAttestedAt DateTime?
   notes           String?
+  approvalStatus  String      @default("PENDING")
+  approvedByUserId String?
+  approvedAt      DateTime?
+  editedByUserId  String?
+  editedAt        DateTime?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
   @@index([locationId, clockInAt])
   @@index([staffMemberId, clockInAt])
+  @@index([locationId, approvalStatus])
 }
 
 model ShiftSwapRequest {

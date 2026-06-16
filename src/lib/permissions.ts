@@ -204,7 +204,11 @@ const ROUTE_PERMISSION_MAP: Record<string, Permission> = {
   "/api/inventory": "manage_inventory",
   "/api/walk-in": "manage_inventory",
   "/api/pos": "place_orders",
+  "/api/timeclock/kiosk": "clock_in",
   "/api/timeclock": "clock_in",
+  "/api/timeclock/settings": "manage_schedule",
+  "/api/timeclock/forgotten-clock-outs": "manage_schedule",
+  "/api/timeclock/entries": "clock_in",
   "/api/shift-swaps": "view_own_schedule",
 };
 
@@ -221,6 +225,11 @@ function routeBase(pathname: string): string {
   if (pathname.startsWith("/api/kitchen")) return "/api/kitchen";
   if (pathname.startsWith("/api/pos/layout")) return "/api/pos";
   if (pathname.startsWith("/api/pos")) return "/api/pos";
+  if (pathname.startsWith("/api/timeclock/kiosk")) return "/api/timeclock/kiosk";
+  if (pathname.startsWith("/api/timeclock/forgotten-clock-outs")) return "/api/timeclock/forgotten-clock-outs";
+  if (pathname.startsWith("/api/timeclock/settings")) return "/api/timeclock/settings";
+  if (pathname.startsWith("/api/timeclock/entries")) return "/api/timeclock/entries";
+  if (pathname.startsWith("/api/timeclock")) return "/api/timeclock";
   if (pathname.startsWith("/api/")) {
     const parts = pathname.split("/").filter(Boolean);
     return parts.length >= 2 ? `/${parts[0]}/${parts[1]}` : pathname;

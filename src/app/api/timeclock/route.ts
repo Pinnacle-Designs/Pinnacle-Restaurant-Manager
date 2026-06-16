@@ -4,7 +4,24 @@ import { getLocationIdFromRequest } from "@/lib/location";
 import { requireAnyPermission } from "@/lib/api-auth";
 import { resolveStaffMemberForUser } from "@/lib/staff-resolve";
 import { verifyGeoClockIn } from "@/lib/timeclock/geo";
+import { verifyPunchIdentity } from "@/lib/timeclock/verify-punch";
+import { savePunchPhoto } from "@/lib/timeclock/save-punch-photo";
+import { checkEarlyClockIn } from "@/lib/timeclock/early-clock-in";
 import { startOfDay } from "date-fns";
+
+const locationSelect = {
+  name: true,
+  latitude: true,
+  longitude: true,
+  geoFenceRadiusM: true,
+  geoClockInRequired: true,
+  punchPhotoRequired: true,
+  punchVerificationMode: true,
+  earlyClockInBufferMins: true,
+  blockUnscheduledPunch: true,
+  mealBreakMinutes: true,
+  restBreakMinutes: true,
+} as const;
 
 export async function GET(request: NextRequest) {
   const { user, error } = await requireAnyPermission(request, ["clock_in", "manage_schedule"]);
@@ -21,15 +38,7 @@ export async function GET(request: NextRequest) {
 
   const location = await prisma.location.findUnique({
     where: { id: locationId },
-    select: {
-      name: true,
-      latitude: true,
-      longitude: true,
-      geoFenceRadiusM: true,
-      geoClockInRequired: true,
-      mealBreakMinutes: true,
-      restBreakMinutes: true,
-    },
+    select: locationSelect,
   });
 
   const openEntry = await prisma.timeEntry.findFirst({
@@ -48,10 +57,19 @@ export async function GET(request: NextRequest) {
     orderBy: { startTime: "asc" },
   });
 
+  let biometricEnrolled = false;
+  try {
+    biometricEnrolled =
+      (await prisma.webAuthnCredential.count({ where: { userId: user!.id } })) > 0;
+  } catch {
+    biometricEnrolled = false;
+  }
+
   return NextResponse.json({
     staff: { id: staff.id, name: staff.name, role: staff.role },
     location,
     clockedIn: !!openEntry,
+    biometricEnrolled,
     activeEntry: openEntry
       ? {
           ...openEntry,
@@ -91,9 +109,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: geo.error }, { status: 400 });
   }
 
+  const today = startOfDay(new Date());
   let shiftId: string | null = body.shiftId ?? null;
-  if (!shiftId) {
-    const today = startOfDay(new Date());
+  let shiftForCheck: { date: Date; startTime: string } | null = null;
+
+  if (shiftId) {
+    const shift = await prisma.shift.findFirst({
+      where: { id: shiftId, locationId, staffMemberId: staff.id },
+    });
+    shiftForCheck = shift;
+  } else {
     const match = await prisma.shift.findFirst({
       where: {
         locationId,
@@ -103,6 +128,37 @@ export async function POST(request: NextRequest) {
       orderBy: { startTime: "asc" },
     });
     shiftId = match?.id ?? null;
+    shiftForCheck = match;
+  }
+
+  const early = checkEarlyClockIn(
+    new Date(),
+    shiftForCheck,
+    location.earlyClockInBufferMins,
+    location.blockUnscheduledPunch
+  );
+  if (!early.ok) {
+    return NextResponse.json({ error: early.error }, { status: 400 });
+  }
+
+  const identity = verifyPunchIdentity(location, {
+    photoDataUrl: body.photoDataUrl,
+    biometricVerified: Boolean(body.biometricVerified),
+  });
+  if (!identity.ok) {
+    return NextResponse.json({ error: identity.error }, { status: 400 });
+  }
+
+  let clockInPhotoUrl: string | null = null;
+  if (identity.method === "PHOTO" && body.photoDataUrl) {
+    try {
+      clockInPhotoUrl = await savePunchPhoto(body.photoDataUrl);
+    } catch (err) {
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : "Could not save punch photo" },
+        { status: 400 }
+      );
+    }
   }
 
   const entry = await prisma.timeEntry.create({
@@ -115,6 +171,9 @@ export async function POST(request: NextRequest) {
       clockInLat: body.latitude ?? null,
       clockInLng: body.longitude ?? null,
       geoVerifiedIn: geo.verified,
+      clockInPhotoUrl,
+      identityVerifiedIn: identity.verified,
+      identityMethodIn: identity.method ?? null,
     },
   });
 
@@ -159,6 +218,29 @@ export async function PATCH(request: NextRequest) {
 
   const geo = verifyGeoClockIn(body.latitude, body.longitude, location);
 
+  let clockOutPhotoUrl: string | null = null;
+  let identityVerifiedOut = false;
+  let identityMethodOut: string | null = null;
+
+  if (location.punchPhotoRequired && body.photoDataUrl) {
+    const identity = verifyPunchIdentity(location, {
+      photoDataUrl: body.photoDataUrl,
+      biometricVerified: Boolean(body.biometricVerified),
+    });
+    if (identity.ok && identity.method === "PHOTO") {
+      try {
+        clockOutPhotoUrl = await savePunchPhoto(body.photoDataUrl);
+        identityVerifiedOut = true;
+        identityMethodOut = "PHOTO";
+      } catch {
+        // optional on clock out
+      }
+    } else if (identity.ok && identity.method === "BIOMETRIC") {
+      identityVerifiedOut = true;
+      identityMethodOut = "BIOMETRIC";
+    }
+  }
+
   const entry = await prisma.timeEntry.update({
     where: { id: openEntry.id },
     data: {
@@ -166,10 +248,14 @@ export async function PATCH(request: NextRequest) {
       clockOutLat: body.latitude ?? null,
       clockOutLng: body.longitude ?? null,
       geoVerifiedOut: geo.verified,
+      clockOutPhotoUrl,
+      identityVerifiedOut,
+      identityMethodOut,
       mealBreakTaken: Boolean(body.mealBreakTaken),
       restBreakTaken: Boolean(body.restBreakTaken),
       breakAttestedAt: new Date(),
       notes: body.notes?.trim() || null,
+      approvalStatus: "PENDING",
     },
   });
 

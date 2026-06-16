@@ -6,7 +6,7 @@ export default function TimeClockPage() {
     <div>
       <PageHeader
         title="Time Clock"
-        description="Geo-verified clock in and break attestation at clock out"
+        description="Shared kiosk — pick your name, enter PIN, then verify per fraud prevention settings"
       />
       <TimeClockClient />
     </div>

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { InsightPanel } from "@/components/insights/InsightPanel";
+import { ForgottenClockOutAlert } from "@/components/staff/ForgottenClockOutAlert";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { PLAN_BY_ID, requiredPlanForRoute } from "@/lib/plans";
 import { formatCurrency } from "@/lib/utils";
@@ -49,6 +50,7 @@ export function DashboardClient({ data }: { data: DashboardData }) {
   const canViewInsights = can("view_insights");
   const canSeed = user?.role === "OWNER" || user?.role === "MANAGER";
   const canAnalytics = can("view_analytics");
+  const canManageSchedule = can("manage_schedule");
   const [seeding, setSeeding] = useState(false);
   const [seedMessage, setSeedMessage] = useState<string | null>(null);
 
@@ -82,6 +84,8 @@ export function DashboardClient({ data }: { data: DashboardData }) {
           Capture Photo
         </Link>
       </PageHeader>
+
+      {canManageSchedule && <ForgottenClockOutAlert variant="banner" />}
 
       {upgradeFeature && (
         <div className="mb-6 rounded-xl border border-orange-200 bg-orange-50 p-4">

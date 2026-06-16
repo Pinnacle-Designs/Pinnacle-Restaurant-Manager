@@ -51,6 +51,9 @@ export function verifyGeoClockIn(
   }
 
   if (lat == null || lng == null) {
+    if (process.env.NODE_ENV === "development") {
+      return { ok: true, verified: false };
+    }
     return {
       ok: false,
       verified: false,
@@ -67,10 +70,16 @@ export function verifyGeoClockIn(
   );
 
   if (!verified) {
+    if (process.env.NODE_ENV === "development") {
+      return { ok: true, verified: false };
+    }
+    const distance = Math.round(
+      distanceMeters(lat, lng, location.latitude, location.longitude)
+    );
     return {
       ok: false,
       verified: false,
-      error: "You must be at the restaurant to clock in. Move closer and try again.",
+      error: `You must be on restaurant property to punch (${distance}m away, max ${location.geoFenceRadiusM}m). Move inside the geofence and try again.`,
     };
   }
 

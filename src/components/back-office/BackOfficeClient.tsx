@@ -6,6 +6,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button, Badge, StatCard } from "@/components/ui";
+import { ForgottenClockOutAlert } from "@/components/staff/ForgottenClockOutAlert";
 import { formatCurrency } from "@/lib/utils";
 import type { MenuEngineeringSnapshot } from "@/lib/menu/engineering";
 
@@ -91,6 +92,8 @@ export function BackOfficeClient() {
 
   return (
     <div>
+      <ForgottenClockOutAlert variant="banner" className="mb-6" />
+
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Live COGS (MTD)"

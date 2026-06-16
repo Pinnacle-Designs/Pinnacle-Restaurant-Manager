@@ -46,6 +46,7 @@ export function StaffClient({
     tipPoints: "1",
     active: true,
     dateOfBirth: "",
+    clockPin: "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +58,7 @@ export function StaffClient({
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: "", role: "Server", email: "", phone: "", hourlyRate: "", isTippedEmployee: true, tipPoints: "1", active: true, dateOfBirth: "" });
+    setForm({ name: "", role: "Server", email: "", phone: "", hourlyRate: "", isTippedEmployee: true, tipPoints: "1", active: true, dateOfBirth: "", clockPin: "" });
     setError(null);
     setModalOpen(true);
   };
@@ -76,6 +77,7 @@ export function StaffClient({
       dateOfBirth: member.dateOfBirth
         ? String(member.dateOfBirth).slice(0, 10)
         : "",
+      clockPin: "",
     });
     setError(null);
     setModalOpen(true);
@@ -98,6 +100,7 @@ export function StaffClient({
         tipPoints: parseFloat(form.tipPoints) || 1,
         active: form.active,
         dateOfBirth: form.dateOfBirth || null,
+        ...(form.clockPin ? { clockPin: form.clockPin } : editing ? {} : { clockPin: "1234" }),
       };
       if (editing) {
         const updated = await apiPatch<StaffMember>(`/api/staff/${editing.id}`, payload);
@@ -209,6 +212,17 @@ export function StaffClient({
               type="date"
               value={form.dateOfBirth}
               onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })}
+            />
+          </FormField>
+          <FormField label="Time clock PIN (4–6 digits)">
+            <Input
+              type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              placeholder={editing ? "Leave blank to keep current PIN" : "Default 1234 if empty"}
+              value={form.clockPin}
+              onChange={(e) => setForm({ ...form, clockPin: e.target.value.replace(/\D/g, "").slice(0, 6) })}
             />
           </FormField>
           <div className="grid grid-cols-2 gap-4">
