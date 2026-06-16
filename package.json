@@ -18,6 +18,7 @@
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
+    "db:reseed": "tsx scripts/full-reseed.ts",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate"
   },
