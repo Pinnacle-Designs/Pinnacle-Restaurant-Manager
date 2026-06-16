@@ -8,6 +8,7 @@ import {
   Camera,
   CreditCard,
   LifeBuoy,
+  Link2,
   Lock,
   Shield,
   User,
@@ -20,6 +21,7 @@ import { Input, FormField } from "@/components/ui/form";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { PermissionsTab } from "@/components/account/PermissionsTab";
 import { BillingIntegrations } from "@/components/account/BillingIntegrations";
+import { IntegrationsPanel } from "@/components/account/IntegrationsPanel";
 import { PaymentSupportPanel } from "@/components/account/PaymentSupportPanel";
 import { PLAN_BY_ID } from "@/lib/plans";
 import { ROLE_LABELS, ROLE_COLORS } from "@/lib/permissions";
@@ -27,12 +29,13 @@ import { cn, formatCurrency } from "@/lib/utils";
 import type { PlanId } from "@/lib/plans";
 import type { AppRole } from "@prisma/client";
 
-type Tab = "profile" | "security" | "billing" | "support" | "permissions";
+type Tab = "profile" | "security" | "billing" | "integrations" | "support" | "permissions";
 
 const BASE_TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "profile", label: "Profile", icon: User },
   { id: "security", label: "Security", icon: Lock },
   { id: "billing", label: "Billing & autopay", icon: CreditCard },
+  { id: "integrations", label: "Integrations", icon: Link2 },
   { id: "support", label: "Payments & support", icon: LifeBuoy },
   { id: "permissions", label: "Team access", icon: Users },
 ];
@@ -76,16 +79,17 @@ function AvatarPlaceholder({ name }: { name: string }) {
 export function AccountClient() {
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get("tab") as Tab | null) ?? "profile";
-  const { refresh, can } = useAuth();
-  const visibleTabs = BASE_TABS.filter(
-    (item) => item.id !== "permissions" || can("manage_permissions")
-  );
-  const [tab, setTab] = useState<Tab>(
-    visibleTabs.some((t) => t.id === initialTab) ? initialTab : "profile"
-  );
+  const { refresh, can, user } = useAuth();
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [data, setData] = useState<AccountData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const visibleTabs = BASE_TABS.filter((item) => {
+    if (item.id === "permissions") return can("manage_permissions");
+    if (item.id === "integrations") return user?.role === "OWNER";
+    return true;
+  });
 
   const [name, setName] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
@@ -659,6 +663,8 @@ export function AccountClient() {
               )}
             </div>
           )}
+
+          {tab === "integrations" && <IntegrationsPanel />}
 
           {tab === "support" && <PaymentSupportPanel />}
 

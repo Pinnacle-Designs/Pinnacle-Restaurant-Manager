@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { bumpMenuRevision } from "./stock";
+import { recordPosSyncDepletion } from "@/lib/integrations/pos-sync";
 
 export type RecipeLineInput = {
   inventoryItemId: string;
@@ -132,4 +133,6 @@ export async function depleteRecipeForSale(
       data: { quantity: nextQty },
     });
   }
+
+  await recordPosSyncDepletion(locationId, menuItemId, platesSold, lines.length);
 }

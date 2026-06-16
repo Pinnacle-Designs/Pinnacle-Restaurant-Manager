@@ -117,6 +117,17 @@ enum PaymentProviderPurpose {
   POS
 }
 
+enum AccountingProvider {
+  QUICKBOOKS
+  XERO
+  SAGE
+}
+
+enum VendorEdiProvider {
+  SYSCO
+  US_FOODS
+}
+
 enum TipPoolMode {
   INDIVIDUAL
   FULL_POOL
@@ -314,6 +325,12 @@ model Location {
   menuChannelConfigs   MenuChannelConfig[]
   kitchenStations      KitchenStation[]
   menuRevision         Int      @default(0)
+  integrationSettings  IntegrationSettings?
+  accountingConnections AccountingConnection[]
+  accountingJournalEntries AccountingJournalEntry[]
+  vendorEdiConnections VendorEdiConnection[]
+  vendorCatalogItems   VendorCatalogItem[]
+  vendorPurchaseOrders VendorPurchaseOrder[]
 }
 
 model KitchenStation {
@@ -386,6 +403,100 @@ model PaymentProviderConnection {
   updatedAt   DateTime @updatedAt
 
   @@unique([locationId, purpose])
+}
+
+/// Real-time POS → inventory sync settings (recipe depletion on kitchen fire).
+model IntegrationSettings {
+  id                 String   @id @default(cuid())
+  locationId         String   @unique
+  location           Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  posSyncEnabled     Boolean  @default(true)
+  lastPosSyncAt      DateTime?
+  posDepletionsToday Int      @default(0)
+  updatedAt          DateTime @updatedAt
+}
+
+model AccountingConnection {
+  id                String             @id @default(cuid())
+  locationId        String
+  location          Location           @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  provider          AccountingProvider
+  connected         Boolean            @default(false)
+  companyName       String?
+  externalCompanyId String?
+  autoSyncEnabled   Boolean            @default(true)
+  lastSyncAt        DateTime?
+  entriesSynced     Int                @default(0)
+  lastSyncStatus    String?
+  lastSyncMessage   String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@unique([locationId, provider])
+}
+
+model AccountingJournalEntry {
+  id          String             @id @default(cuid())
+  locationId  String
+  location    Location           @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  provider    AccountingProvider
+  entryType   String
+  reference   String
+  description String
+  debit       Float              @default(0)
+  credit      Float              @default(0)
+  accountCode String?
+  sourceId    String?
+  syncedAt    DateTime           @default(now())
+}
+
+model VendorEdiConnection {
+  id                String            @id @default(cuid())
+  locationId        String
+  location          Location          @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  provider          VendorEdiProvider
+  connected         Boolean           @default(false)
+  accountNumber     String?
+  warehouseCode     String?
+  catalogItemsCount Int               @default(0)
+  lastCatalogSyncAt DateTime?
+  lastOrderAt       DateTime?
+  lastSyncStatus    String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@unique([locationId, provider])
+}
+
+model VendorCatalogItem {
+  id              String            @id @default(cuid())
+  locationId      String
+  location        Location          @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  provider        VendorEdiProvider
+  sku             String
+  name            String
+  unit            String
+  packSize        String?
+  unitPrice       Float
+  inStock         Boolean           @default(true)
+  leadTimeDays    Int               @default(1)
+  inventoryItemId String?
+  inventoryItem   InventoryItem?    @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([locationId, provider, sku])
+}
+
+model VendorPurchaseOrder {
+  id          String            @id @default(cuid())
+  locationId  String
+  location    Location          @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  provider    VendorEdiProvider
+  status      String            @default("SUBMITTED")
+  lineCount   Int
+  totalAmount Float
+  linesJson   String?
+  submittedAt DateTime          @default(now())
 }
 
 model RolePermissionSet {
@@ -472,6 +583,7 @@ model InventoryItem {
   updatedAt     DateTime @updatedAt
   wasteLogs     InventoryWaste[]
   recipeLines   MenuRecipeLine[]
+  vendorCatalogItems VendorCatalogItem[]
 
   @@unique([locationId, barcode])
 }

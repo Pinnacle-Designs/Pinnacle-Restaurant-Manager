@@ -7,6 +7,7 @@
     { hash: "#features", label: "Features" },
     { hash: "#pos-kitchen", label: "POS" },
     { hash: "#menu-platform", label: "Menu" },
+    { hash: "#integrations", label: "Integrations" },
     { hash: "#command-center", label: "AI" },
     { hash: "#analytics", label: "Analytics" },
     { hash: "#pricing", label: "Pricing" },

@@ -5,6 +5,7 @@ import { getSessionUserFromRequest } from "@/lib/auth";
 import { requirePermission, unauthorizedResponse } from "@/lib/api-auth";
 import { ORDER_INCLUDE } from "@/lib/orders";
 import { decrementMenuStock } from "@/lib/menu/stock";
+import { depleteRecipeForSale } from "@/lib/menu/recipe";
 
 export async function GET(request: NextRequest) {
   const user = await getSessionUserFromRequest(request);
@@ -64,7 +65,9 @@ export async function POST(request: NextRequest) {
 
   if (body.items?.length) {
     for (const item of body.items as { menuItemId: string; quantity: number }[]) {
-      await decrementMenuStock(locationId, item.menuItemId, item.quantity || 1);
+      const qty = item.quantity || 1;
+      await decrementMenuStock(locationId, item.menuItemId, qty);
+      await depleteRecipeForSale(locationId, item.menuItemId, qty);
     }
   }
 

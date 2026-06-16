@@ -27,6 +27,7 @@ export async function seedDemoExtras(locationId: string) {
   await seedTimeEntries(locationId);
   await seedShiftSwap(locationId);
   await seedPayrollSamples(locationId);
+  await import("./integrations/seed-integrations").then((m) => m.seedIntegrationsSample(locationId));
 }
 
 async function seedLocationProfile(locationId: string) {
