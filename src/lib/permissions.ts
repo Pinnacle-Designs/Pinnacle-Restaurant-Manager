@@ -164,6 +164,7 @@ const NAV_PERMISSION_MAP: Record<string, Permission> = {
   "/boh": "manage_boh",
   "/kds": "manage_boh",
   "/inventory": "manage_inventory",
+  "/loading-dock": "manage_inventory",
   "/tables": "manage_tables",
   "/orders": "place_orders",
 };
@@ -188,6 +189,7 @@ const ROUTE_PERMISSION_MAP: Record<string, Permission> = {
   "/api/compliance": "manage_compliance",
   "/api/retention": "manage_retention",
   "/api/boh": "manage_boh",
+  "/api/purchasing": "manage_inventory",
   "/api/kitchen": "manage_boh",
   "/api/pos": "place_orders",
   "/api/timeclock": "clock_in",

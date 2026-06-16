@@ -31,7 +31,7 @@ const STARTER_ROUTES = [
   "/analytics",
 ];
 
-const GROWTH_ROUTES = [...STARTER_ROUTES, "/finances"];
+const GROWTH_ROUTES = [...STARTER_ROUTES, "/finances", "/loading-dock"];
 
 const PRO_ROUTES = [...GROWTH_ROUTES, "/social"];
 
@@ -65,6 +65,7 @@ export const PLANS: PlanDefinition[] = [
     features: [
       "Everything in Starter",
       "Full inventory & vendor pricing",
+      "Loading Dock — PO matching & invoice OCR",
       "Recipe costing & food cost",
       "Staff scheduling & labor analytics",
       "Receipt OCR (limited)",

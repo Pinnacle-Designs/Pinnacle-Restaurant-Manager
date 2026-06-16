@@ -21,6 +21,7 @@ import {
   Shield,
   Zap,
   ChefHat,
+  Truck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/constants";
@@ -47,6 +48,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   clock: Clock,
   zap: Zap,
   "chef-hat": ChefHat,
+  truck: Truck,
 };
 
 export function Sidebar() {

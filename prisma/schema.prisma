@@ -331,6 +331,8 @@ model Location {
   vendorEdiConnections VendorEdiConnection[]
   vendorCatalogItems   VendorCatalogItem[]
   vendorPurchaseOrders VendorPurchaseOrder[]
+  goodsReceipts        GoodsReceipt[]
+  vendorCredits        VendorCredit[]
 }
 
 model KitchenStation {
@@ -488,15 +490,98 @@ model VendorCatalogItem {
 }
 
 model VendorPurchaseOrder {
-  id          String            @id @default(cuid())
+  id          String             @id @default(cuid())
   locationId  String
-  location    Location          @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  provider    VendorEdiProvider
-  status      String            @default("SUBMITTED")
+  location    Location           @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  provider    VendorEdiProvider?
+  vendor      String?
+  poNumber    String?
+  status      String             @default("DRAFT")
+  source      String             @default("MANUAL")
   lineCount   Int
   totalAmount Float
   linesJson   String?
-  submittedAt DateTime          @default(now())
+  expectedAt  DateTime?
+  matchStatus String             @default("PENDING")
+  submittedAt DateTime           @default(now())
+  updatedAt   DateTime           @default(now()) @updatedAt
+
+  lines    PurchaseOrderLine[]
+  receipts GoodsReceipt[]
+  invoices VendorInvoice[]
+
+  @@index([locationId, status])
+}
+
+model PurchaseOrderLine {
+  id              String              @id @default(cuid())
+  poId            String
+  po              VendorPurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  inventoryItemId String?
+  inventoryItem   InventoryItem?      @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  sku             String?
+  description     String
+  qtyOrdered      Float
+  qtyReceived     Float               @default(0)
+  unit            String
+  unitPrice       Float
+  lineTotal       Float
+
+  receiptLines GoodsReceiptLine[]
+
+  @@index([poId])
+}
+
+model GoodsReceipt {
+  id         String              @id @default(cuid())
+  locationId String
+  location   Location            @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  poId       String?
+  po         VendorPurchaseOrder? @relation(fields: [poId], references: [id], onDelete: SetNull)
+  vendor     String
+  receivedAt DateTime            @default(now())
+  receivedBy String?
+  notes      String?
+  createdAt  DateTime            @default(now())
+
+  lines    GoodsReceiptLine[]
+  invoices VendorInvoice[]
+
+  @@index([locationId, receivedAt])
+}
+
+model GoodsReceiptLine {
+  id              String             @id @default(cuid())
+  receiptId       String
+  receipt         GoodsReceipt       @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  poLineId        String?
+  poLine          PurchaseOrderLine? @relation(fields: [poLineId], references: [id], onDelete: SetNull)
+  inventoryItemId String?
+  inventoryItem   InventoryItem?     @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  description     String
+  qtyReceived     Float
+  unit            String
+  unitCost        Float
+
+  @@index([receiptId])
+}
+
+model VendorCredit {
+  id           String         @id @default(cuid())
+  locationId   String
+  location     Location       @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  vendor       String
+  amount       Float
+  reason       String
+  status       String         @default("OPEN")
+  creditMemoNo String?
+  invoiceId    String?
+  invoice      VendorInvoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  itemsJson    String?
+  createdAt    DateTime       @default(now())
+  resolvedAt   DateTime?
+
+  @@index([locationId, status])
 }
 
 model RolePermissionSet {
@@ -584,6 +669,9 @@ model InventoryItem {
   wasteLogs     InventoryWaste[]
   recipeLines   MenuRecipeLine[]
   vendorCatalogItems VendorCatalogItem[]
+  purchaseOrderLines PurchaseOrderLine[]
+  goodsReceiptLines  GoodsReceiptLine[]
+  invoiceLines       VendorInvoiceLine[]
 
   @@unique([locationId, barcode])
 }
@@ -1208,15 +1296,45 @@ model GuestReview {
 }
 
 model VendorInvoice {
-  id            String   @id @default(cuid())
-  locationId    String
-  location      Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  vendor        String
-  amount        Float
-  category      String
-  invoiceDate   DateTime @default(now())
-  priceChangePct Float   @default(0)
-  createdAt     DateTime @default(now())
+  id             String              @id @default(cuid())
+  locationId     String
+  location       Location            @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  vendor         String
+  amount         Float
+  category       String
+  invoiceDate    DateTime            @default(now())
+  priceChangePct Float               @default(0)
+  poId           String?
+  po             VendorPurchaseOrder? @relation(fields: [poId], references: [id], onDelete: SetNull)
+  receiptId      String?
+  receipt        GoodsReceipt?       @relation(fields: [receiptId], references: [id], onDelete: SetNull)
+  invoiceNumber  String?
+  imageUrl       String?
+  matchStatus    String              @default("PENDING")
+  matchNotes     String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @default(now()) @updatedAt
+
+  lines   VendorInvoiceLine[]
+  credits VendorCredit[]
+
+  @@index([locationId, matchStatus])
+}
+
+model VendorInvoiceLine {
+  id              String         @id @default(cuid())
+  invoiceId       String
+  invoice         VendorInvoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  inventoryItemId String?
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  sku             String?
+  description     String
+  qty             Float
+  unit            String
+  unitPrice       Float
+  lineTotal       Float
+
+  @@index([invoiceId])
 }
 
 model VendorPriceHistory {
