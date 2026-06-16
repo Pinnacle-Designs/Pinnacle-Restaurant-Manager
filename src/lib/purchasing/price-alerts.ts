@@ -97,5 +97,8 @@ export async function updateInventoryCostsFromInvoice(
         unit: item.unit,
       },
     });
+
+    const { recalculateRecipesForIngredient } = await import("@/lib/kitchen/dynamic-costing");
+    await recalculateRecipesForIngredient(item.id);
   }
 }

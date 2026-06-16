@@ -618,6 +618,9 @@ model MenuItem {
   category    String
   salesCategory String   @default("FOOD")
   recipeCost  Float    @default(0)
+  recipeCostUpdatedAt DateTime?
+  allergens     String?
+  nutritionJson String?
   available   Boolean  @default(true)
   stockCount  Int?
   eightySixedAt DateTime?
@@ -668,6 +671,7 @@ model InventoryItem {
   storageZoneId String?
   storageZone   StorageZone? @relation(fields: [storageZoneId], references: [id], onDelete: SetNull)
   alternateUnits String?
+  allergens     String?
   countByWeight Boolean  @default(false)
   lastRestocked DateTime?
   imageUrl      String?

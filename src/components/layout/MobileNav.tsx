@@ -21,6 +21,7 @@ import {
   ChefHat,
   Truck,
   ThermometerSnowflake,
+  Soup,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MOBILE_PRIMARY_NAV_HREFS, NAV_ITEMS } from "@/lib/constants";
@@ -60,6 +61,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "chef-hat": ChefHat,
   truck: Truck,
   "thermometer-snowflake": ThermometerSnowflake,
+  soup: Soup,
 };
 
 function mobileNavLabel(item: NavItem) {

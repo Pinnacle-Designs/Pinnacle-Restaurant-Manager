@@ -35,6 +35,11 @@ export async function PATCH(
     },
   });
 
+  if (costChanged) {
+    const { recalculateRecipesForIngredient } = await import("@/lib/kitchen/dynamic-costing");
+    await recalculateRecipesForIngredient(id);
+  }
+
   return NextResponse.json(item);
 }
 

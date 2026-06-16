@@ -30,6 +30,7 @@ export const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: "layout-dashboard" },
   { href: "/photos", label: "Photos", icon: "camera" },
   { href: "/menu", label: "Menu", icon: "utensils" },
+  { href: "/kitchen", label: "Kitchen", icon: "soup" },
   { href: "/boh", label: "BOH", icon: "chef-hat" },
   { href: "/kds", label: "KDS", icon: "chef-hat" },
   { href: "/inventory", label: "Inventory", icon: "package" },

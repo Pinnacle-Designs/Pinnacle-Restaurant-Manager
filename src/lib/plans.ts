@@ -22,6 +22,7 @@ const STARTER_ROUTES = [
   "/admin",
   "/photos",
   "/menu",
+  "/kitchen",
   "/inventory",
   "/walk-in",
   "/staff",
@@ -47,6 +48,7 @@ export const PLANS: PlanDefinition[] = [
     features: [
       "Dashboard & orders",
       "Menu management",
+      "Kitchen — recipe costing, yield & prep lists",
       "Basic inventory",
       "Walk-In mobile counts & FIFO",
       "Staff & roles",
