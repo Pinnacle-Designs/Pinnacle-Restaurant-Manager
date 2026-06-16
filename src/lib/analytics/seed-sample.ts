@@ -11,28 +11,6 @@ export async function seedAnalyticsSampleData(locationId: string) {
   });
 
   const menuItems = await prisma.menuItem.findMany({ where: { locationId } });
-  const recipeCosts: Record<string, number> = {
-    "Smoked Brisket Plate": 8.4,
-    "St. Louis Ribs (Half Rack)": 7.6,
-    "Pulled Pork Sandwich": 4.2,
-    "Smoked Chicken Quarter": 5.1,
-    "Brisket Sandwich": 5.8,
-    "Pitmaster Sampler": 14.2,
-    "Burnt Ends": 6.5,
-    "Mac & Cheese": 1.4,
-    "Coleslaw": 0.9,
-    "Baked Beans": 1.1,
-    "Cornbread": 0.8,
-    "Sweet Tea": 0.35,
-    "Peach Cobbler": 2.1,
-    "Draft Beer": 1.8,
-    "Bourbon Lemonade": 2.6,
-    "Jalapeño Poppers": 2.8,
-  };
-  for (const item of menuItems) {
-    const rc = recipeCosts[item.name] ?? item.price * 0.32;
-    await prisma.menuItem.update({ where: { id: item.id }, data: { recipeCost: rc } });
-  }
 
   const tables = await prisma.table.findMany({ where: { locationId } });
   const staff = await prisma.staffMember.findMany({ where: { locationId } });
@@ -138,6 +116,10 @@ export async function seedAnalyticsSampleData(locationId: string) {
       { locationId, vendor: "Bulk Foods Co", itemName: "Elbow macaroni", category: "Dry goods", unitPrice: 1.4, unit: "lbs", effectiveDate: new Date(now - 12 * 86400000) },
       { locationId, vendor: "Texas Fuel & Wood", itemName: "Oak smoking wood", category: "Fuel", unitPrice: 22.0, unit: "bags", effectiveDate: new Date(now - 9 * 86400000) },
       { locationId, vendor: "Farm Fresh Poultry", itemName: "Chicken quarters", category: "Poultry", unitPrice: 1.85, unit: "each", effectiveDate: new Date(now - 14 * 86400000) },
+      { locationId, vendor: "Smokehouse Supply", itemName: "Alabama white sauce", category: "Dry goods", unitPrice: 16.0, unit: "gal", effectiveDate: new Date(now - 10 * 86400000) },
+      { locationId, vendor: "Bulk Foods Co", itemName: "Sharp cheddar", category: "Dairy", unitPrice: 4.2, unit: "lbs", effectiveDate: new Date(now - 12 * 86400000) },
+      { locationId, vendor: "Bulk Foods Co", itemName: "Unsalted butter", category: "Dairy", unitPrice: 5.4, unit: "lbs", effectiveDate: new Date(now - 15 * 86400000) },
+      { locationId, vendor: "Green Valley Produce", itemName: "Fresh mint", category: "Produce", unitPrice: 8.5, unit: "lbs", effectiveDate: new Date(now - 6 * 86400000) },
     ],
   });
 

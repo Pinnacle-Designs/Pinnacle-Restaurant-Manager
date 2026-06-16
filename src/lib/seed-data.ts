@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { BBQ_INVENTORY_CATALOG } from "./menu/bbq-catalog";
 
 export type DemoMode = "seeded" | "fresh";
 
@@ -420,6 +421,7 @@ export async function seedLocationData(locationId: string) {
     await import("@/lib/menu/seed-boh").then((m) => m.seedBohSample(locationId));
     await import("@/lib/kitchen/seed-kitchen").then((m) => m.seedKitchenSample(locationId));
     await import("@/lib/menu/seed-recipes").then((m) => m.seedMenuRecipes(locationId));
+    await import("@/lib/seed-extras").then((m) => m.seedDemoExtras(locationId));
     return {
       message: "Already seeded for this location",
       locationId,
@@ -506,18 +508,19 @@ export async function seedLocationData(locationId: string) {
   });
 
   await prisma.inventoryItem.createMany({
-    data: [
-      { locationId, name: "Beef brisket", quantity: 42, unit: "lbs", minQuantity: 30, costPerUnit: 6.8, previousCostPerUnit: 6.4, portionSize: 0.45, yieldPct: 88, supplier: "Hill Country Meats" },
-      { locationId, name: "Pork shoulder", quantity: 28, unit: "lbs", minQuantity: 20, costPerUnit: 3.2, previousCostPerUnit: 3.0, portionSize: 0.35, yieldPct: 85, supplier: "Hill Country Meats" },
-      { locationId, name: "St. Louis ribs", quantity: 18, unit: "racks", minQuantity: 12, costPerUnit: 14.5, previousCostPerUnit: 13.8, portionSize: 0.5, yieldPct: 90, supplier: "Hill Country Meats" },
-      { locationId, name: "Chicken quarters", quantity: 24, unit: "each", minQuantity: 16, costPerUnit: 1.85, previousCostPerUnit: 1.75, portionSize: 1, yieldPct: 92, supplier: "Farm Fresh Poultry" },
-      { locationId, name: "Brioche buns", quantity: 120, unit: "each", minQuantity: 80, costPerUnit: 0.55, portionSize: 1, yieldPct: 100, supplier: "Local Bakery Co" },
-      { locationId, name: "BBQ dry rub", quantity: 8, unit: "lbs", minQuantity: 4, costPerUnit: 9.5, portionSize: 0.02, yieldPct: 100, supplier: "Smokehouse Supply" },
-      { locationId, name: "House BBQ sauce", quantity: 6, unit: "gal", minQuantity: 3, costPerUnit: 18.0, portionSize: 0.05, yieldPct: 100, supplier: "Smokehouse Supply" },
-      { locationId, name: "Cabbage", quantity: 14, unit: "heads", minQuantity: 8, costPerUnit: 2.2, previousCostPerUnit: 2.0, portionSize: 0.15, yieldPct: 82, supplier: "Green Valley Produce" },
-      { locationId, name: "Elbow macaroni", quantity: 16, unit: "lbs", minQuantity: 10, costPerUnit: 1.4, portionSize: 0.12, yieldPct: 100, supplier: "Bulk Foods Co" },
-      { locationId, name: "Oak smoking wood", quantity: 12, unit: "bags", minQuantity: 6, costPerUnit: 22.0, portionSize: 0.25, yieldPct: 100, supplier: "Texas Fuel & Wood" },
-    ],
+    data: BBQ_INVENTORY_CATALOG.map((item) => ({
+      locationId,
+      name: item.name,
+      quantity: item.quantity,
+      unit: item.unit,
+      minQuantity: item.minQuantity,
+      costPerUnit: item.costPerUnit,
+      previousCostPerUnit: item.previousCostPerUnit,
+      portionSize: item.portionSize,
+      yieldPct: item.yieldPct ?? 100,
+      supplier: item.supplier,
+      barcode: item.barcode ?? null,
+    })),
   });
 
   await prisma.staffMember.createMany({
@@ -566,6 +569,7 @@ export async function seedLocationData(locationId: string) {
   await import("@/lib/menu/seed-boh").then((m) => m.seedBohSample(locationId));
   await import("@/lib/kitchen/seed-kitchen").then((m) => m.seedKitchenSample(locationId));
   await import("@/lib/menu/seed-recipes").then((m) => m.seedMenuRecipes(locationId));
+  await import("@/lib/seed-extras").then((m) => m.seedDemoExtras(locationId));
 
   return { message: "Seed data created successfully", locationId, alreadySeeded: false, partial: false };
 }

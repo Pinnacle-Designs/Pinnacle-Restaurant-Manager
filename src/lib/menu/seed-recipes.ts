@@ -1,50 +1,68 @@
 import { prisma } from "@/lib/prisma";
 import { saveMenuRecipe } from "@/lib/menu/recipe";
+import { BBQ_INVENTORY_CATALOG, BBQ_MENU_RECIPES } from "@/lib/menu/bbq-catalog";
 
-export async function seedMenuRecipes(locationId: string) {
-  const porkSandwich = await prisma.menuItem.findFirst({
-    where: { locationId, name: "Pulled Pork Sandwich" },
-  });
-  const brisketPlate = await prisma.menuItem.findFirst({
-    where: { locationId, name: "Smoked Brisket Plate" },
-  });
-
-  const pork = await prisma.inventoryItem.findFirst({
-    where: { locationId, name: "Pork shoulder" },
-  });
-  const bun = await prisma.inventoryItem.findFirst({
-    where: { locationId, name: "Brioche buns" },
-  });
-  const sauce = await prisma.inventoryItem.findFirst({
-    where: { locationId, name: "House BBQ sauce" },
-  });
-  const cabbage = await prisma.inventoryItem.findFirst({
-    where: { locationId, name: "Cabbage" },
-  });
-  const brisket = await prisma.inventoryItem.findFirst({
-    where: { locationId, name: "Beef brisket" },
-  });
-  const mac = await prisma.inventoryItem.findFirst({
-    where: { locationId, name: "Elbow macaroni" },
-  });
-
-  if (porkSandwich && pork && bun && sauce) {
-    const lines = [
-      { inventoryItemId: pork.id, quantity: 0.35 },
-      { inventoryItemId: bun.id, quantity: 1 },
-      { inventoryItemId: sauce.id, quantity: 0.04 },
-    ];
-    if (cabbage) lines.push({ inventoryItemId: cabbage.id, quantity: 0.12 });
-    await saveMenuRecipe(locationId, porkSandwich.id, lines);
+/** Upsert every catalog ingredient into inventory (for fresh and existing locations). */
+export async function ensureLocationInventory(locationId: string) {
+  for (const row of BBQ_INVENTORY_CATALOG) {
+    const existing = await prisma.inventoryItem.findFirst({
+      where: { locationId, name: row.name },
+    });
+    if (existing) {
+      if (!existing.barcode && row.barcode) {
+        await prisma.inventoryItem.update({
+          where: { id: existing.id },
+          data: { barcode: row.barcode },
+        });
+      }
+      continue;
+    }
+    await prisma.inventoryItem.create({
+      data: {
+        locationId,
+        name: row.name,
+        quantity: row.quantity,
+        unit: row.unit,
+        minQuantity: row.minQuantity,
+        costPerUnit: row.costPerUnit,
+        previousCostPerUnit: row.previousCostPerUnit,
+        portionSize: row.portionSize,
+        yieldPct: row.yieldPct ?? 100,
+        supplier: row.supplier,
+        barcode: row.barcode ?? null,
+      },
+    });
   }
+}
 
-  if (brisketPlate && brisket && sauce) {
-    const lines = [
-      { inventoryItemId: brisket.id, quantity: 0.45 },
-      { inventoryItemId: sauce.id, quantity: 0.05 },
-    ];
-    if (mac) lines.push({ inventoryItemId: mac.id, quantity: 0.15 });
-    if (cabbage) lines.push({ inventoryItemId: cabbage.id, quantity: 0.1 });
-    await saveMenuRecipe(locationId, brisketPlate.id, lines);
+async function inventoryMap(locationId: string) {
+  const items = await prisma.inventoryItem.findMany({ where: { locationId } });
+  return Object.fromEntries(items.map((i) => [i.name, i.id]));
+}
+
+/** Link each menu item to inventory ingredients and sync recipeCost on the menu item. */
+export async function seedMenuRecipes(locationId: string) {
+  await ensureLocationInventory(locationId);
+  const inv = await inventoryMap(locationId);
+
+  const menuItems = await prisma.menuItem.findMany({ where: { locationId } });
+
+  for (const item of menuItems) {
+    const spec = BBQ_MENU_RECIPES[item.name];
+    if (!spec?.length) continue;
+
+    const lines = spec
+      .map((row) => {
+        const inventoryItemId = inv[row.ingredient];
+        if (!inventoryItemId) {
+          console.warn(`[seed-recipes] Missing inventory "${row.ingredient}" for "${item.name}"`);
+          return null;
+        }
+        return { inventoryItemId, quantity: row.quantity };
+      })
+      .filter((line): line is { inventoryItemId: string; quantity: number } => line !== null);
+
+    if (lines.length === 0) continue;
+    await saveMenuRecipe(locationId, item.id, lines);
   }
 }
