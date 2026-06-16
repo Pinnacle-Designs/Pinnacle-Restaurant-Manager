@@ -126,6 +126,7 @@ enum AccountingProvider {
 enum VendorEdiProvider {
   SYSCO
   US_FOODS
+  GORDON_FOOD_SERVICE
 }
 
 enum TipPoolMode {
@@ -565,6 +566,11 @@ model GoodsReceiptLine {
   qtyReceived     Float
   unit            String
   unitCost        Float
+  catchWeightReceived Float?
+  catchWeightBilled   Float?
+  catchWeightUnit     String?
+  isSubstitution      Boolean  @default(false)
+  orderedDescription  String?
 
   @@index([receiptId])
 }
@@ -577,14 +583,22 @@ model VendorCredit {
   amount       Float
   reason       String
   status       String         @default("OPEN")
+  category     String?
   creditMemoNo String?
   invoiceId    String?
   invoice      VendorInvoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
   itemsJson    String?
+  photoUrl     String?
+  reportedBy   String?
+  repEmail     String?
+  emailSentAt  DateTime?
+  emailStatus  String?
+  accountingLocked Boolean    @default(false)
   createdAt    DateTime       @default(now())
   resolvedAt   DateTime?
 
   @@index([locationId, status])
+  @@index([invoiceId, status])
 }
 
 model RolePermissionSet {
@@ -1416,6 +1430,8 @@ model VendorInvoice {
   imageUrl       String?
   matchStatus    String              @default("PENDING")
   matchNotes     String?
+  accountingSyncLocked Boolean @default(false)
+  paymentHoldReason  String?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @default(now()) @updatedAt
 
@@ -1437,6 +1453,8 @@ model VendorInvoiceLine {
   unit            String
   unitPrice       Float
   lineTotal       Float
+  catchWeightBilled   Float?
+  catchWeightUnit     String?
 
   @@index([invoiceId])
 }

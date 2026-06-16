@@ -37,6 +37,9 @@ export async function GET(request: NextRequest) {
     take: 5,
   });
 
+  const { getCreditMemoSummary } = await import("@/lib/purchasing/credit-memo");
+  const creditMemoSummary = await getCreditMemoSummary(activeLocationId);
+
   const outOfStockByProvider: Record<string, number> = {};
   for (const conn of vendorConns) {
     outOfStockByProvider[conn.provider] = await prisma.vendorCatalogItem.count({
@@ -75,6 +78,13 @@ export async function GET(request: NextRequest) {
         credit: e.credit,
         syncedAt: e.syncedAt.toISOString(),
       })),
+      creditMemoLocks: {
+        openCredits: creditMemoSummary.openCount,
+        openCreditTotal: creditMemoSummary.openTotal,
+        lockedInvoices: creditMemoSummary.accountingLockedCount,
+        lockedExposure: creditMemoSummary.lockedInvoiceExposure,
+        invoices: creditMemoSummary.lockedInvoices,
+      },
     },
     vendorEdi: {
       providers: VENDOR_EDI_PROVIDERS.map((p) => {
@@ -128,7 +138,7 @@ function parseAccountingProvider(value: unknown): AccountingProvider | null {
 }
 
 function parseVendorProvider(value: unknown): VendorEdiProvider | null {
-  if (value === "SYSCO" || value === "US_FOODS") return value;
+  if (value === "SYSCO" || value === "US_FOODS" || value === "GORDON_FOOD_SERVICE") return value;
   return null;
 }
 

@@ -2283,7 +2283,7 @@ body.modal-open {
 }
 
 .highlight-card .icon { font-size: 2rem; }
-.highlight-card h3 { margin-top: 1rem; font-weight: 700; }
+.highlight-card h3 { margin-top: 1rem; font-weight: 700; color: var(--slate-900); }
 .highlight-card p { margin-top: 0.5rem; font-size: 0.875rem; color: var(--slate-600); }
 
 /* Steps */

@@ -11,6 +11,9 @@ export interface InvoiceLineData {
   unitPrice: number;
   lineTotal: number;
   sku?: string;
+  /** Catch-weight: pounds billed when sold by case (brisket, fish, etc.) */
+  catchWeightBilled?: number;
+  catchWeightUnit?: string;
 }
 
 export interface InvoiceData {
@@ -55,9 +58,9 @@ export async function analyzeInvoice(imageBase64: string): Promise<InvoiceData> 
 - invoiceNumber (invoice or PO number if visible)
 - amount (invoice total as number, including tax)
 - invoiceDate (YYYY-MM-DD)
-- lines: array of { description, qty (number), unit (string like lbs/case/each), unitPrice (number), lineTotal (number), sku (optional product code) }
+- lines: array of { description, qty (number), unit (string like lbs/case/each), unitPrice (number), lineTotal (number), sku (optional), catchWeightBilled (optional number — actual weight in lbs when sold by case/box, e.g. brisket 42.5 lbs), catchWeightUnit (optional, default lbs) }
 
-Read crinkled or stained paper carefully. Use line totals that match qty * unitPrice when possible.`,
+Read crinkled or stained paper carefully. For meat/seafood sold by case with a billed weight, capture catchWeightBilled separately from case qty. Use line totals that match qty * unitPrice when possible.`,
             },
             {
               type: "image_url",
@@ -82,6 +85,8 @@ Read crinkled or stained paper carefully. Use line totals that match qty * unitP
         unitPrice: parseFloat(String(l.unitPrice)) || 0,
         lineTotal: parseFloat(String(l.lineTotal)) || 0,
         sku: l.sku ? String(l.sku) : undefined,
+        catchWeightBilled: l.catchWeightBilled != null ? parseFloat(String(l.catchWeightBilled)) : undefined,
+        catchWeightUnit: l.catchWeightUnit ? String(l.catchWeightUnit) : undefined,
       })
     );
 

@@ -37,6 +37,11 @@ export const VENDOR_EDI_PROVIDERS: Array<{
     name: "US Foods",
     description: "EDI catalog sync, out-of-stock alerts, and automated reordering.",
   },
+  {
+    id: "GORDON_FOOD_SERVICE",
+    name: "Gordon Food Service",
+    description: "Live broadline catalog, warehouse pricing, and direct PO transmission.",
+  },
 ];
 
 export function accountingProviderLabel(provider: AccountingProvider): string {

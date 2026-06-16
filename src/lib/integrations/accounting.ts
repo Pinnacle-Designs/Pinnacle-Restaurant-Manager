@@ -119,6 +119,13 @@ export async function syncAccountingToProvider(locationId: string, provider: Acc
   for (const inv of invoices) {
     const sourceId = `invoice:${inv.id}`;
     if (existingSourceIds.has(sourceId)) continue;
+    if (inv.accountingSyncLocked) continue;
+
+    const openCredits = await prisma.vendorCredit.count({
+      where: { invoiceId: inv.id, status: "OPEN" },
+    });
+    if (openCredits > 0) continue;
+
     entries.push({
       entryType: "INVOICE",
       reference: `AP-${inv.id.slice(-6).toUpperCase()}`,
@@ -148,16 +155,30 @@ export async function syncAccountingToProvider(locationId: string, provider: Acc
     });
   }
 
+  const lockedInvoiceCount = await prisma.vendorInvoice.count({
+    where: { locationId, accountingSyncLocked: true },
+  });
+
   if (entries.length === 0) {
     await prisma.accountingConnection.update({
       where: { id: conn.id },
       data: {
         lastSyncAt: new Date(),
         lastSyncStatus: "ok",
-        lastSyncMessage: "Already up to date — no new journal entries.",
+        lastSyncMessage:
+          lockedInvoiceCount > 0
+            ? `No new entries — ${lockedInvoiceCount} invoice(s) held for pending credit memos.`
+            : "Already up to date — no new journal entries.",
       },
     });
-    return { entriesCreated: 0, message: "Already up to date." };
+    return {
+      entriesCreated: 0,
+      message:
+        lockedInvoiceCount > 0
+          ? `${lockedInvoiceCount} invoice(s) blocked from accounting sync until credits are applied.`
+          : "Already up to date.",
+      lockedInvoiceCount,
+    };
   }
 
   await prisma.accountingJournalEntry.createMany({
@@ -187,5 +208,6 @@ export async function syncAccountingToProvider(locationId: string, provider: Acc
   return {
     entriesCreated: entries.length,
     message: `Posted ${entries.length} journal entries.`,
+    lockedInvoiceCount,
   };
 }

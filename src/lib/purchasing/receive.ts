@@ -7,6 +7,11 @@ export interface ReceiveLineInput {
   qtyReceived: number;
   unit: string;
   unitCost: number;
+  catchWeightReceived?: number;
+  catchWeightBilled?: number;
+  catchWeightUnit?: string;
+  isSubstitution?: boolean;
+  orderedDescription?: string;
 }
 
 export async function receiveGoods(
@@ -23,14 +28,39 @@ export async function receiveGoods(
       receivedBy: opts?.receivedBy ?? null,
       notes: opts?.notes ?? null,
       lines: {
-        create: lines.map((l) => ({
-          poLineId: l.poLineId ?? null,
-          inventoryItemId: l.inventoryItemId ?? null,
-          description: l.description,
-          qtyReceived: l.qtyReceived,
-          unit: l.unit,
-          unitCost: l.unitCost,
-        })),
+        create: await Promise.all(
+          lines.map(async (l) => {
+            let orderedDescription = l.orderedDescription ?? null;
+            let isSubstitution = l.isSubstitution ?? false;
+
+            if (l.poLineId) {
+              const poLine = await prisma.purchaseOrderLine.findUnique({
+                where: { id: l.poLineId },
+              });
+              if (poLine) {
+                orderedDescription = orderedDescription ?? poLine.description;
+                if (!l.isSubstitution) {
+                  const { detectSubstitution } = await import("./vendor-scorecards");
+                  isSubstitution = detectSubstitution(poLine.description, l.description);
+                }
+              }
+            }
+
+            return {
+              poLineId: l.poLineId ?? null,
+              inventoryItemId: l.inventoryItemId ?? null,
+              description: l.description,
+              qtyReceived: l.qtyReceived,
+              unit: l.unit,
+              unitCost: l.unitCost,
+              catchWeightReceived: l.catchWeightReceived ?? null,
+              catchWeightBilled: l.catchWeightBilled ?? null,
+              catchWeightUnit: l.catchWeightUnit ?? null,
+              isSubstitution,
+              orderedDescription,
+            };
+          })
+        ),
       },
     },
     include: { lines: true },
@@ -42,10 +72,14 @@ export async function receiveGoods(
         where: { id: line.inventoryItemId, locationId },
       });
       if (item) {
+        const qtyAdd =
+          line.catchWeightReceived && item.countByWeight
+            ? line.catchWeightReceived
+            : line.qtyReceived;
         await prisma.inventoryItem.update({
           where: { id: item.id },
           data: {
-            quantity: item.quantity + line.qtyReceived,
+            quantity: item.quantity + qtyAdd,
             lastRestocked: new Date(),
             ...(line.unitCost > 0
               ? { previousCostPerUnit: item.costPerUnit, costPerUnit: line.unitCost }
@@ -92,6 +126,11 @@ export async function receiveGoods(
       details: `Received ${lines.length} line(s) from ${vendor}${opts?.poId ? ` against PO` : ""}`,
     },
   });
+
+  if (opts?.poId) {
+    const { rematchInvoicesForPo } = await import("./three-way-match");
+    await rematchInvoicesForPo(opts.poId).catch(() => undefined);
+  }
 
   return receipt;
 }

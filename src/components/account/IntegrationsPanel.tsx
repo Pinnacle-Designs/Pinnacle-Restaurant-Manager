@@ -42,6 +42,13 @@ interface IntegrationsPayload {
       credit: number;
       syncedAt: string;
     }>;
+    creditMemoLocks?: {
+      openCredits: number;
+      openCreditTotal: number;
+      lockedInvoices: number;
+      lockedExposure: number;
+      invoices: Array<{ vendor: string; invoiceNumber: string | null; amount: number; reason: string | null }>;
+    };
   };
   vendorEdi: {
     providers: Array<{
@@ -205,8 +212,15 @@ export function IntegrationsPanel() {
             <h3 className="font-semibold text-slate-900">Accounting auto-sync</h3>
             <p className="mt-1 text-sm text-slate-600">
               Push invoices, credits, expenses, and inventory valuations as clean journal entries to
-              QuickBooks, Xero, or Sage.
+              QuickBooks, Xero, or Sage. Invoices with pending vendor credits are <strong>blocked from sync</strong> until memos are applied.
             </p>
+            {data.accounting.creditMemoLocks && data.accounting.creditMemoLocks.lockedInvoices > 0 && (
+              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <strong>{data.accounting.creditMemoLocks.lockedInvoices} invoice(s) locked</strong> —{" "}
+                {formatCurrency(data.accounting.creditMemoLocks.lockedExposure)} held pending{" "}
+                {data.accounting.creditMemoLocks.openCredits} open credit memo(s).
+              </p>
+            )}
             <div className="mt-4 space-y-3">
               {data.accounting.providers.map((p) => (
                 <div

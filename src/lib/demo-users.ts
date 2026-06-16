@@ -77,6 +77,9 @@ export function devDemoLoginEnabled(): boolean {
 
 /** Create or reset all embed demo login accounts. */
 export async function seedDemoUsers() {
+  const { seedPlatformDemos } = await import("./seed-platform");
+  await seedPlatformDemos();
+
   for (const user of DEMO_USERS) {
     await prisma.user.upsert({
       where: { email: user.email },

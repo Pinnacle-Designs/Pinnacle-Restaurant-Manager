@@ -168,6 +168,7 @@ const NAV_PERMISSION_MAP: Record<string, Permission> = {
   "/kds": "manage_boh",
   "/inventory": "manage_inventory",
   "/walk-in": "manage_inventory",
+  "/purchase-orders": "manage_inventory",
   "/loading-dock": "manage_inventory",
   "/tables": "manage_tables",
   "/orders": "place_orders",

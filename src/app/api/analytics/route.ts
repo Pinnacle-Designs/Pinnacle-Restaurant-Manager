@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getLocationIdFromRequest } from "@/lib/location";
 import { requirePermission } from "@/lib/api-auth";
 import { computeAnalytics } from "@/lib/analytics/compute";
+import { normalizeAnalyticsPayload } from "@/lib/analytics/normalize";
 
 export async function GET(request: NextRequest) {
   const { error } = await requirePermission(request, "view_analytics");
@@ -9,7 +10,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const locationId = await getLocationIdFromRequest(request);
-    const data = await computeAnalytics(locationId);
+    const data = normalizeAnalyticsPayload(await computeAnalytics(locationId));
     return NextResponse.json(data);
   } catch (err) {
     console.error("Analytics API error:", err);

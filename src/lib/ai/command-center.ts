@@ -568,6 +568,80 @@ export function analyzeProfitHurt(snapshot: CommandCenterSnapshot): CommandCente
     );
   }
 
+  const twm = a.purchasing?.highlights?.threeWayMatch ?? a.purchasing?.threeWayMatch;
+  if (twm && twm.discrepancyCount > 0) {
+    const top = twm.openIssues[0];
+    findings.push(
+      finding(
+        "vendors",
+        twm.holdPaymentTotal > 200 ? "high" : "medium",
+        "Three-way match failed — hold payment",
+        top
+          ? `${top.vendor}: ${top.issue}`
+          : `${twm.discrepancyCount} invoice(s) do not match PO/receipt`,
+        fmtMoney(twm.holdPaymentTotal),
+        "Do not pay until short-ships or price variances are credited"
+      )
+    );
+  }
+
+  const dig = a.purchasing?.highlights?.invoiceDigitization;
+  if (dig?.recentPriceSpikes && dig.topSpike) {
+    findings.push(
+      finding(
+        "vendors",
+        dig.topSpike.changePct >= 15 ? "high" : "medium",
+        `Price spike: ${dig.topSpike.item}`,
+        `${dig.topSpike.vendor || "Vendor"} raised price +${dig.topSpike.changePct.toFixed(0)}% — recipe costs updated`,
+        "",
+        "Review menu pricing and negotiate with vendor"
+      )
+    );
+  }
+  if (dig?.catchWeightAlerts) {
+    const cw = dig.openCatchWeightIssues[0];
+    findings.push(
+      finding(
+        "vendors",
+        "medium",
+        "Catch-weight billing mismatch",
+        cw?.description ?? `${dig.catchWeightAlerts} case item(s) billed for more weight than received`,
+        "",
+        "Request vendor credit for billed vs received weight"
+      )
+    );
+  }
+
+  const cm = a.purchasing?.highlights?.creditMemoTracking;
+  if (cm && cm.openCount > 0) {
+    findings.push(
+      finding(
+        "vendors",
+        cm.openTotal > 200 ? "high" : "medium",
+        `${cm.openCount} open vendor credit(s)`,
+        cm.recentOpen[0]
+          ? `${cm.recentOpen[0].vendor}: ${cm.recentOpen[0].reason}`
+          : `${cm.openTotal.toFixed(0)} pending from vendors`,
+        cm.accountingLockedCount > 0 ? `${cm.accountingLockedCount} invoice(s) locked from AP sync` : "",
+        "Do not pay full invoices until credit memos are applied"
+      )
+    );
+  }
+
+  const sc = a.purchasing?.highlights?.vendorScorecards;
+  if (sc?.worstVendor && sc.worstVendor.reliabilityScore < 80) {
+    findings.push(
+      finding(
+        "vendors",
+        sc.worstVendor.reliabilityScore < 65 ? "high" : "medium",
+        `Low vendor score: ${sc.worstVendor.vendor}`,
+        `Fill ${sc.worstVendor.fillRatePct}% · on-time ${sc.worstVendor.onTimePct}% · substitutions ${sc.worstVendor.substitutionRatePct}%`,
+        `Grade ${sc.worstVendor.reliabilityGrade}`,
+        "Use scorecard data in contract negotiations or switch suppliers"
+      )
+    );
+  }
+
   const dogs = a.menuEngineering.highlights?.removeItems ?? [];
   for (const dog of dogs.slice(0, 2)) {
     findings.push(

@@ -60,7 +60,7 @@ export async function checkPriceSpikes(
         category: "INVENTORY",
         severity: alert.changePct >= 15 ? "CRITICAL" : alert.changePct >= 10 ? "HIGH" : "MEDIUM",
         actionable: "Negotiate with vendor or find alternate supplier",
-        dataSnapshot: JSON.stringify(alert),
+        dataSnapshot: JSON.stringify({ ...alert, vendor }),
       },
     });
   }
@@ -72,6 +72,8 @@ export async function updateInventoryCostsFromInvoice(
   locationId: string,
   lines: { inventoryItemId?: string | null; description: string; unitPrice: number }[]
 ) {
+  let recipesUpdated = 0;
+
   for (const line of lines) {
     if (!line.inventoryItemId) continue;
     const item = await prisma.inventoryItem.findFirst({
@@ -99,6 +101,45 @@ export async function updateInventoryCostsFromInvoice(
     });
 
     const { recalculateRecipesForIngredient } = await import("@/lib/kitchen/dynamic-costing");
-    await recalculateRecipesForIngredient(item.id);
+    const updated = await recalculateRecipesForIngredient(item.id);
+    recipesUpdated += updated.length;
   }
+
+  return recipesUpdated;
+}
+
+export async function getRecentPriceSpikes(locationId: string, days = 14) {
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+
+  const insights = await prisma.businessInsight.findMany({
+    where: {
+      locationId,
+      resolved: false,
+      title: { startsWith: "Price spike:" },
+      createdAt: { gte: since },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+  });
+
+  return insights.map((i) => {
+    let snapshot: { item?: string; changePct?: number; oldPrice?: number; newPrice?: number } = {};
+    try {
+      if (i.dataSnapshot) snapshot = JSON.parse(i.dataSnapshot);
+    } catch {
+      /* ignore */
+    }
+    return {
+      id: i.id,
+      title: i.title,
+      description: i.description,
+      severity: i.severity,
+      item: snapshot.item ?? i.title.replace("Price spike: ", ""),
+      changePct: snapshot.changePct ?? 0,
+      oldPrice: snapshot.oldPrice,
+      newPrice: snapshot.newPrice,
+      createdAt: i.createdAt.toISOString(),
+    };
+  });
 }

@@ -12,11 +12,22 @@ import {
   Loader2,
   Camera,
   DollarSign,
+  Building2,
+  Link2,
+  ClipboardList,
+  Scale,
+  Send,
+  ShieldCheck,
+  Star,
 } from "lucide-react";
+import Link from "next/link";
 import { Button, Badge, StatCard } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
 import { formatCurrency } from "@/lib/utils";
 import { InvoiceScanModal } from "./InvoiceScanModal";
+import { ThreeWayMatchPanel } from "./ThreeWayMatchPanel";
+import { CreditMemoModal } from "./CreditMemoModal";
+import { VendorScorecardsPanel, type VendorScorecardRow } from "./VendorScorecardsPanel";
 
 interface PoSuggestion {
   inventoryItemId: string;
@@ -72,11 +83,55 @@ interface VendorCredit {
   amount: number;
   reason: string;
   status: string;
+  category: string | null;
   creditMemoNo: string | null;
+  photoUrl: string | null;
+  repEmail: string | null;
+  emailStatus: string | null;
+  emailSentAt: string | null;
+  accountingLocked: boolean;
+  invoiceId: string | null;
   createdAt: string;
 }
 
-type Tab = "suggestions" | "orders" | "invoices" | "credits";
+interface VendorSummary {
+  name: string;
+  kind: "supplier" | "edi";
+  ediProvider?: string;
+  itemCount: number;
+  lowStockCount: number;
+  openPoCount: number;
+  openPoTotal: number;
+  suggestedLineCount: number;
+  suggestedTotal: number;
+  openCreditCount: number;
+  openCreditTotal: number;
+  spentLast90Days: number;
+  connected?: boolean;
+  accountNumber?: string | null;
+  warehouseCode?: string | null;
+  catalogItems?: number;
+  outOfStock?: number;
+  lastCatalogSyncAt?: string | null;
+  lastOrderAt?: string | null;
+  lastSyncStatus?: string | null;
+}
+
+interface VendorBidLine {
+  inventoryItemId: string;
+  itemName: string;
+  unit: string;
+  currentVendor: string | null;
+  currentPrice: number;
+  suggestedQty: number;
+  vendors: Array<{ vendor: string; unitPrice: number; source: string; inStock?: boolean }>;
+  recommendedVendor: string;
+  recommendedPrice: number;
+  savingsAmount: number;
+  savingsPct: number;
+}
+
+type Tab = "drafts" | "bidding" | "vendors" | "scorecards" | "suggestions" | "orders" | "invoices" | "credits";
 
 const MATCH_COLORS: Record<string, string> = {
   MATCHED: "bg-green-100 text-green-800",
@@ -93,41 +148,76 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function LoadingDockClient() {
-  const [tab, setTab] = useState<Tab>("suggestions");
+  const [tab, setTab] = useState<Tab>("drafts");
   const [suggestions, setSuggestions] = useState<PoSuggestion[]>([]);
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [invoices, setInvoices] = useState<VendorInvoice[]>([]);
   const [credits, setCredits] = useState<VendorCredit[]>([]);
+  const [vendors, setVendors] = useState<VendorSummary[]>([]);
+  const [bids, setBids] = useState<VendorBidLine[]>([]);
+  const [bidSavings, setBidSavings] = useState(0);
   const [loading, setLoading] = useState(true);
   const [creatingPo, setCreatingPo] = useState(false);
+  const [creatingPoVendor, setCreatingPoVendor] = useState<string | null>(null);
+  const [buildingDrafts, setBuildingDrafts] = useState(false);
+  const [approvingPoId, setApprovingPoId] = useState<string | null>(null);
   const [receivingPoId, setReceivingPoId] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   const [scanContext, setScanContext] = useState<{ poId?: string; receiptId?: string }>({});
   const [creditForm, setCreditForm] = useState({ vendor: "", amount: "", reason: "" });
   const [savingCredit, setSavingCredit] = useState(false);
+  const [creditMemoOpen, setCreditMemoOpen] = useState(false);
+  const [creditSaveNote, setCreditSaveNote] = useState<string | null>(null);
+  const [scorecards, setScorecards] = useState<VendorScorecardRow[]>([]);
+  const [scorecardSummary, setScorecardSummary] = useState<{
+    avgFillRate: number;
+    avgOnTime: number;
+    avgSubstitutionRate: number;
+    vendorCount: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [sugRes, ordRes, invRes, credRes] = await Promise.all([
+      const [sugRes, ordRes, invRes, credRes, venRes, bidRes, scRes] = await Promise.all([
         fetch("/api/purchasing/suggestions"),
         fetch("/api/purchasing/orders"),
         fetch("/api/purchasing/invoices/scan"),
         fetch("/api/purchasing/credits"),
+        fetch("/api/purchasing/vendors"),
+        fetch("/api/purchasing/bidding"),
+        fetch("/api/purchasing/scorecards"),
       ]);
-      const [sug, ord, inv, cred] = await Promise.all([
+      const [sug, ord, inv, cred, ven, bid, sc] = await Promise.all([
         sugRes.json(),
         ordRes.json(),
         invRes.json(),
         credRes.json(),
+        venRes.json(),
+        bidRes.json(),
+        scRes.json(),
       ]);
       setSuggestions(sug.suggestions ?? []);
       setOrders(ord.orders ?? []);
       setInvoices(inv.invoices ?? []);
       setCredits(cred.credits ?? []);
+      setVendors(ven.vendors ?? []);
+      setBids(bid.bids ?? []);
+      setBidSavings(bid.estimatedWeeklySavings ?? 0);
+      setScorecards(sc.scorecards ?? []);
+      setScorecardSummary(
+        sc.vendorCount != null
+          ? {
+              avgFillRate: sc.avgFillRate ?? 100,
+              avgOnTime: sc.avgOnTime ?? 100,
+              avgSubstitutionRate: sc.avgSubstitutionRate ?? 0,
+              vendorCount: sc.vendorCount ?? 0,
+            }
+          : null
+      );
     } catch {
-      setError("Failed to load loading dock data");
+      setError("Failed to load purchase order data");
     } finally {
       setLoading(false);
     }
@@ -136,6 +226,21 @@ export function LoadingDockClient() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const createPoFromLines = async (
+    lines: { inventoryItemId: string; qty: number; unitPrice: number }[],
+    vendor?: string
+  ) => {
+    const res = await fetch("/api/purchasing/suggestions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lines, vendor, status: "SUBMITTED" }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to create PO");
+    await load();
+    setTab("orders");
+  };
 
   const createPoFromSuggestions = async () => {
     if (suggestions.length === 0) return;
@@ -147,19 +252,62 @@ export function LoadingDockClient() {
         qty: s.suggestedQty,
         unitPrice: s.unitPrice,
       }));
-      const res = await fetch("/api/purchasing/suggestions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lines, status: "SUBMITTED" }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to create PO");
-      await load();
-      setTab("orders");
+      await createPoFromLines(lines);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create PO");
     } finally {
       setCreatingPo(false);
+    }
+  };
+
+  const createPoForVendor = async (vendorName: string) => {
+    const vendorLines = suggestions.filter((s) => s.vendor === vendorName);
+    if (vendorLines.length === 0) return;
+    setCreatingPoVendor(vendorName);
+    setError(null);
+    try {
+      const lines = vendorLines.map((s) => ({
+        inventoryItemId: s.inventoryItemId,
+        qty: s.suggestedQty,
+        unitPrice: s.unitPrice,
+      }));
+      await createPoFromLines(lines, vendorName);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create PO");
+    } finally {
+      setCreatingPoVendor(null);
+    }
+  };
+
+  const buildDraftPos = async () => {
+    setBuildingDrafts(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/purchasing/drafts", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to build drafts");
+      await load();
+      setTab("drafts");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to build draft POs");
+    } finally {
+      setBuildingDrafts(false);
+    }
+  };
+
+  const approveAndTransmit = async (poId: string) => {
+    setApprovingPoId(poId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/purchasing/orders/${poId}/approve`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Transmit failed");
+      await load();
+      setTab("orders");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Approve failed");
+    } finally {
+      setApprovingPoId(null);
     }
   };
 
@@ -240,20 +388,31 @@ export function LoadingDockClient() {
   const discrepancyCount = invoices.filter((i) => i.matchStatus === "DISCREPANCY").length;
   const openCredits = credits.filter((c) => c.status === "OPEN");
 
+  const supplierVendors = vendors.filter((v) => v.kind === "supplier");
+  const ediVendors = vendors.filter((v) => v.kind === "edi");
+  const draftOrders = orders.filter((o) => o.status === "DRAFT");
+  const multiVendorBids = bids.filter((b) => b.vendors.length >= 2);
+
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: "drafts", label: "Smart POs", icon: <ClipboardList className="h-4 w-4" /> },
+    { id: "bidding", label: "Vendor Bidding", icon: <Scale className="h-4 w-4" /> },
+    { id: "vendors", label: "Vendors", icon: <Building2 className="h-4 w-4" /> },
+    { id: "scorecards", label: "Scorecards", icon: <Star className="h-4 w-4" /> },
     { id: "suggestions", label: "Auto-Order", icon: <Sparkles className="h-4 w-4" /> },
     { id: "orders", label: "POs & Receiving", icon: <PackageCheck className="h-4 w-4" /> },
-    { id: "invoices", label: "Invoices & Match", icon: <FileText className="h-4 w-4" /> },
+    { id: "invoices", label: "Three-Way Match", icon: <ShieldCheck className="h-4 w-4" /> },
     { id: "credits", label: "Credits", icon: <DollarSign className="h-4 w-4" /> },
   ];
 
   return (
     <div>
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Suggested lines" value={suggestions.length} subtext="Predictive reorder" />
-        <StatCard label="Open POs" value={orders.filter((o) => !["RECEIVED", "CANCELLED"].includes(o.status)).length} />
-        <StatCard label="Match issues" value={discrepancyCount} subtext="Catch before you pay" />
-        <StatCard label="Open credits" value={openCredits.length} subtext="Awaiting vendor memo" />
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+        <StatCard label="Draft POs" value={draftOrders.length} subtext="Review & approve" />
+        <StatCard label="Bid savings" value={formatCurrency(bidSavings)} subtext="Est. this week" />
+        <StatCard label="Active vendors" value={supplierVendors.length} subtext={`${ediVendors.filter((v) => v.connected).length} EDI`} />
+        <StatCard label="Suggested lines" value={suggestions.length} subtext="Par + forecast" />
+        <StatCard label="Open POs" value={orders.filter((o) => !["RECEIVED", "CANCELLED", "DRAFT"].includes(o.status)).length} />
+        <StatCard label="Match issues" value={discrepancyCount} subtext="Hold payment" />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
@@ -281,12 +440,288 @@ export function LoadingDockClient() {
         </div>
       )}
 
-      {loading && tab === "suggestions" ? (
+      {loading && ["suggestions", "vendors", "drafts", "bidding"].includes(tab) ? (
         <div className="flex justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
         </div>
       ) : (
         <>
+          {tab === "drafts" && (
+            <div className="space-y-4">
+              <div className="card">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-semibold text-slate-900">Smart purchase orders</h2>
+                    <p className="text-sm text-slate-500">
+                      Auto-built per vendor from par levels, sales velocity, holiday forecasts, and winning bid prices
+                    </p>
+                  </div>
+                  <Button onClick={buildDraftPos} disabled={buildingDrafts}>
+                    {buildingDrafts ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-2 h-4 w-4" />
+                    )}
+                    Build draft POs by vendor
+                  </Button>
+                </div>
+                {draftOrders.length === 0 ? (
+                  <p className="py-6 text-center text-slate-500">
+                    No draft POs yet. Click above to generate one draft per vendor — then review and approve to email or EDI transmit.
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {draftOrders.map((po) => (
+                      <div key={po.id} className="rounded-lg border border-slate-200 p-4">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="font-semibold text-slate-900">
+                              {po.poNumber ?? po.id.slice(-8)} — {po.vendor ?? "Vendor"}
+                            </p>
+                            <p className="text-sm text-slate-500">
+                              {po.lines.length} lines · {formatCurrency(po.totalAmount)} · {po.source}
+                            </p>
+                          </div>
+                          <Badge className={STATUS_COLORS.DRAFT}>DRAFT</Badge>
+                        </div>
+                        <div className="mb-3 max-h-40 space-y-1 overflow-y-auto text-sm">
+                          {po.lines.map((l) => (
+                            <div key={l.id} className="flex justify-between text-slate-600">
+                              <span>{l.description}</span>
+                              <span>
+                                {l.qtyOrdered} {l.unit} @ {formatCurrency(l.unitPrice)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        <Button size="sm" onClick={() => approveAndTransmit(po.id)} disabled={approvingPoId === po.id}>
+                          {approvingPoId === po.id ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Send className="mr-2 h-4 w-4" />
+                          )}
+                          Approve &amp; transmit
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {tab === "bidding" && (
+            <div className="card">
+              <div className="mb-4">
+                <h2 className="font-semibold text-slate-900">Cross-vendor price comparison</h2>
+                <p className="text-sm text-slate-500">
+                  Compares vendor quotes, EDI catalog pricing, and invoice history — recommends the lowest in-stock vendor each week
+                </p>
+                {multiVendorBids.length > 0 && (
+                  <p className="mt-2 text-sm font-medium text-green-700">
+                    {multiVendorBids.length} items bid across vendors · est. weekly savings {formatCurrency(bidSavings)}
+                  </p>
+                )}
+              </div>
+              {multiVendorBids.length === 0 ? (
+                <p className="py-8 text-center text-slate-500">
+                  Need 2+ vendor quotes per item. Seed data includes produce bidding — or add vendor price history and connect EDI catalogs.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-slate-500">
+                        <th className="pb-2 pr-4">Item</th>
+                        <th className="pb-2 pr-4">Vendor quotes</th>
+                        <th className="pb-2 pr-4">Winner</th>
+                        <th className="pb-2">Savings</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {multiVendorBids.map((b) => (
+                        <tr key={b.inventoryItemId} className="border-b border-slate-100">
+                          <td className="py-3 pr-4 font-medium">{b.itemName}</td>
+                          <td className="py-3 pr-4 text-xs text-slate-600">
+                            {b.vendors.map((v) => (
+                              <span
+                                key={v.vendor}
+                                className={`mr-2 inline-block rounded px-1.5 py-0.5 ${
+                                  v.vendor === b.recommendedVendor
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-slate-100"
+                                }`}
+                              >
+                                {v.vendor} {formatCurrency(v.unitPrice)}
+                              </span>
+                            ))}
+                          </td>
+                          <td className="py-3 pr-4 text-orange-700">{b.recommendedVendor}</td>
+                          <td className="py-3">
+                            {b.savingsPct > 0 ? (
+                              <span className="text-green-700">{b.savingsPct.toFixed(0)}%</span>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === "scorecards" && (
+            <VendorScorecardsPanel
+              scorecards={scorecards}
+              summary={scorecardSummary}
+              loading={loading}
+            />
+          )}
+
+          {tab === "vendors" && (
+            <div className="space-y-6">
+              {ediVendors.length > 0 && (
+                <section>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h2 className="font-semibold text-slate-900">EDI distributors</h2>
+                      <p className="text-sm text-slate-500">Sysco, US Foods, and Gordon Food Service — live catalog sync and EDI PO transmission</p>
+                    </div>
+                    <Link
+                      href="/account?tab=integrations"
+                      className="inline-flex items-center gap-1 text-sm font-medium text-orange-700 hover:text-orange-800"
+                    >
+                      <Link2 className="h-4 w-4" />
+                      Manage in Integrations
+                    </Link>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {ediVendors.map((v) => (
+                      <div key={v.name} className="card border-orange-100">
+                        <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <p className="font-semibold text-slate-900">{v.name}</p>
+                            <p className="text-sm text-slate-500">
+                              {v.connected
+                                ? `Account ${v.accountNumber ?? "—"} · ${v.warehouseCode ?? "warehouse"}`
+                                : "Not connected — link in Account → Integrations"}
+                            </p>
+                          </div>
+                          <Badge className={v.connected ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-600"}>
+                            {v.connected ? "EDI live" : "Offline"}
+                          </Badge>
+                        </div>
+                        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                          <div>
+                            <dt className="text-slate-500">Catalog items</dt>
+                            <dd className="font-medium">{v.catalogItems ?? 0}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-slate-500">Out of stock</dt>
+                            <dd className={`font-medium ${(v.outOfStock ?? 0) > 0 ? "text-amber-700" : ""}`}>
+                              {v.outOfStock ?? 0}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-slate-500">Open POs</dt>
+                            <dd className="font-medium">
+                              {v.openPoCount} · {formatCurrency(v.openPoTotal)}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-slate-500">90-day spend</dt>
+                            <dd className="font-medium">{formatCurrency(v.spentLast90Days)}</dd>
+                          </div>
+                        </dl>
+                        {v.lastOrderAt && (
+                          <p className="mt-3 text-xs text-slate-500">
+                            Last order {new Date(v.lastOrderAt).toLocaleDateString()}
+                            {v.lastSyncStatus ? ` · ${v.lastSyncStatus}` : ""}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              <section>
+                <div className="mb-3">
+                  <h2 className="font-semibold text-slate-900">Local &amp; specialty suppliers</h2>
+                  <p className="text-sm text-slate-500">
+                    Pulled from inventory supplier fields, purchase orders, and credits
+                  </p>
+                </div>
+                {supplierVendors.length === 0 ? (
+                  <div className="card py-8 text-center text-slate-500">
+                    No vendors yet — set a supplier on inventory items to group orders here.
+                  </div>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {supplierVendors.map((v) => (
+                      <div key={v.name} className="card">
+                        <div className="mb-3 flex items-start justify-between gap-2">
+                          <p className="font-semibold text-slate-900">{v.name}</p>
+                          {v.lowStockCount > 0 && (
+                            <Badge className="bg-amber-100 text-amber-800">{v.lowStockCount} low</Badge>
+                          )}
+                        </div>
+                        <dl className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <dt className="text-slate-500">Inventory items</dt>
+                            <dd className="font-medium">{v.itemCount}</dd>
+                          </div>
+                          <div className="flex justify-between">
+                            <dt className="text-slate-500">Suggested reorder</dt>
+                            <dd className="font-medium text-orange-700">
+                              {v.suggestedLineCount} lines · {formatCurrency(v.suggestedTotal)}
+                            </dd>
+                          </div>
+                          <div className="flex justify-between">
+                            <dt className="text-slate-500">Open POs</dt>
+                            <dd className="font-medium">
+                              {v.openPoCount} · {formatCurrency(v.openPoTotal)}
+                            </dd>
+                          </div>
+                          <div className="flex justify-between">
+                            <dt className="text-slate-500">90-day spend</dt>
+                            <dd className="font-medium">{formatCurrency(v.spentLast90Days)}</dd>
+                          </div>
+                          {v.openCreditCount > 0 && (
+                            <div className="flex justify-between">
+                              <dt className="text-slate-500">Open credits</dt>
+                              <dd className="font-medium text-amber-700">
+                                {v.openCreditCount} · {formatCurrency(v.openCreditTotal)}
+                              </dd>
+                            </div>
+                          )}
+                        </dl>
+                        {v.suggestedLineCount > 0 && (
+                          <Button
+                            size="sm"
+                            className="mt-4 w-full"
+                            onClick={() => createPoForVendor(v.name)}
+                            disabled={creatingPoVendor === v.name}
+                          >
+                            {creatingPoVendor === v.name ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Truck className="mr-2 h-4 w-4" />
+                            )}
+                            Create PO ({v.suggestedLineCount} lines)
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+          )}
+
           {tab === "suggestions" && (
             <div className="card">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -396,123 +831,135 @@ export function LoadingDockClient() {
             </div>
           )}
 
-          {tab === "invoices" && (
-            <div className="space-y-4">
-              <div className="flex justify-end">
-                <Button onClick={() => openInvoiceScan()}>
-                  <Camera className="mr-2 h-4 w-4" />
-                  OCR invoice scan
-                </Button>
-              </div>
-              {invoices.length === 0 ? (
-                <div className="card py-8 text-center text-slate-500">
-                  Scan a vendor invoice to digitize line items and run three-way matching.
-                </div>
-              ) : (
-                invoices.map((inv) => {
-                  let discrepancies: { description: string; severity: string }[] = [];
-                  try {
-                    if (inv.matchNotes) discrepancies = JSON.parse(inv.matchNotes);
-                  } catch {
-                    /* ignore */
-                  }
-                  return (
-                    <div key={inv.id} className="card">
-                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <p className="font-semibold">{inv.vendor}</p>
-                          <p className="text-sm text-slate-500">
-                            {inv.invoiceNumber ?? "No #"} · {formatCurrency(inv.amount)} ·{" "}
-                            {new Date(inv.invoiceDate).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <Badge className={MATCH_COLORS[inv.matchStatus] ?? "bg-slate-100"}>
-                          {inv.matchStatus === "MATCHED" && <CheckCircle2 className="mr-1 inline h-3 w-3" />}
-                          {inv.matchStatus === "DISCREPANCY" && <AlertTriangle className="mr-1 inline h-3 w-3" />}
-                          {inv.matchStatus}
-                        </Badge>
-                      </div>
-                      {discrepancies.length > 0 && (
-                        <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm">
-                          <p className="mb-1 font-medium text-red-800">Three-way match flags</p>
-                          <ul className="list-inside list-disc text-red-700">
-                            {discrepancies.map((d, i) => (
-                              <li key={i}>{d.description}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          )}
+          {tab === "invoices" && <ThreeWayMatchPanel invoices={invoices} onRefresh={load} />}
 
           {tab === "credits" && (
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="card">
-                <h2 className="mb-4 font-semibold">Log returned / damaged goods</h2>
-                <div className="space-y-3">
-                  <FormField label="Vendor">
-                    <Input
-                      value={creditForm.vendor}
-                      onChange={(e) => setCreditForm({ ...creditForm, vendor: e.target.value })}
-                      placeholder="Hill Country Meats"
-                    />
-                  </FormField>
-                  <FormField label="Credit amount">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={creditForm.amount}
-                      onChange={(e) => setCreditForm({ ...creditForm, amount: e.target.value })}
-                    />
-                  </FormField>
-                  <FormField label="Reason">
-                    <Input
-                      value={creditForm.reason}
-                      onChange={(e) => setCreditForm({ ...creditForm, reason: e.target.value })}
-                      placeholder="Damaged cases refused at dock"
-                    />
-                  </FormField>
-                  <Button onClick={saveCredit} disabled={savingCredit}>
-                    {savingCredit ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Log credit & alert bookkeeper
+            <div className="space-y-4">
+              <div className="card border-violet-100 bg-violet-50/40">
+                <div className="flex flex-wrap items-start gap-4">
+                  <Camera className="h-10 w-10 shrink-0 text-violet-600" />
+                  <div className="flex-1">
+                    <h2 className="font-semibold text-slate-900">Credit memo tracking</h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Dishwasher snaps shattered glass, rotten produce, or short-ships — Pinnacle generates a credit
+                      request, emails the vendor rep, and <strong>locks accounting sync</strong> so your bookkeeper
+                      cannot pay the full invoice until the credit is officially applied.
+                    </p>
+                    {openCredits.length > 0 && (
+                      <p className="mt-2 text-sm font-medium text-amber-800">
+                        {openCredits.length} open credit(s) — {formatCurrency(openCredits.reduce((s, c) => s + c.amount, 0))} owed by vendors
+                      </p>
+                    )}
+                  </div>
+                  <Button onClick={() => setCreditMemoOpen(true)}>
+                    <Camera className="mr-2 h-4 w-4" />
+                    Snap damage & request credit
                   </Button>
                 </div>
-              </div>
-              <div className="card">
-                <h2 className="mb-4 font-semibold">Credit tracker</h2>
-                {credits.length === 0 ? (
-                  <p className="text-sm text-slate-500">No credits logged.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {credits.map((c) => (
-                      <div key={c.id} className="rounded-lg border border-slate-200 p-3">
-                        <div className="flex justify-between">
-                          <span className="font-medium">{c.vendor}</span>
-                          <span className="font-semibold text-orange-700">{formatCurrency(c.amount)}</span>
-                        </div>
-                        <p className="mt-1 text-sm text-slate-600">{c.reason}</p>
-                        <div className="mt-2 flex items-center justify-between">
-                          <Badge className={c.status === "OPEN" ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800"}>
-                            {c.status}
-                          </Badge>
-                          {c.status === "OPEN" && (
-                            <Button size="sm" variant="ghost" onClick={() => resolveCredit(c.id, "APPLIED")}>
-                              Mark memo received
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                {creditSaveNote && (
+                  <p className="mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                    {creditSaveNote}
+                  </p>
                 )}
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div className="card">
+                  <h2 className="mb-4 font-semibold">Quick log (no photo)</h2>
+                  <div className="space-y-3">
+                    <FormField label="Vendor">
+                      <Input
+                        value={creditForm.vendor}
+                        onChange={(e) => setCreditForm({ ...creditForm, vendor: e.target.value })}
+                        placeholder="Hill Country Meats"
+                      />
+                    </FormField>
+                    <FormField label="Credit amount">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={creditForm.amount}
+                        onChange={(e) => setCreditForm({ ...creditForm, amount: e.target.value })}
+                      />
+                    </FormField>
+                    <FormField label="Reason">
+                      <Input
+                        value={creditForm.reason}
+                        onChange={(e) => setCreditForm({ ...creditForm, reason: e.target.value })}
+                        placeholder="Damaged cases refused at dock"
+                      />
+                    </FormField>
+                    <Button onClick={saveCredit} disabled={savingCredit}>
+                      {savingCredit ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Log credit & email rep
+                    </Button>
+                  </div>
+                </div>
+                <div className="card">
+                  <h2 className="mb-4 font-semibold">Credit tracker</h2>
+                  {credits.length === 0 ? (
+                    <p className="text-sm text-slate-500">No credits logged.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {credits.map((c) => (
+                        <div key={c.id} className="rounded-lg border border-slate-200 p-3">
+                          <div className="flex justify-between gap-2">
+                            <span className="font-medium">{c.vendor}</span>
+                            <span className="font-semibold text-orange-700">{formatCurrency(c.amount)}</span>
+                          </div>
+                          <p className="mt-1 text-sm text-slate-600">{c.reason}</p>
+                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                            {c.category && <Badge className="bg-slate-100">{c.category.replace(/_/g, " ")}</Badge>}
+                            {c.emailStatus && (
+                              <span className="flex items-center gap-1">
+                                Email: {c.emailStatus}
+                                {c.repEmail ? ` → ${c.repEmail}` : ""}
+                              </span>
+                            )}
+                            {c.accountingLocked && (
+                              <span className="flex items-center gap-1 text-amber-700">
+                                <ShieldCheck className="h-3 w-3" /> AP sync locked
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-2 flex items-center justify-between">
+                            <Badge className={c.status === "OPEN" ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800"}>
+                              {c.status}
+                            </Badge>
+                            {c.status === "OPEN" && (
+                              <Button size="sm" variant="ghost" onClick={() => resolveCredit(c.id, "APPLIED")}>
+                                Mark memo received
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
         </>
+      )}
+
+      {creditMemoOpen && (
+        <CreditMemoModal
+          invoices={invoices.map((i) => ({
+            id: i.id,
+            vendor: i.vendor,
+            invoiceNumber: i.invoiceNumber,
+            amount: i.amount,
+          }))}
+          onSaved={(result) => {
+            const parts = ["Credit request submitted."];
+            if (result.email?.message) parts.push(result.email.message);
+            if (result.accountingLocked) parts.push("Accounting sync locked on linked invoice.");
+            setCreditSaveNote(parts.join(" "));
+            load();
+          }}
+          onClose={() => setCreditMemoOpen(false)}
+        />
       )}
 
       {scanOpen && (

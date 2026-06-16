@@ -121,7 +121,9 @@ const EMPTY_LABOR_HIGHLIGHTS: LaborHighlights = {
 };
 
 /** Ensures analytics API responses always have fields the UI expects. */
-export function normalizeAnalyticsPayload(raw: Partial<AnalyticsPayload> & Record<string, unknown>): AnalyticsPayload {
+export function normalizeAnalyticsPayload(
+  raw: Partial<AnalyticsPayload> | AnalyticsPayload
+): AnalyticsPayload {
   const sales = raw.sales ?? ({} as AnalyticsPayload["sales"]);
   const foodCost = raw.foodCost ?? ({} as AnalyticsPayload["foodCost"]);
   const executive = raw.executive ?? ({} as AnalyticsPayload["executive"]);
@@ -319,6 +321,8 @@ export function normalizeAnalyticsPayload(raw: Partial<AnalyticsPayload> & Recor
       topVendors: raw.purchasing?.topVendors ?? [],
       highlights: raw.purchasing?.highlights ?? EMPTY_PURCHASING_HIGHLIGHTS,
       questions: raw.purchasing?.questions ?? [],
+      draftPurchaseOrders: raw.purchasing?.draftPurchaseOrders ?? [],
+      vendorBids: raw.purchasing?.vendorBids ?? [],
     },
     forecasting: {
       salesForecast7d: raw.forecasting?.salesForecast7d ?? [],

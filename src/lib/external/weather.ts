@@ -1,4 +1,5 @@
 import type { WeatherForecastDay } from "@/lib/analytics/types";
+import { fetchWithTimeout } from "./fetch-timeout";
 
 export type WeatherSource = "weather.com" | "openweathermap" | "open-meteo";
 
@@ -42,7 +43,7 @@ function isRainyCondition(condition: string) {
 async function fetchWeatherCom(lat: number, lon: number, apiKey: string): Promise<WeatherForecastDay[] | null> {
   try {
     const url = `https://api.weather.com/v3/wx/forecast/daily/7day?geocode=${lat},${lon}&format=json&apiKey=${apiKey}&units=e`;
-    const res = await fetch(url, { next: { revalidate: 3600 } });
+    const res = await fetchWithTimeout(url, { next: { revalidate: 3600 } });
     if (!res.ok) return null;
     const data = (await res.json()) as {
       validTimeUtc?: string[];
@@ -77,7 +78,7 @@ async function fetchWeatherCom(lat: number, lon: number, apiKey: string): Promis
 async function fetchOpenWeather(lat: number, lon: number, apiKey: string): Promise<WeatherForecastDay[] | null> {
   try {
     const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=imperial&cnt=40`;
-    const res = await fetch(url, { next: { revalidate: 3600 } });
+    const res = await fetchWithTimeout(url, { next: { revalidate: 3600 } });
     if (!res.ok) return null;
     const data = (await res.json()) as {
       list?: Array<{
@@ -113,7 +114,7 @@ async function fetchOpenWeather(lat: number, lon: number, apiKey: string): Promi
 
 async function fetchOpenMeteo(lat: number, lon: number): Promise<WeatherForecastDay[]> {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=auto&forecast_days=7&temperature_unit=fahrenheit`;
-  const res = await fetch(url, { next: { revalidate: 3600 } });
+  const res = await fetchWithTimeout(url, { next: { revalidate: 3600 } });
   if (!res.ok) throw new Error("Open-Meteo forecast failed");
   const data = (await res.json()) as {
     daily?: {

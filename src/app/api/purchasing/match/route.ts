@@ -1,8 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { getLocationIdFromRequest } from "@/lib/location";
 import { requirePermission } from "@/lib/api-auth";
-import { runThreeWayMatch } from "@/lib/purchasing/three-way-match";
+import {
+  runThreeWayMatch,
+  getThreeWayMatchSummary,
+  getThreeWayMatchDetail,
+} from "@/lib/purchasing/three-way-match";
+
+export async function GET(request: NextRequest) {
+  const { error } = await requirePermission(request, "manage_inventory");
+  if (error) return error;
+
+  const locationId = await getLocationIdFromRequest(request);
+  const invoiceId = request.nextUrl.searchParams.get("invoiceId");
+
+  if (invoiceId) {
+    const detail = await getThreeWayMatchDetail(invoiceId, locationId);
+    if (!detail) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
+    return NextResponse.json(detail);
+  }
+
+  const summary = await getThreeWayMatchSummary(locationId);
+  return NextResponse.json(summary);
+}
 
 export async function POST(request: NextRequest) {
   const { error } = await requirePermission(request, "manage_inventory");
@@ -15,6 +37,7 @@ export async function POST(request: NextRequest) {
   }
 
   const locationId = await getLocationIdFromRequest(request);
+  const { prisma } = await import("@/lib/prisma");
   const invoice = await prisma.vendorInvoice.findFirst({
     where: { id: invoiceId, locationId },
   });

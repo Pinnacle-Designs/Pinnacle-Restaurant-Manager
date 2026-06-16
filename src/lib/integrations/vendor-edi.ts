@@ -5,6 +5,25 @@ import { vendorEdiProviderLabel } from "./providers";
 const SKU_PREFIX: Record<VendorEdiProvider, string> = {
   SYSCO: "SYS",
   US_FOODS: "USF",
+  GORDON_FOOD_SERVICE: "GFS",
+};
+
+const EDI_PRICE_FACTOR: Record<VendorEdiProvider, number> = {
+  SYSCO: 1.02,
+  US_FOODS: 0.98,
+  GORDON_FOOD_SERVICE: 1.0,
+};
+
+const EDI_ACCOUNT: Record<VendorEdiProvider, string> = {
+  SYSCO: "SY-482910",
+  US_FOODS: "USF-771204",
+  GORDON_FOOD_SERVICE: "GFS-339018",
+};
+
+const EDI_WAREHOUSE: Record<VendorEdiProvider, string> = {
+  SYSCO: "AUS-DC12",
+  US_FOODS: "AUS-WH08",
+  GORDON_FOOD_SERVICE: "AUS-GFS04",
 };
 
 export async function connectVendorEdi(
@@ -19,8 +38,8 @@ export async function connectVendorEdi(
       locationId,
       provider,
       connected: true,
-      accountNumber: accountNumber || (provider === "SYSCO" ? "SY-482910" : "USF-771204"),
-      warehouseCode: provider === "SYSCO" ? "AUS-DC12" : "AUS-WH08",
+      accountNumber: accountNumber || EDI_ACCOUNT[provider],
+      warehouseCode: EDI_WAREHOUSE[provider],
       lastSyncStatus: live ? "live" : "demo",
     },
     update: {
@@ -68,7 +87,7 @@ export async function syncVendorCatalog(locationId: string, provider: VendorEdiP
         name: item.name,
         unit: item.unit,
         packSize: item.unit === "each" ? "1 each" : `1 ${item.unit}`,
-        unitPrice: Math.round(item.costPerUnit * (provider === "SYSCO" ? 1.02 : 0.98) * 100) / 100,
+        unitPrice: Math.round(item.costPerUnit * EDI_PRICE_FACTOR[provider] * 100) / 100,
         inStock,
         leadTimeDays: lowStock ? 2 : 1,
         inventoryItemId: item.id,
@@ -76,7 +95,7 @@ export async function syncVendorCatalog(locationId: string, provider: VendorEdiP
       update: {
         name: item.name,
         unit: item.unit,
-        unitPrice: Math.round(item.costPerUnit * (provider === "SYSCO" ? 1.02 : 0.98) * 100) / 100,
+        unitPrice: Math.round(item.costPerUnit * EDI_PRICE_FACTOR[provider] * 100) / 100,
         inStock,
         leadTimeDays: lowStock ? 2 : 1,
         inventoryItemId: item.id,

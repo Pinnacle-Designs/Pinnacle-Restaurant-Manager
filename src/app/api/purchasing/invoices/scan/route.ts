@@ -6,8 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { analyzeInvoice } from "@/lib/ai/analyze-invoice";
 import { getLocationIdFromRequest } from "@/lib/location";
 import { requirePermission } from "@/lib/api-auth";
-import { checkPriceSpikes, updateInventoryCostsFromInvoice } from "@/lib/purchasing/price-alerts";
-import { runThreeWayMatch } from "@/lib/purchasing/three-way-match";
+import { processDigitizedInvoice } from "@/lib/purchasing/invoice-digitization";
 
 export async function POST(request: NextRequest) {
   const { error } = await requirePermission(request, "manage_inventory");
@@ -81,6 +80,8 @@ export async function PUT(request: NextRequest) {
               lineTotal: number;
               sku?: string;
               inventoryItemId?: string;
+              catchWeightBilled?: number;
+              catchWeightUnit?: string;
             }) => ({
               description: l.description,
               qty: l.qty,
@@ -89,6 +90,8 @@ export async function PUT(request: NextRequest) {
               lineTotal: l.lineTotal,
               sku: l.sku ?? null,
               inventoryItemId: l.inventoryItemId ?? null,
+              catchWeightBilled: l.catchWeightBilled ?? null,
+              catchWeightUnit: l.catchWeightUnit ?? null,
             })
           ),
         },
@@ -96,22 +99,28 @@ export async function PUT(request: NextRequest) {
       include: { lines: true },
     });
 
-    const priceAlerts = await checkPriceSpikes(locationId, vendor, saved.lines);
-    await updateInventoryCostsFromInvoice(locationId, saved.lines);
-
-    const match = await runThreeWayMatch(saved.id);
-
-    await prisma.activityLog.create({
-      data: {
-        locationId,
-        action: "INVOICE_OCR",
-        entity: "vendor_invoice",
-        entityId: saved.id,
-        details: `Invoice scanned: ${vendor} $${amount.toFixed(2)} — match: ${match.status}`,
-      },
+    const result = await processDigitizedInvoice(locationId, {
+      id: saved.id,
+      vendor: saved.vendor,
+      amount: saved.amount,
+      invoiceNumber: saved.invoiceNumber,
+      invoiceDate: saved.invoiceDate,
+      imageUrl: saved.imageUrl,
+      poId: saved.poId,
+      receiptId: saved.receiptId,
+      lines: saved.lines,
     });
 
-    return NextResponse.json({ invoice: saved, match, priceAlerts });
+    return NextResponse.json({
+      invoice: saved,
+      match: result.match,
+      priceAlerts: result.priceAlerts,
+      catchWeightAlerts: result.catchWeightAlerts,
+      expenseId: result.expenseId,
+      inventoryUpdated: result.inventoryUpdated,
+      recipesUpdated: result.recipesUpdated,
+      pushNotifications: result.pushNotifications,
+    });
   } catch (err) {
     console.error("Invoice save error:", err);
     return NextResponse.json({ error: "Save failed" }, { status: 500 });

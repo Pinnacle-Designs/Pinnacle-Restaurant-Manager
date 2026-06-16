@@ -479,6 +479,84 @@ function ruleBasedSectionInsights(
         severity: p.costInflationPct > 5 ? "HIGH" : "LOW",
         category: "FINANCE",
       });
+      const smart = h.smartOrdering;
+      if (smart && smart.draftPoCount > 0) {
+        insights.push({
+          title: "Smart draft POs ready for review",
+          description: `${smart.draftPoCount} draft order(s) across ${smart.autoBuiltVendors} vendor(s) — $${smart.draftPoTotal.toFixed(0)} total. Review and approve in Purchase Orders.`,
+          severity: "MEDIUM",
+          category: "INVENTORY",
+        });
+      }
+      const bid = h.vendorBidding;
+      if (bid && bid.multiVendorItems > 0) {
+        insights.push({
+          title: "Cross-vendor bidding opportunities",
+          description: bid.topOpportunity
+            ? `${bid.multiVendorItems} items bid across vendors — best: ${bid.topOpportunity.itemName} from ${bid.topOpportunity.vendor} (${bid.topOpportunity.savingsPct.toFixed(0)}% savings). Est. weekly savings $${bid.estimatedWeeklySavings.toFixed(0)}.`
+            : `${bid.multiVendorItems} items compared across vendors.`,
+          severity: bid.estimatedWeeklySavings > 50 ? "HIGH" : "MEDIUM",
+          category: "INVENTORY",
+        });
+      }
+      const twm = h.threeWayMatch;
+      if (twm && twm.discrepancyCount > 0) {
+        insights.push({
+          title: "Three-way match — hold payment",
+          description:
+            twm.openIssues.length > 0
+              ? `${twm.discrepancyCount} invoice(s) fail PO vs receipt vs invoice check — $${twm.holdPaymentTotal.toFixed(0)} at risk. ${twm.openIssues[0]!.issue}`
+              : `${twm.discrepancyCount} invoice discrepancy(ies) — review before paying vendors.`,
+          severity: twm.holdPaymentTotal > 100 ? "CRITICAL" : "HIGH",
+          category: "FINANCE",
+        });
+      } else if (twm && twm.matchedCount > 0) {
+        insights.push({
+          title: "Invoice protection active",
+          description: `${twm.matchedCount} invoice(s) passed three-way match (PO, receiving log, invoice aligned).`,
+          severity: "LOW",
+          category: "FINANCE",
+        });
+      }
+      const dig = h.invoiceDigitization;
+      if (dig && dig.recentPriceSpikes > 0) {
+        insights.push({
+          title: "Vendor price spike detected",
+          description: dig.topSpike
+            ? `${dig.topSpike.item} up ${dig.topSpike.changePct.toFixed(0)}% — recipe costs recalculated. Push alert sent to management.`
+            : `${dig.recentPriceSpikes} ingredient price spike(s) in the last 14 days.`,
+          severity: dig.topSpike && dig.topSpike.changePct >= 15 ? "CRITICAL" : "HIGH",
+          category: "INVENTORY",
+        });
+      }
+      if (dig && dig.catchWeightAlerts > 0) {
+        insights.push({
+          title: "Catch-weight billing mismatch",
+          description:
+            dig.openCatchWeightIssues[0]?.description ??
+            `${dig.catchWeightAlerts} case item(s) billed for more weight than received — possible heavy-box overcharge.`,
+          severity: "HIGH",
+          category: "FINANCE",
+        });
+      }
+      const cm = h.creditMemoTracking;
+      if (cm && cm.openCount > 0) {
+        insights.push({
+          title: "Open vendor credits — AP sync locked",
+          description: `${cm.openCount} credit memo(s) pending ($${cm.openTotal.toFixed(0)}). ${cm.accountingLockedCount} invoice(s) blocked from accounting sync until vendor applies credit.`,
+          severity: cm.openTotal > 200 ? "HIGH" : "MEDIUM",
+          category: "FINANCE",
+        });
+      }
+      const sc = h.vendorScorecards;
+      if (sc && sc.worstVendor && sc.worstVendor.reliabilityScore < 75) {
+        insights.push({
+          title: "Vendor reliability — contract leverage",
+          description: `${sc.worstVendor.vendor} scores grade ${sc.worstVendor.reliabilityGrade} — fill ${sc.worstVendor.fillRatePct}%, on-time ${sc.worstVendor.onTimePct}%, substitutions ${sc.worstVendor.substitutionRatePct}%. Review at renewal.`,
+          severity: sc.worstVendor.reliabilityScore < 60 ? "HIGH" : "MEDIUM",
+          category: "INVENTORY",
+        });
+      }
       break;
     }
     case "forecasting": {

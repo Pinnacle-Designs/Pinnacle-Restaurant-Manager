@@ -163,7 +163,12 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
 
   const location = await prisma.location.findUnique({ where: { id: locationId } });
   if (location) {
-    await syncWeatherForecasts(locationId, location).catch((err) => {
+    await Promise.race([
+      syncWeatherForecasts(locationId, location),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("weather sync timeout")), 8_000)
+      ),
+    ]).catch((err) => {
       console.warn("Weather sync skipped:", err);
     });
   }
@@ -180,6 +185,8 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
     reviews,
     vendorInvoices,
     vendorPriceHistory,
+    draftPurchaseOrders,
+    vendorEdiConnections,
     externalFactors,
     socialAccounts,
     websiteConnection,
@@ -208,6 +215,11 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
       orderBy: { invoiceDate: "asc" },
     }),
     safeVendorPriceHistory(locationId),
+    prisma.vendorPurchaseOrder.findMany({
+      where: { locationId, status: "DRAFT" },
+      orderBy: { submittedAt: "desc" },
+    }),
+    prisma.vendorEdiConnection.findMany({ where: { locationId } }),
     prisma.externalFactor.findMany({
       where: { locationId, date: { gte: periodStart } },
       orderBy: { date: "desc" },
@@ -216,6 +228,29 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
     safeWebsiteConnection(locationId),
     safeSocialPosts(locationId, periodStart),
   ]);
+
+  let vendorBidsForPurchasing: Array<{
+    itemName: string;
+    recommendedVendor: string;
+    savingsPct: number;
+    savingsAmount: number;
+    suggestedQty: number;
+    vendors: Array<{ vendor: string; unitPrice: number }>;
+  }> = [];
+  try {
+    const { getCrossVendorBids } = await import("@/lib/purchasing/vendor-bidding");
+    const raw = await getCrossVendorBids(locationId);
+    vendorBidsForPurchasing = raw.map((b) => ({
+      itemName: b.itemName,
+      recommendedVendor: b.recommendedVendor,
+      savingsPct: b.savingsPct,
+      savingsAmount: b.savingsAmount,
+      suggestedQty: b.suggestedQty,
+      vendors: b.vendors.map((v) => ({ vendor: v.vendor, unitPrice: v.unitPrice })),
+    }));
+  } catch {
+    /* bidding optional */
+  }
 
   const paidOrders = orders.filter((o) => o.status === "PAID");
   const yesterdayOrders = paidOrders.filter(
@@ -1458,6 +1493,75 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
     .sort((a, b) => b.changePct - a.changePct);
 
   const aboveMarketVendors = vendorComparison.filter((v) => v.potentialSavingsPct > 3);
+  const multiVendorBids = vendorBidsForPurchasing.filter((b) => b.vendors.length >= 2);
+  const biddingSavings = multiVendorBids.reduce(
+    (s, b) => s + b.savingsAmount * Math.max(b.suggestedQty, 1),
+    0
+  );
+  const topBid = multiVendorBids.sort((a, b) => b.savingsPct - a.savingsPct)[0] ?? null;
+
+  const { vendorEdiProviderLabel } = await import("@/lib/integrations/providers");
+  const ediCatalogSummaries = vendorEdiConnections.map((c) => ({
+    name: vendorEdiProviderLabel(c.provider),
+    connected: c.connected,
+    catalogItems: c.catalogItemsCount,
+    outOfStock: 0,
+  }));
+
+  let threeWaySummary = {
+    invoices: [] as Awaited<ReturnType<typeof import("@/lib/purchasing/three-way-match").getThreeWayMatchSummary>>["invoices"],
+    discrepancyCount: 0,
+    holdPaymentTotal: 0,
+    pendingCount: 0,
+    matchedCount: 0,
+  };
+  try {
+    const { getThreeWayMatchSummary } = await import("@/lib/purchasing/three-way-match");
+    threeWaySummary = await getThreeWayMatchSummary(locationId);
+  } catch {
+    /* optional */
+  }
+
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const ocrInvoicesThisMonth = await prisma.vendorInvoice.count({
+    where: { locationId, createdAt: { gte: monthStart } },
+  });
+  const priceSpikeInsights = await prisma.businessInsight.findMany({
+    where: {
+      locationId,
+      resolved: false,
+      title: { startsWith: "Price spike:" },
+      createdAt: { gte: new Date(now.getTime() - 14 * 86400000) },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+  });
+  const catchWeightInsights = await prisma.businessInsight.findMany({
+    where: {
+      locationId,
+      resolved: false,
+      title: { startsWith: "Catch weight:" },
+    },
+    take: 5,
+  });
+  let topSpike: { item: string; changePct: number; vendor: string } | null = null;
+  if (priceSpikeInsights[0]) {
+    try {
+      const snap = JSON.parse(priceSpikeInsights[0].dataSnapshot ?? "{}") as {
+        item?: string;
+        changePct?: number;
+        vendor?: string;
+      };
+      topSpike = {
+        item: snap.item ?? priceSpikeInsights[0].title.replace("Price spike: ", ""),
+        changePct: snap.changePct ?? 0,
+        vendor: snap.vendor ?? "",
+      };
+    } catch {
+      /* ignore */
+    }
+  }
+
   const purchasingHighlights: PurchasingHighlights = {
     costIncreaseSuppliers: costIncreaseSuppliers.slice(0, 5),
     marketRateStatus: {
@@ -1480,7 +1584,112 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
               ? `Paying near market rates with ${purchasingInflation.toFixed(1)}% avg inflation.`
               : "No vendor invoice data to compare rates.",
     },
+    smartOrdering: {
+      draftPoCount: draftPurchaseOrders.length,
+      draftPoTotal: draftPurchaseOrders.reduce((s, d) => s + d.totalAmount, 0),
+      autoBuiltVendors: new Set(draftPurchaseOrders.map((d) => d.vendor)).size,
+    },
+    vendorBidding: {
+      multiVendorItems: multiVendorBids.length,
+      estimatedWeeklySavings: Math.round(biddingSavings * 100) / 100,
+      topOpportunity: topBid
+        ? {
+            itemName: topBid.itemName,
+            vendor: topBid.recommendedVendor,
+            savingsPct: topBid.savingsPct,
+          }
+        : null,
+    },
+    ediCatalogs: ediCatalogSummaries,
+    threeWayMatch: {
+      discrepancyCount: threeWaySummary.discrepancyCount,
+      holdPaymentTotal: threeWaySummary.holdPaymentTotal,
+      pendingCount: threeWaySummary.pendingCount,
+      matchedCount: threeWaySummary.matchedCount,
+      openIssues: threeWaySummary.invoices
+        .filter((s) => s.matchStatus === "DISCREPANCY")
+        .slice(0, 5)
+        .map((s) => ({ vendor: s.vendor, issue: s.topIssue ?? s.summary, exposure: s.exposureTotal })),
+    },
+    invoiceDigitization: {
+      ocrInvoicesThisMonth,
+      recentPriceSpikes: priceSpikeInsights.length,
+      catchWeightAlerts: catchWeightInsights.length,
+      topSpike,
+      openCatchWeightIssues: catchWeightInsights.map((i) => ({
+        item: i.title.replace("Catch weight: ", ""),
+        description: i.description,
+      })),
+    },
   };
+
+  let creditMemoSummary: Awaited<ReturnType<typeof import("@/lib/purchasing/credit-memo").getCreditMemoSummary>> = {
+    openCount: 0,
+    openTotal: 0,
+    appliedYtdTotal: 0,
+    accountingLockedCount: 0,
+    lockedInvoiceExposure: 0,
+    lockedInvoices: [],
+    recentOpen: [],
+  };
+  try {
+    const { getCreditMemoSummary } = await import("@/lib/purchasing/credit-memo");
+    creditMemoSummary = await getCreditMemoSummary(locationId);
+  } catch {
+    /* optional */
+  }
+
+  purchasingHighlights.creditMemoTracking = {
+    openCount: creditMemoSummary.openCount,
+    openTotal: creditMemoSummary.openTotal,
+    appliedYtdTotal: creditMemoSummary.appliedYtdTotal,
+    accountingLockedCount: creditMemoSummary.accountingLockedCount,
+    lockedInvoiceExposure: creditMemoSummary.lockedInvoiceExposure,
+    recentOpen: creditMemoSummary.recentOpen.map((c) => ({
+      vendor: c.vendor,
+      amount: c.amount,
+      reason: c.reason,
+      emailStatus: c.emailStatus,
+    })),
+  };
+
+  try {
+    const { getVendorScorecardSummary } = await import("@/lib/purchasing/vendor-scorecards");
+    const scSummary = await getVendorScorecardSummary(locationId);
+    purchasingHighlights.vendorScorecards = {
+      vendorCount: scSummary.vendorCount,
+      avgFillRate: scSummary.avgFillRate,
+      avgOnTime: scSummary.avgOnTime,
+      avgSubstitutionRate: scSummary.avgSubstitutionRate,
+      bestVendor: scSummary.bestVendor
+        ? {
+            vendor: scSummary.bestVendor.vendor,
+            reliabilityGrade: scSummary.bestVendor.reliabilityGrade,
+            reliabilityScore: scSummary.bestVendor.reliabilityScore,
+          }
+        : null,
+      worstVendor: scSummary.worstVendor
+        ? {
+            vendor: scSummary.worstVendor.vendor,
+            reliabilityGrade: scSummary.worstVendor.reliabilityGrade,
+            reliabilityScore: scSummary.worstVendor.reliabilityScore,
+            fillRatePct: scSummary.worstVendor.fillRatePct,
+            onTimePct: scSummary.worstVendor.onTimePct,
+            substitutionRatePct: scSummary.worstVendor.substitutionRatePct,
+          }
+        : null,
+      topVendors: scSummary.scorecards.slice(0, 6).map((c) => ({
+        vendor: c.vendor,
+        fillRatePct: c.fillRatePct,
+        onTimePct: c.onTimePct,
+        substitutionRatePct: c.substitutionRatePct,
+        reliabilityGrade: c.reliabilityGrade,
+        reliabilityScore: c.reliabilityScore,
+      })),
+    };
+  } catch {
+    /* optional */
+  }
 
   const nextFriday = new Date(now);
   const daysUntilFriday = ((5 - nextFriday.getDay() + 7) % 7) || 7;
@@ -2086,7 +2295,29 @@ export async function computeAnalytics(locationId: string): Promise<AnalyticsPay
       questions: [
         "Which suppliers are increasing costs?",
         "Are we paying market rates?",
+        "What draft purchase orders are ready to approve?",
+        "Which vendor wins the bid on each item this week?",
+        "Do any invoices fail three-way match?",
+        "What is at risk if we pay open vendor invoices?",
+        "Did any vendor quietly raise prices on recent invoices?",
+        "Are catch-weight items billed for more weight than we received?",
+        "What vendor credits are open and locking AP sync?",
+        "Which vendor has the best fill rate?",
+        "Who delivers late during lunch rush?",
+        "How often do vendors substitute cheaper brands?",
       ],
+      draftPurchaseOrders: draftPurchaseOrders.slice(0, 8).map((d) => ({
+        vendor: d.vendor ?? "Vendor",
+        lineCount: d.lineCount,
+        totalAmount: d.totalAmount,
+        status: d.status,
+      })),
+      vendorBids: multiVendorBids.slice(0, 10).map((b) => ({
+        itemName: b.itemName,
+        recommendedVendor: b.recommendedVendor,
+        savingsPct: b.savingsPct,
+        vendors: b.vendors,
+      })),
     },
     forecasting: {
       salesForecast7d,
@@ -2461,6 +2692,13 @@ export function buildAnalyticsSnapshotForAI(payload: AnalyticsPayload) {
       highlights: payload.purchasing.highlights,
       keyQuestions: payload.purchasing.questions,
       topVendors: payload.purchasing.topVendors.slice(0, 6),
+      draftPurchaseOrders: payload.purchasing.draftPurchaseOrders ?? [],
+      vendorBids: payload.purchasing.vendorBids ?? [],
+      vendorComparison: payload.foodCost.vendorComparison.slice(0, 6),
+      threeWayMatch: payload.purchasing.highlights.threeWayMatch,
+      invoiceDigitization: payload.purchasing.highlights.invoiceDigitization,
+      creditMemoTracking: payload.purchasing.highlights.creditMemoTracking,
+      vendorScorecards: payload.purchasing.highlights.vendorScorecards,
     },
     forecasting: {
       salesForecast7d: payload.forecasting.salesForecast7d,

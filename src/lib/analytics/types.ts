@@ -453,6 +453,60 @@ export interface PurchasingHighlights {
     status: "above" | "at" | "below" | "unknown";
     reason: string;
   };
+  smartOrdering?: {
+    draftPoCount: number;
+    draftPoTotal: number;
+    autoBuiltVendors: number;
+  };
+  vendorBidding?: {
+    multiVendorItems: number;
+    estimatedWeeklySavings: number;
+    topOpportunity: { itemName: string; vendor: string; savingsPct: number } | null;
+  };
+  ediCatalogs?: Array<{
+    name: string;
+    connected: boolean;
+    catalogItems: number;
+    outOfStock: number;
+  }>;
+  threeWayMatch?: {
+    discrepancyCount: number;
+    holdPaymentTotal: number;
+    pendingCount: number;
+    matchedCount: number;
+    openIssues: Array<{ vendor: string; issue: string; exposure: number }>;
+  };
+  invoiceDigitization?: {
+    ocrInvoicesThisMonth: number;
+    recentPriceSpikes: number;
+    catchWeightAlerts: number;
+    topSpike: { item: string; changePct: number; vendor: string } | null;
+    openCatchWeightIssues: Array<{ item: string; description: string }>;
+  };
+  creditMemoTracking?: {
+    openCount: number;
+    openTotal: number;
+    appliedYtdTotal: number;
+    accountingLockedCount: number;
+    lockedInvoiceExposure: number;
+    recentOpen: Array<{ vendor: string; amount: number; reason: string; emailStatus: string | null }>;
+  };
+  vendorScorecards?: {
+    vendorCount: number;
+    avgFillRate: number;
+    avgOnTime: number;
+    avgSubstitutionRate: number;
+    bestVendor: { vendor: string; reliabilityGrade: string; reliabilityScore: number } | null;
+    worstVendor: { vendor: string; reliabilityGrade: string; reliabilityScore: number; fillRatePct: number; onTimePct: number; substitutionRatePct: number } | null;
+    topVendors: Array<{
+      vendor: string;
+      fillRatePct: number;
+      onTimePct: number;
+      substitutionRatePct: number;
+      reliabilityGrade: string;
+      reliabilityScore: number;
+    }>;
+  };
 }
 
 export interface PurchasingAnalytics {
@@ -463,6 +517,13 @@ export interface PurchasingAnalytics {
   topVendors: Array<{ vendor: string; spend: number; orders: number }>;
   highlights: PurchasingHighlights;
   questions: string[];
+  draftPurchaseOrders?: Array<{ vendor: string; lineCount: number; totalAmount: number; status: string }>;
+  vendorBids?: Array<{
+    itemName: string;
+    recommendedVendor: string;
+    savingsPct: number;
+    vendors: Array<{ vendor: string; unitPrice: number }>;
+  }>;
 }
 
 export interface ForecastingHighlights {

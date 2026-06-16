@@ -8,6 +8,11 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function createPrismaClient() {
+  const url = process.env.DATABASE_URL ?? "";
+  if (url.startsWith("file:") && !url.includes("socket_timeout")) {
+    const sep = url.includes("?") ? "&" : "?";
+    process.env.DATABASE_URL = `${url}${sep}socket_timeout=30`;
+  }
   return new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });

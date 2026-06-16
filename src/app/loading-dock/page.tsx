@@ -1,14 +1,6 @@
-import { PageHeader } from "@/components/ui";
-import { LoadingDockClient } from "@/components/loading-dock/LoadingDockClient";
+import { redirect } from "next/navigation";
 
-export default function LoadingDockPage() {
-  return (
-    <div>
-      <PageHeader
-        title="Loading Dock"
-        description="Purchasing & receiving — catch overcharges before you write the check"
-      />
-      <LoadingDockClient />
-    </div>
-  );
+/** Renamed to Purchase Orders. */
+export default function LoadingDockRedirectPage() {
+  redirect("/purchase-orders");
 }

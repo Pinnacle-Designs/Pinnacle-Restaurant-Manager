@@ -121,12 +121,12 @@ async function seedPaymentProviders(locationId: string) {
       purpose: "POS",
       status: "demo",
       accountId: "sq0demo-smoky-oak",
-      metadata: JSON.stringify({ demo: true, sandbox: true }),
+      metadata: JSON.stringify({ demo: true, sandbox: true, stripeConnectAvailable: true }),
     },
     update: {
       provider: "SQUARE",
       status: "demo",
-      metadata: JSON.stringify({ demo: true, sandbox: true }),
+      metadata: JSON.stringify({ demo: true, sandbox: true, stripeConnectAvailable: true }),
     },
   });
 }
@@ -917,9 +917,6 @@ async function seedPayrollSamples(locationId: string) {
     });
   }
 
-  const runCount = await prisma.payrollRun.count({ where: { locationId } });
-  if (runCount > 0) return;
-
   const priya = await prisma.staffMember.findFirst({
     where: { locationId, name: { contains: "Priya" } },
   });
@@ -932,46 +929,84 @@ async function seedPayrollSamples(locationId: string) {
   const david = await prisma.staffMember.findFirst({
     where: { locationId, name: { contains: "David" } },
   });
-
-  const periodEnd = subDays(new Date(), 1);
-  const periodStart = subDays(periodEnd, 13);
-
-  const payPeriod = await prisma.payPeriod.create({
-    data: {
-      locationId,
-      startDate: periodStart,
-      endDate: periodEnd,
-      status: "FINALIZED",
-    },
-  });
-
   const staffRows = [priya, elena, marcus, david].filter(Boolean);
-  await prisma.payrollRun.create({
-    data: {
-      locationId,
-      payPeriodId: payPeriod.id,
-      status: "FINALIZED",
-      finalizedAt: subDays(new Date(), 1),
-      lineItems: {
-        create: staffRows.map((s, i) => ({
-          staffMemberId: s!.id,
-          regularHours: 32 + i * 4,
-          overtimeHours: i === 0 ? 2 : 0,
-          regularPay: (32 + i * 4) * s!.hourlyRate,
-          overtimePay: i === 0 ? 2 * s!.hourlyRate * 1.5 : 0,
-          tipsAllocated: s!.isTippedEmployee ? 280 + i * 40 : 0,
-          grossPay:
-            (32 + i * 4) * s!.hourlyRate +
-            (i === 0 ? 2 * s!.hourlyRate * 1.5 : 0) +
-            (s!.isTippedEmployee ? 280 + i * 40 : 0),
-          netPay:
-            (32 + i * 4) * s!.hourlyRate +
-            (i === 0 ? 2 * s!.hourlyRate * 1.5 : 0) +
-            (s!.isTippedEmployee ? 280 + i * 40 : 0),
-        })),
+
+  const runCount = await prisma.payrollRun.count({ where: { locationId } });
+  if (runCount === 0) {
+    const periodEnd = subDays(new Date(), 1);
+    const periodStart = subDays(periodEnd, 13);
+
+    const payPeriod = await prisma.payPeriod.create({
+      data: {
+        locationId,
+        startDate: periodStart,
+        endDate: periodEnd,
+        status: "FINALIZED",
       },
-    },
+    });
+
+    await prisma.payrollRun.create({
+      data: {
+        locationId,
+        payPeriodId: payPeriod.id,
+        status: "FINALIZED",
+        finalizedAt: subDays(new Date(), 1),
+        lineItems: {
+          create: staffRows.map((s, i) => ({
+            staffMemberId: s!.id,
+            regularHours: 32 + i * 4,
+            overtimeHours: i === 0 ? 2 : 0,
+            regularPay: (32 + i * 4) * s!.hourlyRate,
+            overtimePay: i === 0 ? 2 * s!.hourlyRate * 1.5 : 0,
+            tipsAllocated: s!.isTippedEmployee ? 280 + i * 40 : 0,
+            grossPay:
+              (32 + i * 4) * s!.hourlyRate +
+              (i === 0 ? 2 * s!.hourlyRate * 1.5 : 0) +
+              (s!.isTippedEmployee ? 280 + i * 40 : 0),
+            netPay:
+              (32 + i * 4) * s!.hourlyRate +
+              (i === 0 ? 2 * s!.hourlyRate * 1.5 : 0) +
+              (s!.isTippedEmployee ? 280 + i * 40 : 0),
+          })),
+        },
+      },
+    });
+  }
+
+  const draftCount = await prisma.payrollRun.count({
+    where: { locationId, status: "DRAFT" },
   });
+  if (draftCount === 0 && staffRows.length > 0) {
+    const currentStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+    const currentEnd = addDays(currentStart, 13);
+    const draftPeriod = await prisma.payPeriod.create({
+      data: {
+        locationId,
+        startDate: currentStart,
+        endDate: currentEnd,
+        status: "DRAFT",
+      },
+    });
+    await prisma.payrollRun.create({
+      data: {
+        locationId,
+        payPeriodId: draftPeriod.id,
+        status: "DRAFT",
+        lineItems: {
+          create: staffRows.map((s, i) => ({
+            staffMemberId: s!.id,
+            regularHours: 18 + i * 2,
+            overtimeHours: 0,
+            regularPay: (18 + i * 2) * s!.hourlyRate,
+            overtimePay: 0,
+            tipsAllocated: s!.isTippedEmployee ? 120 + i * 20 : 0,
+            grossPay: (18 + i * 2) * s!.hourlyRate + (s!.isTippedEmployee ? 120 + i * 20 : 0),
+            netPay: (18 + i * 2) * s!.hourlyRate + (s!.isTippedEmployee ? 120 + i * 20 : 0),
+          })),
+        },
+      },
+    });
+  }
 
   if (priya) {
     const ewaCount = await prisma.ewaAdvance.count({
@@ -994,6 +1029,8 @@ async function seedPayrollSamples(locationId: string) {
 
   const tipCount = await prisma.tipPoolRun.count({ where: { locationId } });
   if (tipCount === 0 && priya && david) {
+    const periodEnd = subDays(new Date(), 1);
+    const periodStart = subDays(periodEnd, 13);
     await prisma.tipPoolRun.create({
       data: {
         locationId,

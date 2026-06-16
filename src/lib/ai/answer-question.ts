@@ -622,6 +622,309 @@ function answerFromKeyQuestions(
   );
   if (forecast) return forecast;
 
+  const purchasing = tryMatch(
+    [
+      /purchase order|draft po|auto.?order|smart po|approve.*po|transmit/i,
+      /which vendor|best price|bid|bidding|cheapest vendor|compare.*vendor/i,
+      /sysco|us foods|gordon|edi|broadline/i,
+      /order from today|order list|what should i order/i,
+    ],
+    "purchasing",
+    () => {
+      const p = a.purchasing;
+      const h = p.highlights;
+      const lines = ["## Automated Purchasing & Bidding", ""];
+
+      if (h.smartOrdering?.draftPoCount) {
+        lines.push(
+          `**Draft POs:** ${h.smartOrdering.draftPoCount} smart draft(s) across ${h.smartOrdering.autoBuiltVendors} vendor(s) — **${fmtMoney(h.smartOrdering.draftPoTotal)}** awaiting your approval in Purchase Orders.`
+        );
+        for (const d of (p.draftPurchaseOrders ?? []).slice(0, 4)) {
+          lines.push(`- ${d.vendor}: ${d.lineCount} lines · ${fmtMoney(d.totalAmount)}`);
+        }
+      } else {
+        lines.push(
+          "**Draft POs:** None yet — open **Purchase Orders → Smart POs** and click *Build draft POs by vendor* to auto-generate from par levels and forecasts."
+        );
+      }
+
+      lines.push("");
+      const bid = h.vendorBidding;
+      if (bid?.multiVendorItems) {
+        lines.push(
+          `**Cross-vendor bidding:** ${bid.multiVendorItems} items compared — est. weekly savings **${fmtMoney(bid.estimatedWeeklySavings)}**.`
+        );
+        if (bid.topOpportunity) {
+          lines.push(
+            `Best opportunity: **${bid.topOpportunity.itemName}** → order from **${bid.topOpportunity.vendor}** (${bid.topOpportunity.savingsPct.toFixed(0)}% vs current).`
+          );
+        }
+        for (const b of (p.vendorBids ?? []).slice(0, 4)) {
+          const alt = b.vendors
+            .map((v) => `${v.vendor} $${v.unitPrice.toFixed(2)}`)
+            .join(" · ");
+          lines.push(`- **${b.itemName}:** ${alt} → **${b.recommendedVendor}**`);
+        }
+      } else {
+        lines.push(
+          "**Bidding:** Add vendor price quotes (or connect EDI catalogs) to enable automatic cross-vendor comparison."
+        );
+      }
+
+      lines.push("");
+      if (h.ediCatalogs?.length) {
+        lines.push("**EDI catalogs:**");
+        for (const e of h.ediCatalogs) {
+          lines.push(
+            `- ${e.name}: ${e.connected ? `connected · ${e.catalogItems} SKUs` : "not connected"}`
+          );
+        }
+      }
+
+      const twm = h.threeWayMatch;
+      if (twm) {
+        lines.push("", "**Three-way match (invoice protection):**");
+        if (twm.discrepancyCount > 0) {
+          lines.push(
+            `**${twm.discrepancyCount} invoice(s) on HOLD** — $${twm.holdPaymentTotal.toFixed(0)} at risk if paid without resolving.`
+          );
+          for (const issue of twm.openIssues.slice(0, 3)) {
+            lines.push(`- ${issue.vendor}: ${issue.issue}`);
+          }
+          lines.push("_Compare PO vs receiving log vs invoice before paying._");
+        } else if (twm.matchedCount > 0) {
+          lines.push(`${twm.matchedCount} invoice(s) passed — PO, receipt, and invoice align.`);
+        } else {
+          lines.push("Scan invoices against POs and receiving logs in Purchase Orders → Three-Way Match.");
+        }
+      }
+
+      const dig = h.invoiceDigitization;
+      if (dig) {
+        lines.push("", "**Invoice digitization & price auditing:**");
+        lines.push(`${dig.ocrInvoicesThisMonth} invoice(s) digitized this month via OCR.`);
+        if (dig.recentPriceSpikes > 0) {
+          const spike = dig.topSpike;
+          lines.push(
+            `**${dig.recentPriceSpikes} price spike alert(s)**${spike ? ` — latest: **${spike.item}** +${spike.changePct.toFixed(0)}%` : ""}. Recipe costs recalculated automatically.`
+          );
+        }
+        if (dig.catchWeightAlerts > 0) {
+          lines.push(`**${dig.catchWeightAlerts} catch-weight issue(s)** — billed vs received weight mismatch.`);
+          for (const c of dig.openCatchWeightIssues.slice(0, 2)) {
+            lines.push(`- ${c.item}: ${c.description}`);
+          }
+        }
+        if (!dig.recentPriceSpikes && !dig.catchWeightAlerts) {
+          lines.push("Scan paper invoices in Purchase Orders — OCR updates inventory and audits vendor pricing.");
+        }
+      }
+
+      const cm = h.creditMemoTracking;
+      if (cm) {
+        lines.push("", "**Credit memo tracking:**");
+        if (cm.openCount > 0) {
+          lines.push(
+            `**${cm.openCount} open credit(s)** — **${fmtMoney(cm.openTotal)}** owed by vendors. ${cm.accountingLockedCount} invoice(s) locked from accounting sync (${fmtMoney(cm.lockedInvoiceExposure)} exposure).`
+          );
+          for (const c of cm.recentOpen.slice(0, 3)) {
+            lines.push(`- ${c.vendor}: ${fmtMoney(c.amount)} — ${c.reason}`);
+          }
+        } else {
+          lines.push("Snap damaged goods in Purchase Orders → Credits to email vendor rep and lock AP sync.");
+        }
+      }
+
+      const sc = h.vendorScorecards;
+      if (sc && sc.vendorCount > 0) {
+        lines.push("", "**Vendor scorecards (90-day reliability):**");
+        lines.push(
+          `Avg fill ${sc.avgFillRate}% · on-time ${sc.avgOnTime}% · substitution ${sc.avgSubstitutionRate}%`
+        );
+        if (sc.bestVendor) {
+          lines.push(`Best: **${sc.bestVendor.vendor}** (grade ${sc.bestVendor.reliabilityGrade})`);
+        }
+        if (sc.worstVendor) {
+          lines.push(
+            `Needs review: **${sc.worstVendor.vendor}** — fill ${sc.worstVendor.fillRatePct}%, on-time ${sc.worstVendor.onTimePct}%, substitutions ${sc.worstVendor.substitutionRatePct}%`
+          );
+        }
+        for (const v of sc.topVendors.slice(0, 4)) {
+          lines.push(
+            `- ${v.vendor}: grade ${v.reliabilityGrade} (${v.reliabilityScore}) — fill ${v.fillRatePct}%, on-time ${v.onTimePct}%`
+          );
+        }
+      }
+
+      const comp = p.vendorBids?.length
+        ? null
+        : (a.foodCost as { vendorComparison?: Array<{ itemName: string; cheapestVendor: string; potentialSavingsPct: number }> })
+            .vendorComparison;
+      if (comp?.length) {
+        lines.push("", "**Price comparison (inventory):**");
+        for (const c of comp.slice(0, 3)) {
+          lines.push(
+            `- ${c.itemName}: switch to **${c.cheapestVendor}** (${c.potentialSavingsPct.toFixed(0)}% savings potential)`
+          );
+        }
+      }
+
+      lines.push(
+        "",
+        "**Next steps:** Review drafts → Approve & transmit (email or EDI) → receive and match invoices."
+      );
+      return lines.join("\n");
+    }
+  );
+  if (purchasing) return purchasing;
+
+  const threeWay = tryMatch(
+    [/three.?way|short.?ship|overbill|hold payment|invoice.*match|match.*invoice|charged for.*not received|did we receive everything/i],
+    "purchasing",
+    () => {
+      const twm = a.purchasing.highlights?.threeWayMatch;
+      const lines = ["## Three-Way Match (Invoice Protection)", ""];
+      lines.push(
+        "Pinnacle compares **PO (ordered)** · **Receiving log (truck)** · **Invoice (billed)** on every vendor bill."
+      );
+      if (!twm || twm.discrepancyCount === 0 && twm.matchedCount === 0) {
+        lines.push("", "No matched invoices yet. Flow: receive PO → scan invoice → automatic match runs.");
+        return lines.join("\n");
+      }
+      if (twm.discrepancyCount > 0) {
+        lines.push(
+          "",
+          `**Hold payment on ${twm.discrepancyCount} invoice(s)** — **${fmtMoney(twm.holdPaymentTotal)}** exposure if paid as-is.`
+        );
+        for (const issue of twm.openIssues) {
+          lines.push(`- **${issue.vendor}:** ${issue.issue} (${fmtMoney(issue.exposure)} at risk)`);
+        }
+        lines.push("", "**Action:** Resolve with vendor credit or adjusted invoice before paying.");
+      }
+      if (twm.matchedCount > 0) {
+        lines.push("", `**${twm.matchedCount} invoice(s) cleared** — safe to pay.`);
+      }
+      return lines.join("\n");
+    }
+  );
+  if (threeWay) return threeWay;
+
+  const invoiceDigitization = tryMatch(
+    [
+      /ocr|scan.*invoice|digitiz|photo.*invoice|crumpled|paper invoice/i,
+      /price spike|sneaky.*price|vendor.*raised|oil.*price|cooking oil/i,
+      /catch.?weight|heavy box|billed.*weight|received.*weight|brisket.*weight|paying for.*box/i,
+      /recipe cost.*invoice|invoice.*recipe/i,
+    ],
+    "purchasing",
+    () => {
+      const dig = a.purchasing.highlights?.invoiceDigitization;
+      const lines = ["## Invoice Digitization & Price Auditing", ""];
+      lines.push(
+        "Snap a messy vendor invoice — **OCR** reads every line item, updates inventory quantities, logs the expense, and runs three-way match."
+      );
+      lines.push(
+        "**Price spikes:** When a vendor quietly raises an item (e.g. cooking oil +15%), management gets a **push notification** and **recipe costs recalculate** automatically."
+      );
+      lines.push(
+        "**Catch-weight:** For case items billed by weight (brisket, fish), Pinnacle compares **billed lbs vs received lbs** so you are not paying for heavy boxes."
+      );
+      if (dig) {
+        lines.push("", `**This month:** ${dig.ocrInvoicesThisMonth} invoice(s) digitized.`);
+        if (dig.recentPriceSpikes > 0 && dig.topSpike) {
+          lines.push(
+            `**Active price spike:** ${dig.topSpike.item} +${dig.topSpike.changePct.toFixed(0)}% — review menu pricing.`
+          );
+        }
+        if (dig.catchWeightAlerts > 0) {
+          lines.push(`**Catch-weight alerts:** ${dig.catchWeightAlerts} open issue(s).`);
+          for (const c of dig.openCatchWeightIssues.slice(0, 3)) {
+            lines.push(`- ${c.item}: ${c.description}`);
+          }
+        }
+      }
+      lines.push("", "**Action:** Purchase Orders → Three-Way Match → **Scan invoice**.");
+      return lines.join("\n");
+    }
+  );
+  if (invoiceDigitization) return invoiceDigitization;
+
+  const creditMemo = tryMatch(
+    [
+      /credit memo|vendor credit|credit request|damaged goods|rotten produce|shattered|missing credit/i,
+      /bookkeeper.*pay|accounting.*lock|sync.*lock|pay full invoice/i,
+      /vendor owe|owed by vendor|open credit/i,
+    ],
+    "purchasing",
+    () => {
+      const cm = a.purchasing.highlights?.creditMemoTracking;
+      const lines = ["## Credit Memo Tracking", ""];
+      lines.push(
+        "Staff snap damaged or spoiled goods — Pinnacle **generates a credit request**, **emails the vendor rep**, and **locks accounting sync** on the linked invoice so your bookkeeper cannot pay the full bill until the credit memo is applied."
+      );
+      if (cm && cm.openCount > 0) {
+        lines.push(
+          "",
+          `**${cm.openCount} open credit(s)** — **${fmtMoney(cm.openTotal)}** pending from vendors.`
+        );
+        if (cm.accountingLockedCount > 0) {
+          lines.push(
+            `**${cm.accountingLockedCount} invoice(s) locked** from QuickBooks/Xero sync — **${fmtMoney(cm.lockedInvoiceExposure)}** held until credits clear.`
+          );
+        }
+        for (const c of cm.recentOpen.slice(0, 4)) {
+          lines.push(`- **${c.vendor}** ${fmtMoney(c.amount)}: ${c.reason}${c.emailStatus ? ` (email ${c.emailStatus})` : ""}`);
+        }
+        lines.push("", "**Action:** Mark memo received in Purchase Orders → Credits when vendor applies credit.");
+      } else {
+        lines.push("", "No open credits. Use **Purchase Orders → Credits → Snap damage & request credit**.");
+      }
+      return lines.join("\n");
+    }
+  );
+  if (creditMemo) return creditMemo;
+
+  const vendorScorecards = tryMatch(
+    [
+      /vendor scorecard|fill rate|on.?time.*deliver|deliver.*on time|lunch rush/i,
+      /substitut|swap.*brand|cheaper alternative|premium.*brand|silent swap/i,
+      /vendor reliab|which vendor.*reliable|contract negotiat|vendor.*late/i,
+      /short.?ship|deliver everything|missing from.*order/i,
+    ],
+    "purchasing",
+    () => {
+      const sc = a.purchasing.highlights?.vendorScorecards;
+      const lines = ["## Vendor Scorecards", ""];
+      lines.push(
+        "Pinnacle tracks **fill rate** (everything ordered actually delivered), **on-time %** (vs expected window — e.g. 9 AM not lunch rush), and **substitution frequency** (premium brands swapped without asking)."
+      );
+      if (!sc || sc.vendorCount === 0) {
+        lines.push("", "Build history by receiving POs in **Purchase Orders → Scorecards**.");
+        return lines.join("\n");
+      }
+      lines.push(
+        "",
+        `**${sc.vendorCount} vendor(s) scored** — network avg: ${sc.avgFillRate}% fill, ${sc.avgOnTime}% on-time, ${sc.avgSubstitutionRate}% substitutions.`
+      );
+      if (sc.worstVendor) {
+        lines.push(
+          `**Negotiation leverage — ${sc.worstVendor.vendor}:** grade **${sc.worstVendor.reliabilityGrade}** — fill ${sc.worstVendor.fillRatePct}%, on-time ${sc.worstVendor.onTimePct}%, substitutions ${sc.worstVendor.substitutionRatePct}%.`
+        );
+      }
+      if (sc.bestVendor) {
+        lines.push(`**Most reliable:** ${sc.bestVendor.vendor} (grade ${sc.bestVendor.reliabilityGrade}).`);
+      }
+      for (const v of sc.topVendors.slice(0, 5)) {
+        lines.push(
+          `- **${v.vendor}** — ${v.reliabilityGrade} (${v.reliabilityScore}/100): fill ${v.fillRatePct}% · on-time ${v.onTimePct}% · subs ${v.substitutionRatePct}%`
+        );
+      }
+      lines.push("", "Full scorecards: **Purchase Orders → Scorecards** tab.");
+      return lines.join("\n");
+    }
+  );
+  if (vendorScorecards) return vendorScorecards;
+
   const kq = pickKeyQuestions(a, category.sections);
   if (kq.length) {
     return {
@@ -670,7 +973,7 @@ async function answerWithGPT(
       messages: [
         {
           role: "system",
-          content: `You are the AI brain of a restaurant command center. The owner asks plain-English questions and you answer by synthesizing ALL connected data: sales, labor, inventory, scheduling, vendor invoices, waste logs, guest reviews, employee performance, operations (voids/discounts), menu engineering, and profitability — together, not in silos.
+          content: `You are the AI brain of a restaurant command center. The owner asks plain-English questions and you answer by synthesizing ALL connected data: sales, labor, inventory, scheduling, vendor invoices, **three-way match (PO vs receiving log vs invoice)** with hold-payment recommendations, waste logs, guest reviews, employee performance, operations (voids/discounts), menu engineering, profitability, and automated purchasing — together, not in silos.
 
 Rules:
 - Lead with a one-sentence headline answering the question directly

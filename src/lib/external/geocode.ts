@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "./fetch-timeout";
+
 export interface GeoPoint {
   lat: number;
   lon: number;
@@ -18,7 +20,7 @@ export async function geocodeLocation(
   for (const query of queries) {
     try {
       const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`;
-      const res = await fetch(url, { next: { revalidate: 86400 } });
+      const res = await fetchWithTimeout(url, { next: { revalidate: 86400 } });
       if (!res.ok) continue;
       const data = (await res.json()) as {
         results?: Array<{ latitude: number; longitude: number; name: string; admin1?: string; country?: string }>;

@@ -2,10 +2,11 @@
 
 import { useState, useRef } from "react";
 import Image from "next/image";
-import { Camera, Upload, Loader2, FileText, CheckCircle } from "lucide-react";
+import { Camera, Upload, Loader2, FileText, CheckCircle, Scale } from "lucide-react";
 import { Button } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
 import { formatCurrency } from "@/lib/utils";
+import { showCriticalNotifications } from "@/lib/notifications";
 
 export interface InvoiceLineData {
   description: string;
@@ -15,6 +16,8 @@ export interface InvoiceLineData {
   lineTotal: number;
   sku?: string;
   inventoryItemId?: string;
+  catchWeightBilled?: number;
+  catchWeightUnit?: string;
 }
 
 export interface InvoiceData {
@@ -25,10 +28,21 @@ export interface InvoiceData {
   lines: InvoiceLineData[];
 }
 
+export interface InvoiceSaveResult {
+  invoice: unknown;
+  match: unknown;
+  priceAlerts: Array<{ item: string; changePct: number; oldPrice: number; newPrice: number }>;
+  catchWeightAlerts?: Array<{ itemName: string; description: string; severity: string }>;
+  expenseId?: string;
+  inventoryUpdated?: number;
+  recipesUpdated?: number;
+  pushNotifications?: Array<{ title: string; description: string; severity: string }>;
+}
+
 interface InvoiceScanModalProps {
   poId?: string;
   receiptId?: string;
-  onSaved: (result: { invoice: unknown; match: unknown; priceAlerts: unknown[] }) => void;
+  onSaved: (result: InvoiceSaveResult) => void;
   onClose: () => void;
 }
 
@@ -69,6 +83,12 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
     }
   };
 
+  const updateLine = (index: number, patch: Partial<InvoiceLineData>) => {
+    if (!invoiceData) return;
+    const lines = invoiceData.lines.map((l, i) => (i === index ? { ...l, ...patch } : l));
+    setInvoiceData({ ...invoiceData, lines });
+  };
+
   const saveInvoice = async () => {
     if (!invoiceData) return;
     setSaving(true);
@@ -85,8 +105,13 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
       formData.append("lines", JSON.stringify(invoiceData.lines));
 
       const res = await fetch("/api/purchasing/invoices/scan", { method: "PUT", body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Save failed");
+      const data = (await res.json()) as InvoiceSaveResult;
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Save failed");
+
+      if (data.pushNotifications?.length) {
+        await showCriticalNotifications(data.pushNotifications);
+      }
+
       onSaved(data);
       onClose();
     } catch (err) {
@@ -109,7 +134,8 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
         {!preview ? (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-slate-500">
-              Photograph a crinkled paper invoice — OCR extracts line items, quantities, and prices.
+              Snap a photo of a crumpled invoice — OCR reads every line item, updates inventory,
+              logs the expense, flags price spikes, and audits catch-weight (billed vs received lbs).
             </p>
             <Button onClick={() => cameraInputRef.current?.click()}>
               <Camera className="mr-2 h-4 w-4" /> Take Photo
@@ -152,12 +178,34 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
                       <p className="text-slate-500">
                         {line.qty} {line.unit} × {formatCurrency(line.unitPrice)} = {formatCurrency(line.lineTotal)}
                       </p>
+                      {(line.catchWeightBilled != null || /case|brisket|fish|lb/i.test(line.description)) && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <Scale className="h-3.5 w-3.5 text-orange-500" />
+                          <label className="text-xs text-slate-600">
+                            Catch weight billed:
+                            <Input
+                              type="number"
+                              step="0.1"
+                              className="ml-2 inline-block w-20 py-1 text-xs"
+                              value={line.catchWeightBilled ?? ""}
+                              onChange={(e) =>
+                                updateLine(i, {
+                                  catchWeightBilled: e.target.value ? parseFloat(e.target.value) : undefined,
+                                  catchWeightUnit: line.catchWeightUnit ?? "lbs",
+                                })
+                              }
+                              placeholder="lbs"
+                            />
+                            <span className="ml-1">{line.catchWeightUnit ?? "lbs"}</span>
+                          </label>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
                 <Button onClick={saveInvoice} disabled={saving} className="w-full">
                   {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-                  Save & run three-way match
+                  Save · update inventory · audit prices
                 </Button>
               </div>
             )}
