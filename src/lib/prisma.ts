@@ -29,7 +29,9 @@ function hasCurrentSchema(): boolean {
       userModel?.fields.some((f) => f.name === "isPlatformAdmin") &&
       locationModel?.fields.some((f) => f.name === "autopayEnabled") &&
       locationModel?.fields.some((f) => f.name === "setupComplete") &&
-      Prisma.dmmf.datamodel.models.some((m) => m.name === "RolePermissionSet")
+      locationModel?.fields.some((f) => f.name === "floorPlanWidth") &&
+      Prisma.dmmf.datamodel.models.some((m) => m.name === "RolePermissionSet") &&
+      Prisma.dmmf.datamodel.models.some((m) => m.name === "TableReservation")
   );
 }
 

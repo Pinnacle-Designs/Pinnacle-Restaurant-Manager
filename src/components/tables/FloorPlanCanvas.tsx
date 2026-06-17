@@ -137,27 +137,24 @@ export function FloorPlanCanvas({
 
       <div className="overflow-auto rounded-xl border border-slate-200 bg-slate-100 p-4">
         <div
-          ref={canvasRef}
-          className="relative mx-auto origin-top-left bg-white shadow-inner"
           style={{
             width: width * scale,
             height: height * scale,
-            transform: `scale(1)`,
-          }}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerLeave={onPointerUp}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) onSelect(null);
           }}
         >
           <div
-            className="relative"
+            ref={canvasRef}
+            className="relative origin-top-left bg-white shadow-inner"
             style={{
               width,
               height,
               transform: `scale(${scale})`,
-              transformOrigin: "top left",
+            }}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerLeave={onPointerUp}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) onSelect(null);
             }}
           >
             {sections.map((sec) => (
