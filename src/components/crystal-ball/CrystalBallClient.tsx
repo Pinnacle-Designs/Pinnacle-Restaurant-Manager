@@ -166,7 +166,7 @@ export function CrystalBallClient() {
         />
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2 border-b border-slate-200 pb-2">
+      <div className="no-print mb-4 flex flex-wrap gap-2 border-b border-slate-200 pb-2">
         {tabs.map((t) => (
           <button
             key={t.id}

@@ -168,7 +168,7 @@ export function InventoryClient({
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-2">
+      <div className="no-print mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-2">
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}

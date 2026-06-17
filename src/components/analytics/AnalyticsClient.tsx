@@ -197,7 +197,7 @@ export function AnalyticsClient() {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap gap-1 rounded-lg border bg-white p-1">
+      <div className="no-print mb-4 flex flex-wrap gap-1 rounded-lg border bg-white p-1">
         {TABS.map(({ id, label }) => (
           <button
             key={id}

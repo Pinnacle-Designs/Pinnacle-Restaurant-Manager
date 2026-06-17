@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { MobileHeader } from "@/components/layout/MobileHeader";
+import { PrintReportStamp } from "@/components/layout/PrintReportStamp";
 import { NotificationProvider } from "@/components/notifications/NotificationProvider";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { isEmbeddableEmbedParam } from "@/lib/embed-config";
@@ -32,11 +33,17 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
   const mainInner = isEmbedMobile ? (
     <main className="min-h-screen flex-1 overflow-auto">
-      <div className="px-2 py-3 sm:px-4 sm:py-4">{children}</div>
+      <div className="px-2 py-3 sm:px-4 sm:py-4">
+        <PrintReportStamp />
+        {children}
+      </div>
     </main>
   ) : (
     <main className="flex-1">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</div>
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <PrintReportStamp />
+        {children}
+      </div>
     </main>
   );
 

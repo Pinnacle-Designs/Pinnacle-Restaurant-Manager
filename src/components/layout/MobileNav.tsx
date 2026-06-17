@@ -179,7 +179,7 @@ export function MobileNav() {
         </div>
       )}
 
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-white md:hidden">
+      <nav className="no-print fixed bottom-0 left-0 right-0 z-50 border-t bg-white md:hidden">
         <div className="flex justify-around px-0.5 py-1.5">
           {mobileNavItems.map((item) => (
             <NavLink

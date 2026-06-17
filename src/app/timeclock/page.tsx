@@ -7,6 +7,7 @@ export default function TimeClockPage() {
       <PageHeader
         title="Time Clock"
         description="Shared kiosk — pick your name, enter PIN, then verify per fraud prevention settings"
+        showPrint={false}
       />
       <TimeClockClient />
     </div>

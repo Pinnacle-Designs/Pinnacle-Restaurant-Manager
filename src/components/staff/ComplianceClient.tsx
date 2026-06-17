@@ -12,6 +12,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { Button, EmptyState } from "@/components/ui";
+import { PrintButton } from "@/components/ui/PrintButton";
 import { Input, Select, FormField, Modal, Textarea } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
 import { INCIDENT_CATEGORIES } from "@/lib/compliance/minor-labor";
@@ -216,7 +217,7 @@ export function ComplianceClient({ staff }: { staff: StaffOption[] }) {
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="no-print flex flex-wrap gap-2">
         {(
           [
             ["guardrails", "Minor labor", ShieldAlert],
@@ -435,7 +436,7 @@ export function ComplianceClient({ staff }: { staff: StaffOption[] }) {
             Pull schedules, timecards, and payroll runs for any date range. Export JSON for labor
             department or counsel.
           </p>
-          <div className="flex flex-wrap items-end gap-3">
+          <div className="no-print flex flex-wrap items-end gap-3">
             <FormField label="From">
               <Input type="date" value={auditFrom} onChange={(e) => setAuditFrom(e.target.value)} />
             </FormField>
@@ -446,10 +447,13 @@ export function ComplianceClient({ staff }: { staff: StaffOption[] }) {
               Load records
             </Button>
             {auditData && (
-              <Button variant="secondary" onClick={exportAudit}>
-                <Download className="h-4 w-4" />
-                Export JSON
-              </Button>
+              <>
+                <PrintButton reportTitle="Compliance audit records" label="Print" />
+                <Button variant="secondary" onClick={exportAudit}>
+                  <Download className="h-4 w-4" />
+                  Export JSON
+                </Button>
+              </>
             )}
           </div>
           {auditData && (

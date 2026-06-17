@@ -500,7 +500,7 @@ export function KitchenClient() {
         <StatCard label="Ingredients to prep" value={prepList?.totalPrep.tasks.length ?? 0} subtext="B + L + D combined" />
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
+      <div className="no-print mb-4 flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
         {tabs.map((t) => (
           <button
             key={t.id}

@@ -308,7 +308,7 @@ export function AccountClient() {
       />
 
       <div className="flex flex-col gap-6 lg:flex-row">
-        <nav className="flex gap-2 overflow-x-auto lg:w-52 lg:flex-col lg:gap-1">
+        <nav className="no-print flex gap-2 overflow-x-auto lg:w-52 lg:flex-col lg:gap-1">
           {visibleTabs.map((item) => {
             const Icon = item.icon;
             const active = tab === item.id;

@@ -86,8 +86,8 @@ export function DashboardClient({ data }: { data: DashboardData }) {
         </Link>
       </PageHeader>
 
-      {canManageSchedule && <ForgottenClockOutAlert variant="banner" />}
-      {canManageSchedule && <ComplianceAlertsBanner variant="banner" />}
+      {canManageSchedule && <div className="no-print"><ForgottenClockOutAlert variant="banner" /></div>}
+      {canManageSchedule && <div className="no-print"><ComplianceAlertsBanner variant="banner" /></div>}
 
       {upgradeFeature && (
         <div className="mb-6 rounded-xl border border-orange-200 bg-orange-50 p-4">

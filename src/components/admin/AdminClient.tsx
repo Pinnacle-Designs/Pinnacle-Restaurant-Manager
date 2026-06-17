@@ -114,7 +114,7 @@ export function AdminClient() {
         <p className="mb-4 text-sm text-green-700">{message}</p>
       )}
 
-      <div className="mb-6 flex gap-2">
+      <div className="no-print mb-6 flex gap-2">
         {(
           [
             { id: "locations" as Tab, label: "Locations", icon: Building2 },

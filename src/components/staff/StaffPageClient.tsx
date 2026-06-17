@@ -127,7 +127,7 @@ export function StaffPageClient({ initialStaff }: { initialStaff: StaffMember[] 
   return (
     <>
       {tabs.length > 1 && (
-        <div className="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-2">
+        <div className="no-print mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-2">
           {tabs.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
