@@ -12,8 +12,16 @@ export async function PATCH(
     where: { id },
     data: {
       number: body.number,
+      label: body.label,
       capacity: body.capacity,
       status: body.status,
+      section: body.section,
+      shape: body.shape,
+      posX: body.posX,
+      posY: body.posY,
+      width: body.width,
+      height: body.height,
+      rotation: body.rotation,
     },
   });
 

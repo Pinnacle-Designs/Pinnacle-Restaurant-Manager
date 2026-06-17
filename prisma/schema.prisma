@@ -234,6 +234,21 @@ enum ShiftFeedbackKind {
   COACHING
 }
 
+enum ReservationProvider {
+  OPENTABLE
+  RESY
+  TOCK
+  YELP
+}
+
+enum ReservationStatus {
+  CONFIRMED
+  SEATED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -350,7 +365,13 @@ model Location {
   menuChannelConfigs   MenuChannelConfig[]
   kitchenStations      KitchenStation[]
   menuRevision         Int      @default(0)
+  floorPlanWidth       Int      @default(900)
+  floorPlanHeight      Int      @default(600)
+  /// JSON array of dining zones: { id, name, x, y, width, height, color }
+  floorPlanSections    String?
   integrationSettings  IntegrationSettings?
+  reservationConnections ReservationConnection[]
+  tableReservations    TableReservation[]
   accountingConnections AccountingConnection[]
   accountingJournalEntries AccountingJournalEntry[]
   vendorEdiConnections VendorEdiConnection[]
@@ -1217,10 +1238,59 @@ model Table {
   locationId String
   location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
   number     Int
+  label      String?
   capacity   Int      @default(4)
   status     String   @default("available")
+  section    String   @default("main")
+  shape      String   @default("round")
+  posX       Float    @default(0)
+  posY       Float    @default(0)
+  width      Float    @default(72)
+  height     Float    @default(72)
+  rotation   Float    @default(0)
   createdAt  DateTime @default(now())
   orders     Order[]
+  reservations TableReservation[]
+}
+
+model ReservationConnection {
+  id                   String              @id @default(cuid())
+  locationId           String
+  location             Location            @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  provider             ReservationProvider
+  connected            Boolean             @default(false)
+  restaurantExternalId String?
+  restaurantName       String?
+  autoSyncEnabled      Boolean             @default(true)
+  lastSyncAt           DateTime?
+  lastSyncStatus       String?
+  lastSyncMessage      String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  @@unique([locationId, provider])
+}
+
+model TableReservation {
+  id              String              @id @default(cuid())
+  locationId      String
+  location        Location            @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  tableId         String?
+  table           Table?              @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  provider        ReservationProvider
+  externalId      String?
+  guestName       String
+  partySize       Int
+  reservationAt   DateTime
+  durationMinutes Int                 @default(90)
+  status          ReservationStatus   @default(CONFIRMED)
+  notes           String?
+  phone           String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([locationId, reservationAt])
+  @@index([tableId])
 }
 
 model Order {

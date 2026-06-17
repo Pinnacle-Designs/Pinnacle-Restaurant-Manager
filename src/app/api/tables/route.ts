@@ -25,8 +25,16 @@ export async function POST(request: NextRequest) {
     data: {
       locationId,
       number: body.number,
+      label: body.label ?? null,
       capacity: body.capacity ?? 4,
       status: body.status ?? "available",
+      section: body.section ?? "main",
+      shape: body.shape ?? "round",
+      posX: body.posX ?? 100,
+      posY: body.posY ?? 100,
+      width: body.width ?? 72,
+      height: body.height ?? 72,
+      rotation: body.rotation ?? 0,
     },
   });
 
