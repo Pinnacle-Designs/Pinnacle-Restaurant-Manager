@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { formatPortionLabel, roundKitchenQty, scaleRecipeQty } from "./portion";
 import { getPlatingSpec } from "./plating-catalog";
+import { getFlattenedRecipeLines } from "@/lib/menu/recipe";
 import type { PrepList } from "./prep-list";
 
 export interface KitchenRecipeLine {
@@ -77,20 +78,27 @@ export async function getKitchenRecipeSpecs(
 
   const menuItems = await prisma.menuItem.findMany({
     where: { locationId, available: true },
-    include: {
-      recipeLines: {
-        include: { inventoryItem: true },
-        orderBy: { sortOrder: "asc" },
-      },
-    },
     orderBy: [{ category: "asc" }, { name: "asc" }],
   });
 
-  return menuItems.map((item) => {
+  const specs: KitchenRecipeSpec[] = [];
+
+  for (const item of menuItems) {
     const plating = getPlatingSpec(item.name);
     const forecastPlates = forecastByMenuId.get(item.id) ?? 0;
+    const flatLines = await getFlattenedRecipeLines(locationId, item.id);
+    const recipeLines = flatLines.map((line) => ({
+      quantity: line.quantity,
+      inventoryItemId: line.inventoryItemId,
+      inventoryItem: {
+        name: line.inventoryItem.name,
+        unit: line.inventoryItem.unit,
+        yieldPct: line.inventoryItem.yieldPct,
+        portionSize: null as number | null,
+      },
+    }));
 
-    return {
+    specs.push({
       menuItemId: item.id,
       name: item.name,
       category: item.category,
@@ -100,9 +108,11 @@ export async function getKitchenRecipeSpecs(
       plateware: plating?.plateware ?? null,
       garnish: plating?.garnish ?? null,
       forecastPlates,
-      lines: buildLines(item.recipeLines, forecastPlates > 0 ? forecastPlates : 1),
-    };
-  });
+      lines: buildLines(recipeLines, forecastPlates > 0 ? forecastPlates : 1),
+    });
+  }
+
+  return specs;
 }
 
 /** Rebuild recipe lines when plate count is overridden in the UI. */

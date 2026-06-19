@@ -11,7 +11,7 @@ import {
   Shield,
   ShieldAlert,
 } from "lucide-react";
-import { Button, EmptyState } from "@/components/ui";
+import { Button, EmptyState, ScrollableTabs, TabPill } from "@/components/ui";
 import { PageSectionShell, PageSection } from "@/components/layout/PageSections";
 import { PrintButton } from "@/components/ui/PrintButton";
 import { Input, Select, FormField, Modal, Textarea } from "@/components/ui/form";
@@ -222,7 +222,7 @@ export function ComplianceClient({ staff }: { staff: StaffOption[] }) {
         </PageSection>
       </PageSectionShell>
 
-      <div className="no-print flex flex-wrap gap-2">
+      <ScrollableTabs className="no-print mb-4 gap-2" menuLabel="Compliance">
         {(
           [
             ["guardrails", "Minor labor", ShieldAlert],
@@ -230,20 +230,18 @@ export function ComplianceClient({ staff }: { staff: StaffOption[] }) {
             ["audit", "Audit records", FileArchive],
           ] as const
         ).map(([id, label, Icon]) => (
-          <button
+          <TabPill
             key={id}
-            type="button"
+            id={id}
+            active={section === id}
             onClick={() => setSection(id)}
-            className={cn(
-              "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium",
-              section === id ? "bg-orange-500 text-white" : "bg-white border text-slate-600 hover:bg-slate-50"
-            )}
+            className={cn(section === id && "bg-orange-500 text-white hover:bg-orange-500")}
           >
-            <Icon className="h-4 w-4" />
+            <Icon className="h-4 w-4 shrink-0" />
             {label}
-          </button>
+          </TabPill>
         ))}
-      </div>
+      </ScrollableTabs>
 
       {section === "guardrails" && (
         <PageSectionShell pageId="compliance-guardrails">

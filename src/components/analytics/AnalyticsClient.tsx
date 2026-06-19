@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PageHeader, StatCard, Badge, Button } from "@/components/ui";
+import { PageHeader, StatCard, Badge, Button, ScrollableTabs, TabPill } from "@/components/ui";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { AnalyticsPayload } from "@/lib/analytics/types";
@@ -199,21 +199,22 @@ export function AnalyticsClient() {
         </div>
       )}
 
-      <div className="no-print mb-4 flex flex-wrap gap-1 rounded-lg border bg-white p-1">
+      <ScrollableTabs className="mb-4 gap-1 rounded-lg border bg-white p-1" menuLabel="Analytics">
         {TABS.map(({ id, label }) => (
-          <button
+          <TabPill
             key={id}
-            type="button"
+            id={id}
+            active={tab === id}
             onClick={() => setTab(id)}
             className={cn(
-              "rounded-md px-3 py-2 text-xs font-medium transition-colors sm:text-sm",
-              tab === id ? "bg-orange-500 text-white" : "text-slate-600 hover:bg-slate-50"
+              "px-2 text-xs sm:px-3 sm:text-sm",
+              tab === id && "bg-orange-500 text-white hover:bg-orange-500"
             )}
           >
             {label}
-          </button>
+          </TabPill>
         ))}
-      </div>
+      </ScrollableTabs>
 
       {tab === "executive" && (
         <AnalyticsTabShell tabId="executive">

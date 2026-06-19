@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Plus, Trash2, UtensilsCrossed } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Layers, Plus, Trash2, UtensilsCrossed } from "lucide-react";
 import { Button } from "@/components/ui";
 import {
   CollapsibleGroup,
@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/Collapsible";
 import { Input, Select, FormField, Modal } from "@/components/ui/form";
 import { apiFetch } from "@/lib/api";
+import { lineTheoreticalCost } from "@/lib/menu/recipe-cost";
 import { formatCurrency } from "@/lib/utils";
 
 interface InventoryOption {
@@ -17,6 +18,14 @@ interface InventoryOption {
   name: string;
   unit: string;
   costPerUnit: number;
+  yieldPct?: number;
+}
+
+interface MenuItemOption {
+  id: string;
+  name: string;
+  category: string;
+  recipeCost: number;
 }
 
 interface RecipeLineRow {
@@ -24,35 +33,84 @@ interface RecipeLineRow {
   quantity: string;
 }
 
+interface RecipeComponentRow {
+  componentMenuItemId: string;
+  quantity: string;
+}
+
+interface FlattenedPreviewLine {
+  inventoryItemId: string;
+  name: string;
+  unit: string;
+  quantity: number;
+  lineCost: number;
+}
+
 interface RecipeBuilderModalProps {
   open: boolean;
   menuItem: { id: string; name: string; price: number } | null;
   inventory: InventoryOption[];
+  menuItems: MenuItemOption[];
   onClose: () => void;
   onSaved: (recipeCost: number) => void;
 }
+
+type RecipePayload = {
+  lines: Array<{ inventoryItemId: string; quantity: number }>;
+  components: Array<{ componentMenuItemId: string; quantity: number }>;
+  flattenedLines: Array<{
+    inventoryItemId: string;
+    quantity: number;
+    lineCost: number;
+    inventoryItem: { id: string; name: string; unit: string; costPerUnit: number; yieldPct: number };
+  }>;
+  theoreticalCost: number;
+};
 
 export function RecipeBuilderModal({
   open,
   menuItem,
   inventory,
+  menuItems,
   onClose,
   onSaved,
 }: RecipeBuilderModalProps) {
   const [lines, setLines] = useState<RecipeLineRow[]>([{ inventoryItemId: "", quantity: "" }]);
+  const [components, setComponents] = useState<RecipeComponentRow[]>([]);
+  const [componentCache, setComponentCache] = useState<
+    Map<string, RecipePayload["flattenedLines"]>
+  >(new Map());
   const [theoreticalCost, setTheoreticalCost] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const componentOptions = useMemo(
+    () => menuItems.filter((item) => item.id !== menuItem?.id),
+    [menuItems, menuItem?.id]
+  );
+
+  const loadComponentRecipe = useCallback(async (componentMenuItemId: string) => {
+    if (!componentMenuItemId) return;
+    try {
+      const data = await apiFetch<RecipePayload>(`/api/menu/${componentMenuItemId}/recipe`);
+      setComponentCache((prev) => {
+        if (prev.has(componentMenuItemId)) return prev;
+        const next = new Map(prev);
+        next.set(componentMenuItemId, data.flattenedLines);
+        return next;
+      });
+    } catch {
+      /* preview only */
+    }
+  }, []);
+
   useEffect(() => {
     if (!open || !menuItem) return;
     setLoading(true);
     setError(null);
-    apiFetch<{
-      lines: Array<{ inventoryItemId: string; quantity: number }>;
-      theoreticalCost: number;
-    }>(`/api/menu/${menuItem.id}/recipe`)
+    setComponentCache(new Map());
+    apiFetch<RecipePayload>(`/api/menu/${menuItem.id}/recipe`)
       .then((data) => {
         setTheoreticalCost(data.theoreticalCost);
         setLines(
@@ -63,10 +121,90 @@ export function RecipeBuilderModal({
               }))
             : [{ inventoryItemId: "", quantity: "" }]
         );
+        setComponents(
+          data.components.length
+            ? data.components.map((c) => ({
+                componentMenuItemId: c.componentMenuItemId,
+                quantity: String(c.quantity),
+              }))
+            : []
+        );
+        for (const comp of data.components) {
+          void apiFetch<RecipePayload>(`/api/menu/${comp.componentMenuItemId}/recipe`).then(
+            (sub) => {
+              setComponentCache((prev) => {
+                const next = new Map(prev);
+                next.set(comp.componentMenuItemId, sub.flattenedLines);
+                return next;
+              });
+            }
+          );
+        }
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Could not load recipe"))
       .finally(() => setLoading(false));
-  }, [open, menuItem]);
+  }, [open, menuItem?.id]);
+
+  const flattenedPreview = useMemo(() => {
+    const rollup = new Map<string, FlattenedPreviewLine>();
+
+    const merge = (
+      inventoryItemId: string,
+      name: string,
+      unit: string,
+      quantity: number,
+      costPerUnit: number,
+      yieldPct: number
+    ) => {
+      const existing = rollup.get(inventoryItemId);
+      const nextQty = (existing?.quantity ?? 0) + quantity;
+      rollup.set(inventoryItemId, {
+        inventoryItemId,
+        name,
+        unit,
+        quantity: Math.round(nextQty * 1000) / 1000,
+        lineCost: lineTheoreticalCost(nextQty, costPerUnit, yieldPct),
+      });
+    };
+
+    for (const line of lines) {
+      const qty = parseFloat(line.quantity);
+      if (!line.inventoryItemId || !(qty > 0)) continue;
+      const inv = inventory.find((i) => i.id === line.inventoryItemId);
+      if (!inv) continue;
+      merge(
+        inv.id,
+        inv.name,
+        inv.unit,
+        qty,
+        inv.costPerUnit,
+        inv.yieldPct ?? 100
+      );
+    }
+
+    for (const comp of components) {
+      const qty = parseFloat(comp.quantity);
+      if (!comp.componentMenuItemId || !(qty > 0)) continue;
+      const nested = componentCache.get(comp.componentMenuItemId) ?? [];
+      for (const line of nested) {
+        merge(
+          line.inventoryItemId,
+          line.inventoryItem.name,
+          line.inventoryItem.unit,
+          line.quantity * qty,
+          line.inventoryItem.costPerUnit,
+          line.inventoryItem.yieldPct
+        );
+      }
+    }
+
+    return Array.from(rollup.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [lines, components, inventory, componentCache]);
+
+  useEffect(() => {
+    const total = flattenedPreview.reduce((sum, line) => sum + line.lineCost, 0);
+    setTheoreticalCost(Math.round(total * 100) / 100);
+  }, [flattenedPreview]);
 
   if (!open || !menuItem) return null;
 
@@ -83,6 +221,12 @@ export function RecipeBuilderModal({
           .map((l) => ({
             inventoryItemId: l.inventoryItemId,
             quantity: parseFloat(l.quantity),
+          })),
+        components: components
+          .filter((c) => c.componentMenuItemId && parseFloat(c.quantity) > 0)
+          .map((c) => ({
+            componentMenuItemId: c.componentMenuItemId,
+            quantity: parseFloat(c.quantity),
           })),
       };
       const data = await apiFetch<{ menuItem: { recipeCost: number } }>(
@@ -109,8 +253,8 @@ export function RecipeBuilderModal({
         <div className="space-y-3">
           <CollapsibleSection
             id="recipe-ingredients"
-            title="Ingredients"
-            description="When this item fires to the kitchen, inventory deducts these amounts automatically."
+            title="Direct ingredients"
+            description="Raw inventory used directly on this plate."
             defaultOpen
             variant="plain"
             bodyClassName="!pt-2"
@@ -157,7 +301,7 @@ export function RecipeBuilderModal({
                       variant="ghost"
                       size="sm"
                       onClick={() => setLines(lines.filter((_, i) => i !== idx))}
-                      disabled={lines.length === 1}
+                      disabled={lines.length === 1 && !components.length}
                     >
                       <Trash2 className="h-4 w-4 text-red-500" />
                     </Button>
@@ -175,6 +319,113 @@ export function RecipeBuilderModal({
               </div>
             )}
           </CollapsibleSection>
+
+          <CollapsibleSection
+            id="recipe-sub-recipes"
+            title="Sub-recipes"
+            description="Include another menu item's full recipe — all of its ingredients roll up for costing and inventory depletion."
+            defaultOpen
+            variant="plain"
+            bodyClassName="!pt-2"
+          >
+            {loading ? (
+              <p className="text-sm text-slate-500">Loading…</p>
+            ) : (
+              <div className="space-y-3">
+                {components.length === 0 && (
+                  <p className="text-sm text-slate-500">
+                    No sub-recipes yet. Add a sauce, prep batch, or base that already has its own recipe.
+                  </p>
+                )}
+                {components.map((comp, idx) => (
+                  <div key={idx} className="flex items-end gap-2">
+                    <FormField label={idx === 0 ? "Menu item" : " "} className="flex-1">
+                      <Select
+                        value={comp.componentMenuItemId}
+                        onChange={(e) => {
+                          const next = [...components];
+                          next[idx] = { ...next[idx], componentMenuItemId: e.target.value };
+                          setComponents(next);
+                          void loadComponentRecipe(e.target.value);
+                        }}
+                      >
+                        <option value="">Select existing recipe…</option>
+                        {componentOptions.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name} ({item.category})
+                            {item.recipeCost > 0 ? ` — ${formatCurrency(item.recipeCost)}/plate` : ""}
+                          </option>
+                        ))}
+                      </Select>
+                    </FormField>
+                    <FormField label={idx === 0 ? "Portions" : " "} className="w-28">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={comp.quantity}
+                        onChange={(e) => {
+                          const next = [...components];
+                          next[idx] = { ...next[idx], quantity: e.target.value };
+                          setComponents(next);
+                        }}
+                        placeholder="1"
+                      />
+                    </FormField>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setComponents(components.filter((_, i) => i !== idx))}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() =>
+                    setComponents([...components, { componentMenuItemId: "", quantity: "1" }])
+                  }
+                >
+                  <Layers className="h-4 w-4" />
+                  Add sub-recipe
+                </Button>
+              </div>
+            )}
+          </CollapsibleSection>
+
+          {flattenedPreview.length > 0 && (
+            <CollapsibleSection
+              id="recipe-rollup"
+              title="All ingredients (rolled up)"
+              description="Combined inventory impact per plate — direct items plus everything from sub-recipes."
+              defaultOpen
+              variant="plain"
+              bodyClassName="!pt-2"
+            >
+              <ul className="divide-y rounded-lg border border-slate-200 text-sm">
+                {flattenedPreview.map((line) => (
+                  <li
+                    key={line.inventoryItemId}
+                    className="flex items-center justify-between gap-3 px-3 py-2"
+                  >
+                    <span className="min-w-0 truncate text-slate-700">
+                      {line.name}{" "}
+                      <span className="text-slate-400">
+                        {line.quantity} {line.unit}
+                      </span>
+                    </span>
+                    <span className="shrink-0 font-medium text-slate-600">
+                      {formatCurrency(line.lineCost)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </CollapsibleSection>
+          )}
 
           <CollapsibleSection
             id="recipe-costing"

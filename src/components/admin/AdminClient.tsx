@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { Shield, Building2, Users, Mail } from "lucide-react";
-import { PageHeader, Button, Badge } from "@/components/ui";
+import { PageHeader, Button, Badge, ScrollableTabs, TabPill } from "@/components/ui";
 import { PageSectionShell, PageSection } from "@/components/layout/PageSections";
 import { cn } from "@/lib/utils";
 import type { PlanId } from "@/lib/plans";
@@ -149,7 +149,7 @@ export function AdminClient() {
         <p className="mb-4 text-sm text-green-700">{message}</p>
       )}
 
-      <div className="no-print mb-6 flex gap-2">
+      <ScrollableTabs className="mb-6 gap-2" menuLabel="Admin">
         {(
           [
             { id: "locations" as Tab, label: "Locations", icon: Building2 },
@@ -159,21 +159,18 @@ export function AdminClient() {
         ).map((item) => {
           const Icon = item.icon;
           return (
-            <button
+            <TabPill
               key={item.id}
-              type="button"
+              id={item.id}
+              active={tab === item.id}
               onClick={() => setTab(item.id)}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium",
-                tab === item.id ? "bg-orange-50 text-orange-700" : "text-slate-600 hover:bg-slate-100"
-              )}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-4 w-4 shrink-0" />
               {item.label}
-            </button>
+            </TabPill>
           );
         })}
-      </div>
+      </ScrollableTabs>
 
       {loading ? (
         <p className="text-sm text-slate-500">Loading…</p>

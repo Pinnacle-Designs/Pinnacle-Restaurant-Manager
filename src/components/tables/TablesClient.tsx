@@ -11,7 +11,7 @@ import {
   Save,
   List,
 } from "lucide-react";
-import { Button, Badge, EmptyState } from "@/components/ui";
+import { Button, Badge, EmptyState, ScrollableTabs, TabPill } from "@/components/ui";
 import { Input, Select, FormField, Modal } from "@/components/ui/form";
 import { apiPost, apiPatch, apiDelete } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -345,24 +345,22 @@ export function TablesClient({
         </div>
       </div>
 
-      <div className="no-print mb-6 flex gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
+      <ScrollableTabs className="mb-6 gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1" menuLabel="Tables">
         {tabs.map((t) => (
-          <button
+          <TabPill
             key={t.id}
-            type="button"
-            className={cn(
-              "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors",
-              tab === t.id
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-600 hover:text-slate-900"
-            )}
+            id={t.id}
+            active={tab === t.id}
             onClick={() => setTab(t.id)}
+            className={cn(
+              tab === t.id && "bg-white text-slate-900 shadow-sm hover:bg-white"
+            )}
           >
             {t.icon}
             {t.label}
-          </button>
+          </TabPill>
         ))}
-      </div>
+      </ScrollableTabs>
 
       {tab === "floor" && (
         <PageSectionShell pageId="tables-floor">

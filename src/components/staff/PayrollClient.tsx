@@ -9,7 +9,7 @@ import {
   Wallet,
   Users,
 } from "lucide-react";
-import { Button, Badge, EmptyState } from "@/components/ui";
+import { Button, Badge, EmptyState, ScrollableTabs, TabPill } from "@/components/ui";
 import { Input, Select, FormField } from "@/components/ui/form";
 import { apiPost } from "@/lib/api";
 import { ForgottenClockOutAlert } from "@/components/staff/ForgottenClockOutAlert";
@@ -214,22 +214,20 @@ export function PayrollClient({ staff }: { staff: StaffMember[] }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-1 rounded-lg border bg-white p-1">
+      <ScrollableTabs className="gap-1 rounded-lg border bg-white p-1" menuLabel="Payroll">
         {sections.map(({ id, label, icon: Icon }) => (
-          <button
+          <TabPill
             key={id}
-            type="button"
+            id={id}
+            active={section === id}
             onClick={() => setSection(id)}
-            className={cn(
-              "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              section === id ? "bg-orange-500 text-white" : "text-slate-600 hover:bg-slate-50"
-            )}
+            className={cn(section === id && "bg-orange-500 text-white hover:bg-orange-500")}
           >
-            <Icon className="h-4 w-4" />
+            <Icon className="h-4 w-4 shrink-0" />
             {label}
-          </button>
+          </TabPill>
         ))}
-      </div>
+      </ScrollableTabs>
 
       <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-white p-4">
         <FormField label="Period start">

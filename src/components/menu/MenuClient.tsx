@@ -48,6 +48,7 @@ interface InventoryOption {
   name: string;
   unit: string;
   costPerUnit: number;
+  yieldPct?: number;
 }
 
 interface MenuClientProps {
@@ -431,6 +432,12 @@ export function MenuClient({
         open={!!recipeItem}
         menuItem={recipeItem}
         inventory={inventory}
+        menuItems={items.map((i) => ({
+          id: i.id,
+          name: i.name,
+          category: i.category,
+          recipeCost: i.recipeCost ?? 0,
+        }))}
         onClose={() => setRecipeItem(null)}
         onSaved={(recipeCost) => {
           if (!recipeItem) return;

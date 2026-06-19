@@ -17,7 +17,7 @@ import {
   Globe,
   BarChart3,
 } from "lucide-react";
-import { Button, Badge, EmptyState, StatCard } from "@/components/ui";
+import { Button, Badge, EmptyState, StatCard, ScrollableTabs, TabPill } from "@/components/ui";
 import { PageSectionShell, PageSection } from "@/components/layout/PageSections";
 import { Input, Textarea, FormField, Modal } from "@/components/ui/form";
 import { apiPost, apiPatch, apiDelete } from "@/lib/api";
@@ -315,22 +315,20 @@ export function SocialClient({
         </PageSection>
       </PageSectionShell>
 
-      <div className="mt-6 flex gap-1 rounded-lg border bg-white p-1">
+      <ScrollableTabs className="mt-6 gap-1 rounded-lg border bg-white p-1" menuLabel="Social">
         {tabs.map(({ id, label, icon: Icon }) => (
-          <button
+          <TabPill
             key={id}
-            type="button"
+            id={id}
+            active={tab === id}
             onClick={() => setTab(id)}
-            className={cn(
-              "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-colors sm:flex-none",
-              tab === id ? "bg-orange-500 text-white" : "text-slate-600 hover:bg-slate-50"
-            )}
+            className={cn(tab === id && "bg-orange-500 text-white hover:bg-orange-500")}
           >
-            <Icon className="h-4 w-4" />
+            <Icon className="h-4 w-4 shrink-0" />
             {label}
-          </button>
+          </TabPill>
         ))}
-      </div>
+      </ScrollableTabs>
 
       {tab === "accounts" && (
         <PageSectionShell pageId="social-accounts">

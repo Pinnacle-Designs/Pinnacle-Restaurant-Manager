@@ -746,7 +746,9 @@ model MenuItem {
   modifierGroups ModifierGroup[]
   comboComponents MenuComboComponent[] @relation("ComboParent")
   comboMemberships MenuComboComponent[] @relation("ComboChild")
-  recipeLines     MenuRecipeLine[]
+  recipeLines        MenuRecipeLine[]
+  recipeComponents   MenuRecipeComponent[] @relation("RecipeParent")
+  usedInRecipes      MenuRecipeComponent[] @relation("RecipeComponent")
 }
 
 /// Ingredient build — theoretical food cost and inventory depletion per plate sold.
@@ -761,6 +763,20 @@ model MenuRecipeLine {
 
   @@unique([menuItemId, inventoryItemId])
   @@index([menuItemId])
+}
+
+/// Sub-recipe — include another menu item's full recipe (ingredients roll up for cost & depletion).
+model MenuRecipeComponent {
+  id                  String   @id @default(cuid())
+  parentMenuItemId    String
+  parentMenuItem      MenuItem @relation("RecipeParent", fields: [parentMenuItemId], references: [id], onDelete: Cascade)
+  componentMenuItemId String
+  componentMenuItem   MenuItem @relation("RecipeComponent", fields: [componentMenuItemId], references: [id], onDelete: Cascade)
+  quantity            Float
+  sortOrder           Int      @default(0)
+
+  @@unique([parentMenuItemId, componentMenuItemId])
+  @@index([parentMenuItemId])
 }
 
 model InventoryItem {

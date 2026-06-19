@@ -10,7 +10,7 @@ import {
   AlertCircle,
   Trash2,
 } from "lucide-react";
-import { Button, EmptyState } from "@/components/ui";
+import { Button, EmptyState, ScrollableTabs, TabPill } from "@/components/ui";
 import { Select, FormField } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
 import { ShiftFeedbackModal, formatShiftLabel } from "@/components/staff/ShiftFeedbackModal";
@@ -125,29 +125,19 @@ export function RetentionClient({ staff }: { staff: StaffOption[] }) {
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap gap-2">
+      <ScrollableTabs className="mb-6 gap-2" menuLabel="Retention">
         {(
           [
             { id: "feedback" as Section, label: "Shift feedback", icon: MessageSquare },
             { id: "turnover" as Section, label: "Turnover analytics", icon: TrendingDown },
           ] as const
         ).map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setSection(id)}
-            className={cn(
-              "flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
-              section === id
-                ? "border-orange-500 bg-orange-50 text-orange-700"
-                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-            )}
-          >
-            <Icon className="h-4 w-4" />
+          <TabPill key={id} id={id} active={section === id} onClick={() => setSection(id)}>
+            <Icon className="h-4 w-4 shrink-0" />
             {label}
-          </button>
+          </TabPill>
         ))}
-      </div>
+      </ScrollableTabs>
 
       {section === "feedback" && (
         <PageSectionShell pageId="retention-feedback">

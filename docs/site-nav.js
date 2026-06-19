@@ -116,6 +116,25 @@
       mobile +
       "</nav>" +
       "</div>";
+    initMobileNav();
+  }
+
+  function initMobileNav() {
+    var toggle = document.getElementById("nav-toggle");
+    var mobile = document.getElementById("nav-mobile");
+    if (!toggle || !mobile) return;
+    toggle.addEventListener("click", function () {
+      var open = mobile.classList.toggle("open");
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+    });
+    mobile.querySelectorAll("a").forEach(function (a) {
+      a.addEventListener("click", function () {
+        mobile.classList.remove("open");
+        toggle.setAttribute("aria-expanded", "false");
+        toggle.setAttribute("aria-label", "Open menu");
+      });
+    });
   }
 
   renderNav();

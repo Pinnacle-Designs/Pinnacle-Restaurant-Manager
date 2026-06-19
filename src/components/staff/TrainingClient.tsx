@@ -11,7 +11,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { Button, EmptyState } from "@/components/ui";
+import { Button, EmptyState, ScrollableTabs, TabPill } from "@/components/ui";
 import { Input, Select, FormField, Modal } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -166,29 +166,29 @@ export function TrainingClient({ staff }: { staff: StaffOption[] }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-2">
-        {(
-          [
-            ["alerts", "Alerts", AlertTriangle],
-            ["certifications", "Certifications", Award],
-            ["modules", "Training modules", BookOpen],
-            ...(canComplete ? [["mine", "My training", ClipboardCheck] as const] : []),
-          ] as const
-        ).map(([id, label, Icon]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setSection(id)}
-            className={cn(
-              "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium",
-              section === id ? "bg-orange-500 text-white" : "bg-white border text-slate-600 hover:bg-slate-50"
-            )}
-          >
-            <Icon className="h-4 w-4" />
-            {label}
-          </button>
-        ))}
-        <div className="ml-auto flex items-center gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <ScrollableTabs className="min-w-0 flex-1 gap-2" menuLabel="Training">
+          {(
+            [
+              ["alerts", "Alerts", AlertTriangle],
+              ["certifications", "Certifications", Award],
+              ["modules", "Training modules", BookOpen],
+              ...(canComplete ? [["mine", "My training", ClipboardCheck] as const] : []),
+            ] as const
+          ).map(([id, label, Icon]) => (
+            <TabPill
+              key={id}
+              id={id}
+              active={section === id}
+              onClick={() => setSection(id)}
+              className={cn(section === id && "bg-orange-500 text-white hover:bg-orange-500")}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              {label}
+            </TabPill>
+          ))}
+        </ScrollableTabs>
+        <div className="flex shrink-0 items-center gap-2 sm:ml-auto">
           <label className="text-xs text-slate-500">Warn</label>
           <Select
             value={String(data.settings.expirationWarnDays)}

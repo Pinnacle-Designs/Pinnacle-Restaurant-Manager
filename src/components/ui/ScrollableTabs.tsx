@@ -32,15 +32,22 @@ interface ScrollableTabsProps {
   /** lg+ layout: vertical stack (e.g. account sidebar) */
   verticalAtLg?: boolean;
   verticalClassName?: string;
-  /** Label on the mobile menu trigger button */
+  /** Label on the mobile hamburger trigger */
   menuLabel?: string;
 }
 
+/** Stable marker — survives barrel re-exports and minification better than reference equality. */
+const TAB_PILL_MARKER = Symbol.for("pinnacle.TabPill");
+
 function isTabPillElement(child: React.ReactElement): child is ReactElement<TabPillProps> {
-  return (
-    isValidElement(child) &&
-    (child.type === TabPill || (child.type as { displayName?: string }).displayName === "TabPill")
-  );
+  if (!isValidElement(child)) return false;
+  const type = child.type;
+  if (type === TabPill) return true;
+  if (typeof type === "function") {
+    const fn = type as { displayName?: string; [TAB_PILL_MARKER]?: boolean };
+    if (fn.displayName === "TabPill" || fn[TAB_PILL_MARKER]) return true;
+  }
+  return false;
 }
 
 function parseTabPills(children: ReactNode): ParsedTab[] {
@@ -52,7 +59,11 @@ function parseTabPills(children: ReactNode): ParsedTab[] {
     }));
 }
 
-/** Tab row on desktop; hamburger menu on small screens. */
+/** Desktop tab row only — never add bare `flex` here; display comes from `hidden md:flex` / `hidden lg:flex`. */
+const desktopRowClass =
+  "w-full min-w-0 flex-wrap items-center gap-2 overflow-x-auto overscroll-x-contain pb-1 [-webkit-overflow-scrolling:touch] scroll-smooth snap-x snap-mandatory";
+
+/** Desktop: full tab row. Below md (or lg for verticalAtLg): hamburger menu with every tab. */
 export function ScrollableTabs({
   children,
   className,
@@ -75,16 +86,28 @@ export function ScrollableTabs({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [menuOpen, closeMenu]);
 
-  const mobileHidden = verticalAtLg ? "lg:hidden" : "md:hidden";
-  const desktopVisible = verticalAtLg
-    ? cn("hidden lg:flex lg:flex-col lg:gap-1 lg:overflow-x-visible lg:overflow-y-auto lg:pb-0", verticalClassName)
-    : "hidden md:flex";
+  useEffect(() => {
+    if (!menuOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [menuOpen]);
+
+  const mobileOnly = verticalAtLg ? "lg:hidden" : "md:hidden";
+  const desktopOnly = verticalAtLg
+    ? cn(
+        "hidden lg:flex lg:flex-col lg:flex-nowrap lg:items-stretch lg:overflow-x-visible lg:overflow-y-auto lg:gap-1 lg:pb-0 lg:snap-none",
+        verticalClassName
+      )
+    : cn("hidden md:flex md:flex-row", desktopRowClass);
 
   return (
-    <div className={cn("no-print relative", className)}>
-      {tabs.length > 0 && (
+    <div className={cn("no-print relative min-w-0", className)}>
+      {tabs.length > 0 ? (
         <>
-          <div className={mobileHidden}>
+          <div className={mobileOnly}>
             <button
               type="button"
               aria-expanded={menuOpen}
@@ -93,7 +116,7 @@ export function ScrollableTabs({
               className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-left text-sm font-medium text-slate-900 shadow-sm"
             >
               <span className="flex min-w-0 items-center gap-2">
-                <Menu className="h-4 w-4 shrink-0 text-slate-500" />
+                <Menu className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
                 <span className="truncate">
                   {activeTab ? (
                     <>
@@ -106,12 +129,16 @@ export function ScrollableTabs({
                 </span>
               </span>
               <ChevronDown
-                className={cn("h-4 w-4 shrink-0 text-slate-400 transition-transform", menuOpen && "rotate-180")}
+                className={cn(
+                  "h-4 w-4 shrink-0 text-slate-400 transition-transform",
+                  menuOpen && "rotate-180"
+                )}
+                aria-hidden
               />
             </button>
 
             {menuOpen && (
-              <div className="fixed inset-0 z-50" role="dialog" aria-label={menuLabel}>
+              <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={menuLabel}>
                 <button
                   type="button"
                   className="absolute inset-0 border-0 bg-slate-900/45"
@@ -161,19 +188,11 @@ export function ScrollableTabs({
             )}
           </div>
 
-          <div
-            className={cn(
-              desktopVisible,
-              !verticalAtLg &&
-                "gap-2 overflow-x-auto overscroll-x-contain pb-1 [-webkit-overflow-scrolling:touch] scroll-smooth snap-x snap-mandatory"
-            )}
-          >
-            {children}
-          </div>
+          <div className={desktopOnly}>{children}</div>
         </>
+      ) : (
+        children
       )}
-
-      {tabs.length === 0 && children}
     </div>
   );
 }
@@ -190,7 +209,7 @@ export function TabPill({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex min-h-[44px] shrink-0 snap-start items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors sm:min-h-0",
+        "inline-flex min-h-[44px] shrink-0 snap-start items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:min-h-[36px] sm:py-2",
         variant === "dark"
           ? active
             ? "bg-slate-900 text-white"
@@ -207,3 +226,4 @@ export function TabPill({
 }
 
 TabPill.displayName = "TabPill";
+(TabPill as unknown as { [TAB_PILL_MARKER]: boolean })[TAB_PILL_MARKER] = true;

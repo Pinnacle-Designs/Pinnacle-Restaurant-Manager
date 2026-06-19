@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { format, differenceInMinutes } from "date-fns";
 import { Check, Clock, Edit2, MapPin, AlertCircle, ShieldCheck, Camera } from "lucide-react";
-import { Button, Badge, EmptyState } from "@/components/ui";
+import { Button, Badge, EmptyState, ScrollableTabs, TabPill } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
 import { PageSectionShell, PageSection } from "@/components/layout/PageSections";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -149,21 +149,22 @@ export function TimePunchesPanel() {
             ) : undefined
           }
         >
-          <div className="flex gap-1 rounded-lg border bg-white p-1 w-fit">
+          <ScrollableTabs className="gap-1 rounded-lg border bg-white p-1" menuLabel="Status">
             {(["all", "PENDING", "APPROVED"] as const).map((f) => (
-              <button
+              <TabPill
                 key={f}
-                type="button"
+                id={f}
+                active={filter === f}
                 onClick={() => setFilter(f)}
                 className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  filter === f ? "bg-orange-500 text-white" : "text-slate-600 hover:bg-slate-50"
+                  "min-h-[36px] px-3 py-1.5",
+                  filter === f && "bg-orange-500 text-white hover:bg-orange-500"
                 )}
               >
                 {f === "all" ? "All" : f === "PENDING" ? "Pending" : "Approved"}
-              </button>
+              </TabPill>
             ))}
-          </div>
+          </ScrollableTabs>
 
           {error && (
             <div className="mt-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

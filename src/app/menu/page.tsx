@@ -23,7 +23,7 @@ export default async function MenuPage() {
     prisma.inventoryItem.findMany({
       where: { locationId },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, unit: true, costPerUnit: true },
+      select: { id: true, name: true, unit: true, costPerUnit: true, yieldPct: true },
     }),
   ]);
 
