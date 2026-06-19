@@ -74,6 +74,50 @@ Copy `.env.example` to `.env`. Key variables:
 
 **Events:** `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
 
+### Stripe production (Vercel / live app)
+
+Production app URL: **`https://pinnacle-resturant-manager.vercel.app`** (or your custom domain, e.g. `https://pinnacle.com` — set `NEXT_PUBLIC_APP_URL` to the URL customers use).
+
+1. **Stripe Dashboard → Live mode** (toggle off “Test mode”)
+2. **API keys** — copy **Secret key** (`sk_live_...`) → Vercel env `STRIPE_SECRET_KEY`
+3. **Create products & prices** (one-time):
+
+   ```bash
+   # In .env temporarily set STRIPE_SECRET_KEY=sk_live_...
+   APP_URL=https://pinnacle-resturant-manager.vercel.app npm run stripe:setup:live
+   ```
+
+   This creates Starter ($79), Growth ($249), and Pro ($449) as Stripe **Products** with `default_price_data` (monthly recurring). Price IDs are written to `.env` locally or printed for Vercel.
+
+   Or create products manually in Stripe → Products, then add price IDs to Vercel.
+
+4. **Webhook** (if not created by script) — [Stripe Webhooks](https://dashboard.stripe.com/webhooks) → Add endpoint:
+   - URL: `https://pinnacle-resturant-manager.vercel.app/api/webhooks/stripe`
+   - Events: `checkout.session.completed`, `customer.subscription.*`, `invoice.payment_failed`
+   - Copy **Signing secret** → Vercel `STRIPE_WEBHOOK_SECRET`
+
+5. **Vercel project → Settings → Environment Variables** (Production):
+
+   | Variable | Value |
+   |----------|--------|
+   | `AUTH_SECRET` | Random string, **32+ characters** |
+   | `NEXT_PUBLIC_APP_URL` | `https://pinnacle-resturant-manager.vercel.app` (or custom domain) |
+   | `STRIPE_SECRET_KEY` | `sk_live_...` |
+   | `STRIPE_WEBHOOK_SECRET` | `whsec_...` |
+   | `STRIPE_PRICE_STARTER` | `price_...` from setup script |
+   | `STRIPE_PRICE_GROWTH` | `price_...` |
+   | `STRIPE_PRICE_PRO` | `price_...` |
+   | `PLAN_BILLING_OPTIONAL` | `false` |
+   | `PLAN_TRIAL_DAYS` | `14` |
+   | `SUPPORT_EMAIL` | Your support inbox |
+   | `EMBED_FRAME_ANCESTORS` | `https://pinnacle.com,https://pinnacle-designs.github.io` (if marketing site iframes the demo) |
+
+6. **Redeploy** Vercel after saving env vars.
+
+7. **Test live checkout** — sign up at `/signup?plan=GROWTH`, complete onboarding → **Set up autopay with Stripe**. Use a real card or Stripe test clock in live mode only with caution.
+
+**Local dev** keeps `sk_test_...`, `PLAN_BILLING_OPTIONAL=true`, and `npm run stripe:listen` for webhooks.
+
 ### Guest payments (POS)
 
 | Variable | Purpose |
@@ -157,6 +201,9 @@ Access: `/admin` (requires `PLATFORM_ADMIN_EMAILS` or `isPlatformAdmin`)
 | `npm run db:push` | Apply Prisma schema to local DB |
 | `npm run db:studio` | Prisma Studio GUI |
 | `npm run db:deploy-seed` | Build deploy SQLite with seed data |
+| `npm run stripe:setup` | Create test-mode Stripe prices (+ optional `--webhook`) |
+| `npm run stripe:setup:live` | Create live-mode prices + production webhook |
+| `npm run stripe:listen` | Forward Stripe webhooks to localhost |
 
 ## Troubleshooting
 

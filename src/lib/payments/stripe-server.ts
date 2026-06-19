@@ -1,21 +1,11 @@
-import Stripe from "stripe";
+import type Stripe from "stripe";
 import type { PlanId } from "@/lib/plans";
 import { PLAN_BY_ID } from "@/lib/plans";
 import { planMonthlyAmount } from "@/lib/billing";
 import { appBaseUrl } from "./providers";
+import { getStripe } from "./stripe-client";
 
-let stripeClient: Stripe | null = null;
-
-export function getStripe(): Stripe {
-  const key = process.env.STRIPE_SECRET_KEY?.trim();
-  if (!key) {
-    throw new Error("STRIPE_SECRET_KEY is not configured");
-  }
-  if (!stripeClient) {
-    stripeClient = new Stripe(key);
-  }
-  return stripeClient;
-}
+export { getStripe } from "./stripe-client";
 
 function stripePriceIdForPlan(plan: PlanId): string | null {
   const map: Record<PlanId, string | undefined> = {
