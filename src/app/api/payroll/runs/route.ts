@@ -81,6 +81,8 @@ export async function POST(request: NextRequest) {
               regularPay: e.regularPay,
               overtimePay: e.overtimePay,
               splitShiftPay: e.splitShiftPay,
+              holidayPay: e.holidayPay ?? 0,
+              holidayPremiumPay: e.holidayPremiumPay ?? 0,
               tipsAllocated: e.tipsAllocated,
               tipCreditMakeup: e.tipCreditMakeup,
               grossPay: e.grossPay,
@@ -106,6 +108,21 @@ export async function POST(request: NextRequest) {
       details: `Payroll run draft: $${preview.totals.grossPay.toFixed(2)} gross`,
     },
   });
+
+  const accruedRows = preview.employees.flatMap((e) =>
+    (e.holidayDetails ?? [])
+      .filter((d) => d.accruedDaysOff > 0 && d.eligible)
+      .map((d) => ({
+        locationId,
+        staffMemberId: e.staffMemberId,
+        holidayDate: new Date(`${d.holidayDate}T12:00:00.000Z`),
+        daysAccrued: d.accruedDaysOff,
+        reason: `Substitute day — ${d.holidayName}`,
+      }))
+  );
+  if (accruedRows.length > 0) {
+    await prisma.staffAccruedDayOff.createMany({ data: accruedRows });
+  }
 
   return NextResponse.json(run);
 }

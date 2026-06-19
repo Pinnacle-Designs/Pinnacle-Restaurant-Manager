@@ -14,6 +14,13 @@ import type {
   RateSegment,
   EwaAvailability,
 } from "./types";
+import { getEffectiveRate } from "./rates";
+import {
+  computeHolidayPay,
+  type HolidayPayRuleInput,
+  type HolidayDateInput,
+  type StaffHolidayInput,
+} from "./holiday-pay";
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -28,28 +35,7 @@ function dateKey(d: Date | string): string {
   return dt.toISOString().slice(0, 10);
 }
 
-export function getEffectiveRate(
-  staff: StaffInput,
-  workRole: string | null | undefined,
-  roleRates: RoleRateInput[]
-): { role: string; rate: number; tipPoints: number; isTipped: boolean } {
-  const role = workRole || staff.role;
-  const match = roleRates.find((r) => r.staffMemberId === staff.id && r.role === role);
-  if (match) {
-    return {
-      role,
-      rate: match.hourlyRate,
-      tipPoints: match.tipPoints,
-      isTipped: match.isTippedRole,
-    };
-  }
-  return {
-    role,
-    rate: staff.hourlyRate,
-    tipPoints: staff.tipPoints,
-    isTipped: staff.isTippedEmployee,
-  };
-}
+export { getEffectiveRate } from "./rates";
 
 /** Detect shifts eligible for split-shift premium on the same calendar day. */
 export function detectSplitShiftPremiums(
@@ -575,7 +561,16 @@ export function computePayrollPreview(
   settings: PayrollSettingsInput,
   periodStart: Date,
   periodEnd: Date,
-  timeEntries: TimeEntryInput[] = []
+  timeEntries: TimeEntryInput[] = [],
+  holidayContext?: {
+    rule: HolidayPayRuleInput;
+    delegatedToProvider: boolean;
+    provider: string | null;
+    holidays: HolidayDateInput[];
+    staffMeta: StaffHolidayInput[];
+    lookbackShifts: ShiftInput[];
+    lookbackPunches: TimeEntryInput[];
+  }
 ): PayrollPreview {
   const periodShifts = shifts.filter((sh) => {
     const d = toDate(sh.date);
@@ -679,6 +674,10 @@ export function computePayrollPreview(
       regularPay: round2(regularPay),
       overtimePay: round2(overtimePay),
       splitShiftPay: round2(splitShiftPay),
+      statutoryHolidayPay: 0,
+      holidayPremiumPay: 0,
+      holidayPay: 0,
+      accruedDaysOff: 0,
       tipsAllocated,
       tipCreditMakeup,
       grossPay,
@@ -688,6 +687,37 @@ export function computePayrollPreview(
     });
   }
 
+  const holidaySummary = holidayContext
+    ? computeHolidayPay({
+        rule: holidayContext.rule,
+        delegatedToProvider: holidayContext.delegatedToProvider,
+        provider: holidayContext.provider,
+        staff,
+        staffMeta: holidayContext.staffMeta,
+        holidays: holidayContext.holidays,
+        shifts: holidayContext.lookbackShifts,
+        punches: holidayContext.lookbackPunches,
+        roleRates,
+        periodStart,
+        periodEnd,
+      })
+    : undefined;
+
+  if (holidaySummary?.enabled && !holidaySummary.delegatedToProvider) {
+    for (const employee of employees) {
+      const holiday = holidaySummary.employees.find(
+        (h) => h.staffMemberId === employee.staffMemberId
+      );
+      if (!holiday) continue;
+      employee.statutoryHolidayPay = holiday.statutoryPay;
+      employee.holidayPremiumPay = holiday.premiumPay;
+      employee.holidayPay = holiday.totalHolidayPay;
+      employee.accruedDaysOff = holiday.accruedDaysOff;
+      employee.holidayDetails = holiday.details;
+      employee.grossPay = round2(employee.grossPay + holiday.totalHolidayPay);
+    }
+  }
+
   return {
     periodStart: periodStart.toISOString(),
     periodEnd: periodEnd.toISOString(),
@@ -695,12 +725,20 @@ export function computePayrollPreview(
     tipPoolMode: settings.tipPoolMode,
     employees,
     tipAllocations,
+    holidayPay: holidaySummary,
     totals: {
       grossPay: round2(employees.reduce((s, e) => s + e.grossPay, 0)),
       tips: totalTips,
       tipCreditMakeup: round2(employees.reduce((s, e) => s + e.tipCreditMakeup, 0)),
       overtimePay: round2(employees.reduce((s, e) => s + e.overtimePay, 0)),
       splitShiftPay: round2(employees.reduce((s, e) => s + e.splitShiftPay, 0)),
+      holidayPay: round2(employees.reduce((s, e) => s + e.holidayPay, 0)),
+      statutoryHolidayPay: round2(
+        employees.reduce((s, e) => s + e.statutoryHolidayPay, 0)
+      ),
+      holidayPremiumPay: round2(
+        employees.reduce((s, e) => s + e.holidayPremiumPay, 0)
+      ),
     },
   };
 }
@@ -749,6 +787,8 @@ export function defaultPayrollSettings(): PayrollSettingsInput {
     ewaMaxPerAdvance: 200,
     ewaFeeFlat: 0,
     payPeriodDays: 14,
+    embeddedPayrollProvider: "NONE",
+    embeddedPayrollConnected: false,
   };
 }
 
@@ -784,10 +824,14 @@ export function settingsFromDb(row: {
   ewaMaxPerAdvance: number;
   ewaFeeFlat: number;
   payPeriodDays: number;
+  embeddedPayrollProvider?: "NONE" | "GUSTO" | "WAGEPOINT" | "PAPAYA_GLOBAL";
+  embeddedPayrollConnected?: boolean;
 }): PayrollSettingsInput {
   return {
     ...row,
     tipPoolRoles: parseTipPoolRoles(row.tipPoolRoles),
+    embeddedPayrollProvider: row.embeddedPayrollProvider ?? "NONE",
+    embeddedPayrollConnected: row.embeddedPayrollConnected ?? false,
   };
 }
 

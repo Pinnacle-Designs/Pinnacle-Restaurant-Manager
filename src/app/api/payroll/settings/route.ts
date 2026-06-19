@@ -59,6 +59,12 @@ export async function PUT(request: NextRequest) {
       ewaMaxPerAdvance: Number(body.ewaMaxPerAdvance) || 200,
       ewaFeeFlat: Number(body.ewaFeeFlat) || 0,
       payPeriodDays: Number(body.payPeriodDays) || 14,
+      embeddedPayrollProvider: ["NONE", "GUSTO", "WAGEPOINT", "PAPAYA_GLOBAL"].includes(
+        body.embeddedPayrollProvider
+      )
+        ? body.embeddedPayrollProvider
+        : "NONE",
+      embeddedPayrollConnected: !!body.embeddedPayrollConnected,
     },
   });
 

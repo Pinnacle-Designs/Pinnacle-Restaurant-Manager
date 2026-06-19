@@ -142,6 +142,19 @@ enum PayrollRunStatus {
   PAID
 }
 
+enum HolidayDenominatorMode {
+  FIXED_DIVISOR
+  DAYS_WORKED
+  ANNUAL_PERCENTAGE
+}
+
+enum EmbeddedPayrollProvider {
+  NONE
+  GUSTO
+  WAGEPOINT
+  PAPAYA_GLOBAL
+}
+
 enum EwaAdvanceStatus {
   PENDING
   PAID
@@ -375,6 +388,7 @@ model Location {
   userPermissionOverrides UserPermissionOverride[]
   paymentProviderConnections PaymentProviderConnection[]
   payrollSettings      PayrollSettings?
+  holidayPayRule       HolidayPayRule?
   tipPoolRuns          TipPoolRun[]
   payPeriods           PayPeriod[]
   ewaAdvances          EwaAdvance[]
@@ -941,6 +955,7 @@ model StaffMember {
   logBookMentions LogBookMention[]
   wasteLogs       InventoryWaste[]
   countZoneAssignments CountZoneAssignment[]
+  accruedDaysOff       StaffAccruedDayOff[]
 }
 
 model Shift {
@@ -1209,7 +1224,46 @@ model PayrollSettings {
   ewaMaxPerAdvance        Float       @default(200)
   ewaFeeFlat              Float       @default(0)
   payPeriodDays           Int         @default(14)
+  /// When set, statutory calculations are delegated to the embedded payroll API
+  embeddedPayrollProvider EmbeddedPayrollProvider @default(NONE)
+  embeddedPayrollConnected Boolean    @default(false)
   updatedAt               DateTime    @updatedAt
+}
+
+/// Configurable holiday pay rules — update templates instead of rewriting code when laws change.
+model HolidayPayRule {
+  id                       String                 @id @default(cuid())
+  locationId               String                 @unique
+  location                 Location               @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  enabled                  Boolean                @default(false)
+  templateId               String?
+  ruleName                 String                 @default("Custom")
+  tenureDaysRequired       Int                    @default(30)
+  requireFirstLastShift    Boolean                @default(false)
+  lookbackDays             Int                    @default(28)
+  denominatorMode          HolidayDenominatorMode @default(FIXED_DIVISOR)
+  fixedDivisor             Float                  @default(20)
+  annualPercentage         Float?
+  holidayPremiumMultiplier Float                  @default(1.5)
+  substituteDayEnabled     Boolean                @default(false)
+  substituteDayMultiplier  Float                  @default(1.0)
+  /// Pay average daily wage even when the employee does not work the holiday
+  payStatutoryWhenOff      Boolean                @default(true)
+  updatedAt                DateTime               @updatedAt
+}
+
+model StaffAccruedDayOff {
+  id            String      @id @default(cuid())
+  locationId    String
+  staffMemberId String
+  staffMember   StaffMember @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+  holidayDate   DateTime
+  daysAccrued   Float       @default(1)
+  reason        String?
+  createdAt     DateTime    @default(now())
+
+  @@index([staffMemberId, holidayDate])
+  @@index([locationId])
 }
 
 model TipPoolRun {
@@ -1277,6 +1331,8 @@ model PayrollLineItem {
   regularPay        Float
   overtimePay       Float
   splitShiftPay     Float       @default(0)
+  holidayPay        Float       @default(0)
+  holidayPremiumPay Float       @default(0)
   tipsAllocated     Float       @default(0)
   tipCreditMakeup   Float       @default(0)
   grossPay          Float

@@ -18,6 +18,8 @@ export interface PayrollSettingsInput {
   ewaMaxPerAdvance: number;
   ewaFeeFlat: number;
   payPeriodDays: number;
+  embeddedPayrollProvider: "NONE" | "GUSTO" | "WAGEPOINT" | "PAPAYA_GLOBAL";
+  embeddedPayrollConnected: boolean;
 }
 
 export interface ShiftInput {
@@ -81,12 +83,17 @@ export interface EmployeePayPreview {
   regularPay: number;
   overtimePay: number;
   splitShiftPay: number;
+  statutoryHolidayPay: number;
+  holidayPremiumPay: number;
+  holidayPay: number;
+  accruedDaysOff: number;
   tipsAllocated: number;
   tipCreditMakeup: number;
   grossPay: number;
   blendedRate: number;
   rateSegments: RateSegment[];
   shiftDetails: ShiftPayDetail[];
+  holidayDetails?: import("./holiday-pay/types").HolidayPayDetail[];
 }
 
 export interface TipAllocationPreview {
@@ -106,12 +113,16 @@ export interface PayrollPreview {
   tipPoolMode: TipPoolMode;
   employees: EmployeePayPreview[];
   tipAllocations: TipAllocationPreview[];
+  holidayPay?: import("./holiday-pay/types").HolidayPaySummary;
   totals: {
     grossPay: number;
     tips: number;
     tipCreditMakeup: number;
     overtimePay: number;
     splitShiftPay: number;
+    holidayPay: number;
+    statutoryHolidayPay: number;
+    holidayPremiumPay: number;
   };
 }
 

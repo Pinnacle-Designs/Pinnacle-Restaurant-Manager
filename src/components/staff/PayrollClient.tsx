@@ -19,6 +19,7 @@ import { JOB_ROLES, TIPPED_JOB_ROLES } from "@/lib/payroll/job-roles";
 import { getDefaultPayPeriod } from "@/lib/payroll/compute";
 import type { PayrollPreview } from "@/lib/payroll/types";
 import { PageSectionShell, PageSection } from "@/components/layout/PageSections";
+import { HolidayPayRulesPanel } from "@/components/staff/HolidayPayRulesPanel";
 
 interface StaffMember {
   id: string;
@@ -55,6 +56,8 @@ interface PayrollSettings {
   ewaMaxPerAdvance: number;
   ewaFeeFlat: number;
   payPeriodDays: number;
+  embeddedPayrollProvider: string;
+  embeddedPayrollConnected: boolean;
 }
 
 type Section = "preview" | "tips" | "rates" | "ewa" | "settings";
@@ -263,8 +266,14 @@ export function PayrollClient({ staff }: { staff: StaffMember[] }) {
                   <Stat label="Gross payroll" value={formatCurrency(preview.totals.grossPay)} />
                   <Stat label="Tips in period" value={formatCurrency(preview.totals.tips)} />
                   <Stat label="Overtime pay" value={formatCurrency(preview.totals.overtimePay)} />
+                  <Stat label="Holiday pay" value={formatCurrency(preview.totals.holidayPay ?? 0)} />
                   <Stat label="Tip credit makeup" value={formatCurrency(preview.totals.tipCreditMakeup)} />
                 </div>
+                {preview.holidayPay?.delegatedToProvider && (
+                  <p className="mt-3 text-sm text-blue-700">
+                    Holiday statutory pay is calculated by your embedded payroll provider.
+                  </p>
+                )}
               </PageSection>
               <PageSection id="payroll-table" title="Employee breakdown">
                 <div className="overflow-x-auto rounded-xl border bg-white">
@@ -277,6 +286,7 @@ export function PayrollClient({ staff }: { staff: StaffMember[] }) {
                         <th className="px-4 py-3">Base pay</th>
                         <th className="px-4 py-3">OT pay</th>
                         <th className="px-4 py-3">Split-shift</th>
+                        <th className="px-4 py-3">Holiday</th>
                         <th className="px-4 py-3">Tips</th>
                         <th className="px-4 py-3">Makeup</th>
                         <th className="px-4 py-3">Gross</th>
@@ -291,6 +301,14 @@ export function PayrollClient({ staff }: { staff: StaffMember[] }) {
                           <td className="px-4 py-3">{formatCurrency(row.regularPay)}</td>
                           <td className="px-4 py-3">{formatCurrency(row.overtimePay)}</td>
                           <td className="px-4 py-3">{formatCurrency(row.splitShiftPay)}</td>
+                          <td className="px-4 py-3">
+                            {formatCurrency(row.holidayPay ?? 0)}
+                            {(row.accruedDaysOff ?? 0) > 0 && (
+                              <span className="ml-1 text-xs text-slate-500">
+                                +{row.accruedDaysOff} day off
+                              </span>
+                            )}
+                          </td>
                           <td className="px-4 py-3">{formatCurrency(row.tipsAllocated)}</td>
                           <td className="px-4 py-3">{formatCurrency(row.tipCreditMakeup)}</td>
                           <td className="px-4 py-3 font-semibold">{formatCurrency(row.grossPay)}</td>
@@ -569,6 +587,48 @@ export function PayrollClient({ staff }: { staff: StaffMember[] }) {
               value={settings.ewaMaxPerAdvance}
               onChange={(v) => setSettings({ ...settings, ewaMaxPerAdvance: v })}
             />
+          </PageSection>
+          <PageSection id="settings-holiday" title="Holiday pay rules engine">
+            <HolidayPayRulesPanel
+              embeddedProvider={settings.embeddedPayrollProvider}
+              embeddedConnected={settings.embeddedPayrollConnected}
+            />
+          </PageSection>
+          <PageSection id="settings-embedded-payroll" title="Embedded payroll (Approach 1)">
+            <p className="mb-3 text-sm text-slate-600">
+              For actual money movement, tax withholding, and compliance liability,
+              connect Gusto Embedded, Wagepoint, or Papaya Global. When connected,
+              statutory holiday calculations are delegated to the provider API.
+            </p>
+            <FormField label="Embedded payroll provider">
+              <Select
+                value={settings.embeddedPayrollProvider}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    embeddedPayrollProvider: e.target.value,
+                  })
+                }
+              >
+                <option value="NONE">None — rules engine only (estimates)</option>
+                <option value="GUSTO">Gusto Embedded (US)</option>
+                <option value="WAGEPOINT">Wagepoint (Canada)</option>
+                <option value="PAPAYA_GLOBAL">Papaya Global (global)</option>
+              </Select>
+            </FormField>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={settings.embeddedPayrollConnected}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    embeddedPayrollConnected: e.target.checked,
+                  })
+                }
+              />
+              Provider connected — delegate statutory calculations to API
+            </label>
           </PageSection>
           <PageSection id="settings-save" title="Save rules">
             <Button onClick={saveSettings} disabled={saving}>
