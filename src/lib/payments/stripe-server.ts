@@ -16,6 +16,25 @@ function stripePriceIdForPlan(plan: PlanId): string | null {
   return map[plan]?.trim() || null;
 }
 
+function resolveCheckoutPriceId(plan: PlanId): string {
+  const priceId = stripePriceIdForPlan(plan);
+  if (priceId) return priceId;
+
+  const isProd =
+    process.env.NODE_ENV === "production" && process.env.PLAN_BILLING_OPTIONAL !== "true";
+  if (isProd) {
+    throw new Error(
+      `STRIPE_PRICE_${plan} is not set. Run npm run stripe:setup:live and add price IDs to Vercel.`
+    );
+  }
+  return "";
+}
+
+/**
+ * Stripe Checkout for plan autopay.
+ * Keys from STRIPE_SECRET_KEY env only — @see https://docs.stripe.com/keys-best-practices
+ * Uses catalog price IDs (product default_price) when STRIPE_PRICE_* env vars are set.
+ */
 export async function createStripeCheckoutSession(input: {
   locationId: string;
   plan: PlanId;
@@ -26,23 +45,25 @@ export async function createStripeCheckoutSession(input: {
   const stripe = getStripe();
   const planDef = PLAN_BY_ID[input.plan];
   const amount = planMonthlyAmount(input.plan);
-  const priceId = stripePriceIdForPlan(input.plan);
+  const priceId = resolveCheckoutPriceId(input.plan);
   const base = appBaseUrl();
 
-  const lineItem: Stripe.Checkout.SessionCreateParams.LineItem = priceId
-    ? { price: priceId, quantity: 1 }
-    : {
-        price_data: {
-          currency: "usd",
-          unit_amount: Math.round(amount * 100),
-          recurring: { interval: "month" },
-          product_data: {
-            name: `Pinnacle ${planDef.name}`,
-            description: planDef.blurb,
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = priceId
+    ? [{ price: priceId, quantity: 1 }]
+    : [
+        {
+          price_data: {
+            currency: "usd",
+            unit_amount: Math.round(amount * 100),
+            recurring: { interval: "month" },
+            product_data: {
+              name: `Pinnacle ${planDef.name}`,
+              description: planDef.blurb,
+            },
           },
+          quantity: 1,
         },
-        quantity: 1,
-      };
+      ];
 
   return stripe.checkout.sessions.create({
     mode: "subscription",
@@ -59,7 +80,7 @@ export async function createStripeCheckoutSession(input: {
         plan: input.plan,
       },
     },
-    line_items: [lineItem],
+    line_items: lineItems,
     success_url:
       input.returnTo === "onboarding"
         ? `${base}/download?from=onboarding`

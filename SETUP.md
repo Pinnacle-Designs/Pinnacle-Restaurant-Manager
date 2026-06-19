@@ -64,11 +64,13 @@ Copy `.env.example` to `.env`. Key variables:
 
 | Variable | Purpose |
 |----------|---------|
-| `STRIPE_SECRET_KEY` | Stripe API secret |
+| `STRIPE_SECRET_KEY` | Stripe API secret (env only — never in code) |
 | `STRIPE_WEBHOOK_SECRET` | Webhook signature verification |
-| `STRIPE_PRICE_STARTER` | Optional fixed price ID |
-| `STRIPE_PRICE_GROWTH` | Optional fixed price ID |
-| `STRIPE_PRICE_PRO` | Optional fixed price ID |
+| `STRIPE_PRICE_STARTER` | Price ID (`price_...`) from product default_price |
+| `STRIPE_PRICE_GROWTH` | Price ID for Growth plan |
+| `STRIPE_PRICE_PRO` | Price ID for Pro plan |
+
+Checkout uses these price IDs in `line_items` (same pattern as [Stripe Checkout docs](https://docs.stripe.com/checkout/quickstart)), with `mode: subscription` for monthly autopay.
 
 **Webhook endpoint:** `{APP_URL}/api/webhooks/stripe`
 
