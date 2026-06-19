@@ -24,6 +24,7 @@
     "stripe:listen": "stripe listen --forward-to localhost:3000/api/webhooks/stripe",
     "stripe:setup": "tsx scripts/setup-stripe-billing.ts --write-env",
     "stripe:setup:live": "tsx scripts/setup-stripe-billing.ts --live --webhook --write-env",
+    "vercel:env:push": "node scripts/push-vercel-env.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {
