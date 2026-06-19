@@ -5,7 +5,11 @@ import { Globe, Loader2, MapPin, RefreshCw, Coins, Ruler } from "lucide-react";
 import { Button, Badge } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
 import { useLocationLocale } from "@/components/location/LocationLocaleProvider";
-import { measurementSystemLabel } from "@/lib/location/locale";
+import {
+  measurementSystemLabel,
+  setActiveLocationLocale,
+  type LocationLocaleSettings,
+} from "@/lib/location/locale";
 
 interface LocationProfile {
   id: string;
@@ -36,6 +40,9 @@ const COUNTRIES = [
 
 export function LocationProfilePanel() {
   const { refresh: refreshLocale } = useLocationLocale();
+  const [previewRegional, setPreviewRegional] = useState<LocationLocaleSettings | null>(null);
+  const [previewLabel, setPreviewLabel] = useState<string | null>(null);
+  const [resolvingPostal, setResolvingPostal] = useState(false);
   const [location, setLocation] = useState<LocationProfile | null>(null);
   const [localTime, setLocalTime] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,6 +92,57 @@ export function LocationProfilePanel() {
     void load();
   }, [load]);
 
+  // Live preview: postal code → country → currency & units across the app
+  useEffect(() => {
+    const zip = postalCode.trim();
+    if (zip.length < 3) {
+      setPreviewRegional(null);
+      setPreviewLabel(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setResolvingPostal(true);
+      try {
+        const res = await fetch("/api/locations/resolve-postal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ postalCode: zip, countryCode }),
+        });
+        const data = await res.json();
+        if (!data.resolved) {
+          setPreviewRegional(null);
+          setPreviewLabel(null);
+          return;
+        }
+        setPreviewRegional(data.regional);
+        setPreviewLabel(data.measurementLabel);
+        if (data.countryCode && data.countryCode !== countryCode) {
+          setCountryCode(data.countryCode);
+        }
+        if (data.city && !city.trim()) setCity(data.city);
+        if (data.stateProvince && !stateProvince.trim()) setStateProvince(data.stateProvince);
+        setActiveLocationLocale(data.regional);
+      } catch {
+        setPreviewRegional(null);
+        setPreviewLabel(null);
+      } finally {
+        setResolvingPostal(false);
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [postalCode, countryCode, city, stateProvince]);
+
+  const displayRegional = previewRegional ?? (location
+    ? {
+        currencyCode: location.currencyCode,
+        measurementSystem: location.measurementSystem,
+        volumeStandard: location.volumeStandard,
+        locale: location.locale,
+      }
+    : null);
+
   const save = async () => {
     setSaving(true);
     setMessage(null);
@@ -128,31 +186,33 @@ export function LocationProfilePanel() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-600">
-        Set your postal code to auto-sync local time, currency, units, public holidays, and weather
-        for Crystal Ball, analytics, and prep forecasts.
+        Enter your postal or ZIP code — currency, units (kg/lb, °C/°F), and formatting switch
+        automatically for your location. No need to pick a country first.
       </p>
 
-      {(location?.timezone || localTime || location?.currencyCode) && (
+      {(displayRegional || location?.timezone || localTime) && (
         <div className="flex flex-wrap gap-2">
-          {location?.currencyCode && (
-            <Badge className="bg-amber-100 text-amber-900">
+          {displayRegional?.currencyCode && (
+            <Badge className="max-w-full truncate bg-amber-100 text-amber-900">
               <Coins className="mr-1 inline h-3.5 w-3.5" />
-              {location.currencyCode}
+              {displayRegional.currencyCode}
             </Badge>
           )}
-          {location?.measurementSystem && (
-            <Badge className="bg-purple-100 text-purple-800">
+          {(previewLabel || location?.measurementSystem) && (
+            <Badge className="max-w-full truncate bg-purple-100 text-purple-800">
               <Ruler className="mr-1 inline h-3.5 w-3.5" />
-              {measurementSystemLabel({
-                measurementSystem:
-                  location.measurementSystem === "metric" || location.measurementSystem === "mixed"
-                    ? location.measurementSystem
-                    : "imperial",
-                volumeStandard:
-                  location.volumeStandard === "uk" || location.volumeStandard === "metric"
-                    ? location.volumeStandard
-                    : "us",
-              })}
+              {previewLabel ??
+                measurementSystemLabel({
+                  measurementSystem:
+                    location!.measurementSystem === "metric" || location!.measurementSystem === "mixed"
+                      ? location!.measurementSystem
+                      : "imperial",
+                  volumeStandard:
+                    location!.volumeStandard === "uk" || location!.volumeStandard === "metric"
+                      ? location!.volumeStandard
+                      : "us",
+                })}
+              {resolvingPostal ? " …" : previewRegional ? " (preview)" : ""}
             </Badge>
           )}
           {location?.timezone && (
@@ -232,8 +292,8 @@ export function LocationProfilePanel() {
         </p>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={() => void save()} disabled={saving}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <Button onClick={() => void save()} disabled={saving} className="btn-mobile-full">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           Save & sync weather & holidays
         </Button>

@@ -35,8 +35,8 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const showMobileChrome = !isEmbed || isEmbedMobile || isEmbedFull;
 
   const mainInner = isEmbedMobile ? (
-    <main className="min-h-screen flex-1 overflow-auto">
-      <div className="px-2 py-3 sm:px-4 sm:py-4">
+    <main className="page-content min-h-screen min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
+      <div className="px-3 py-3 sm:px-4 sm:py-4">
         <PrintReportStamp />
         <Suspense fallback={null}>
           <PageSearchStrip />
@@ -45,8 +45,8 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       </div>
     </main>
   ) : (
-    <main className="flex-1">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <main className="page-content min-w-0 flex-1 overflow-x-hidden">
+      <div className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
         <PrintReportStamp />
         <Suspense fallback={null}>
           <PageSearchStrip />
@@ -61,9 +61,9 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       <LocationLocaleProvider>
         <GlobalSearchProvider>
           <NotificationProvider>
-            <div className="flex min-h-screen">
+            <div className="flex min-h-screen min-w-0 overflow-x-hidden">
               {showSidebar && <Sidebar />}
-              <div className={`flex flex-1 flex-col ${showMobileChrome ? "pb-20 md:pb-0" : ""}`}>
+              <div className={`flex min-w-0 flex-1 flex-col ${showMobileChrome ? "pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-0" : ""}`}>
                 {showMobileChrome && <MobileHeader />}
                 {mainInner}
               </div>

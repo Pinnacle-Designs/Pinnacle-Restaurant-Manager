@@ -9,7 +9,7 @@ export function Input({
   return (
     <input
       className={cn(
-        "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500",
+        "w-full min-h-[44px] rounded-lg border border-slate-200 px-3 py-2.5 text-base sm:min-h-0 sm:py-2 sm:text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500",
         className
       )}
       {...props}
@@ -25,7 +25,7 @@ export function Select({
   return (
     <select
       className={cn(
-        "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500",
+        "w-full min-h-[44px] rounded-lg border border-slate-200 px-3 py-2.5 text-base sm:min-h-0 sm:py-2 sm:text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500",
         className
       )}
       {...props}
@@ -42,7 +42,7 @@ export function Textarea({
   return (
     <textarea
       className={cn(
-        "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500",
+        "w-full min-h-[44px] rounded-lg border border-slate-200 px-3 py-2.5 text-base sm:min-h-0 sm:py-2 sm:text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500",
         className
       )}
       {...props}
@@ -99,7 +99,7 @@ export function Modal({ open, onClose, title, children, size = "md" }: ModalProp
         className={
           fullscreen
             ? "relative flex h-[94vh] w-full flex-col rounded-t-2xl bg-white shadow-xl sm:h-[92vh] sm:max-w-6xl sm:rounded-xl"
-            : `relative w-full ${MODAL_SIZES[size]} max-h-[92vh] overflow-y-auto rounded-xl bg-white shadow-xl`
+            : `relative w-full ${MODAL_SIZES[size]} max-h-[92vh] overflow-y-auto rounded-xl bg-white shadow-xl max-sm:mx-0`
         }
       >
         <div className="flex shrink-0 items-center justify-between border-b px-4 py-3 sm:px-6 sm:py-4">
@@ -107,7 +107,8 @@ export function Modal({ open, onClose, title, children, size = "md" }: ModalProp
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            aria-label="Close"
           >
             ✕
           </button>
@@ -116,7 +117,7 @@ export function Modal({ open, onClose, title, children, size = "md" }: ModalProp
           className={
             fullscreen
               ? "flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-3 sm:px-6 sm:py-4"
-              : "px-6 py-4"
+              : "px-4 py-4 sm:px-6"
           }
         >
           {children}

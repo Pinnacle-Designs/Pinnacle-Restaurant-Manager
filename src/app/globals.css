@@ -13,11 +13,25 @@
   * {
     @apply border-slate-200;
   }
+
+  html {
+    @apply overflow-x-hidden;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply min-h-screen overflow-x-hidden;
+  }
+
+  /* Match form Input — used by legacy selects */
+  .input {
+    @apply w-full min-h-[44px] rounded-lg border border-slate-200 px-3 py-2.5 text-base sm:min-h-0 sm:py-2 sm:text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500;
+  }
 }
 
 @layer utilities {
   .card {
-    @apply rounded-xl border bg-white p-6 shadow-sm;
+    @apply rounded-xl border bg-white p-4 shadow-sm sm:p-6;
   }
 
   .no-print {
@@ -26,6 +40,25 @@
 
   .print-only {
     display: none;
+  }
+
+  /** Horizontal scroll for wide tables on small screens */
+  .table-scroll {
+    @apply -mx-1 overflow-x-auto overscroll-x-contain px-1 [-webkit-overflow-scrolling:touch];
+  }
+
+  .table-scroll table {
+    @apply min-w-full;
+  }
+
+  /** Page content wrapper — prevents flex children from overflowing viewport */
+  .page-content {
+    @apply min-w-0 w-full max-w-full;
+  }
+
+  /** Touch-friendly primary action on mobile */
+  .btn-mobile-full {
+    @apply w-full sm:w-auto;
   }
 }
 

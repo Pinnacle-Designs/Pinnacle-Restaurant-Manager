@@ -18,7 +18,7 @@ import {
   Camera,
   UserCheck,
 } from "lucide-react";
-import { Button, Badge, StatCard } from "@/components/ui";
+import { Button, Badge, StatCard, ScrollableTabs, TabPill } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
 import { useWalkInOffline } from "@/hooks/useWalkInOffline";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
@@ -641,16 +641,9 @@ export function MonthlyCountClient() {
         <StatCard label="Items aggregated" value={aggregatedByItem.size} subtext="Unique SKUs totalled" />
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2 border-b border-slate-200 pb-2">
+      <ScrollableTabs className="mb-4 border-b border-slate-200 pb-2" menuLabel="Monthly count">
         {(["count", "assign", "summary", "variance"] as View[]).map((v) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => setView(v)}
-            className={`min-h-11 rounded-lg px-4 py-2 text-base font-medium capitalize ${
-              view === v ? "bg-orange-100 text-orange-800" : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
+          <TabPill key={v} active={view === v} onClick={() => setView(v)}>
             {v === "count"
               ? "Count"
               : v === "assign"
@@ -658,9 +651,9 @@ export function MonthlyCountClient() {
                 : v === "summary"
                   ? "Summary"
                   : "Variance & COGS"}
-          </button>
+          </TabPill>
         ))}
-      </div>
+      </ScrollableTabs>
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-base text-red-700">{error}</div>

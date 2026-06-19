@@ -14,7 +14,7 @@ import {
   Trash2,
   ClipboardList,
 } from "lucide-react";
-import { Button, Badge, StatCard } from "@/components/ui";
+import { Button, Badge, StatCard, ScrollableTabs, TabPill } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { useScaleSerial } from "@/hooks/useScaleSerial";
@@ -313,20 +313,13 @@ export function WalkInClient() {
         <StatCard label="Counted" value={session?.lines.length ?? 0} subtext={session ? "This session" : "No active count"} />
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2 border-b border-slate-200 pb-2">
+      <ScrollableTabs className="mb-4 border-b border-slate-200 pb-2" menuLabel="Walk-in">
         {(["count", "fifo", "route"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={`rounded-lg px-3 py-2 text-sm font-medium capitalize ${
-              tab === t ? "bg-orange-100 text-orange-800" : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
+          <TabPill key={t} active={tab === t} onClick={() => setTab(t)}>
             {t === "count" ? "Count" : t === "fifo" ? "FIFO Alerts" : "Count Route"}
-          </button>
+          </TabPill>
         ))}
-      </div>
+      </ScrollableTabs>
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>

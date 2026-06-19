@@ -40,8 +40,8 @@ export function ReportViewer({ result, loading }: ReportViewerProps) {
             {result.meta.locationName ? ` · ${result.meta.locationName}` : ""}
           </p>
         </div>
-        <div className="max-h-[480px] overflow-auto">
-          <table className="report-table w-full text-sm">
+        <div className="table-scroll max-h-[min(480px,60vh)] overflow-y-auto">
+          <table className="report-table w-full min-w-[640px] text-sm">
             <thead className="sticky top-0 bg-slate-50">
               <tr>
                 {result.columns.map((col) => (

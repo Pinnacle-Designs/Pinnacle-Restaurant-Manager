@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
+import { ScrollableTabs, TabPill } from "@/components/ui";
 import { ComplianceClient } from "@/components/staff/ComplianceClient";
 import { RetentionClient } from "@/components/staff/RetentionClient";
 import { FraudPreventionPanel } from "@/components/staff/FraudPreventionPanel";
@@ -127,21 +128,14 @@ export function StaffPageClient({ initialStaff }: { initialStaff: StaffMember[] 
   return (
     <>
       {tabs.length > 1 && (
-        <div className="no-print mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-2">
+        <ScrollableTabs className="mb-6 border-b border-slate-200 pb-2" menuLabel="Staff">
           {tabs.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                tab === id ? "bg-orange-100 text-orange-800" : "text-slate-600 hover:bg-slate-100"
-              }`}
-            >
-              <Icon className="h-4 w-4" />
+            <TabPill key={id} id={id} active={tab === id} onClick={() => setTab(id)}>
+              <Icon className="h-4 w-4 shrink-0" />
               {label}
-            </button>
+            </TabPill>
           ))}
-        </div>
+        </ScrollableTabs>
       )}
 
       {tab === "time_clock" && canClock && <TimeClockClient />}

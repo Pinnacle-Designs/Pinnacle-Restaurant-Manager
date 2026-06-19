@@ -91,7 +91,7 @@ function NavLink({
       href={item.href}
       onClick={onNavigate}
       className={cn(
-        "flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-1 text-[0.625rem]",
+        "flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-2 text-[0.625rem] sm:py-1",
         isActive ? "text-orange-600" : "text-slate-500"
       )}
     >
@@ -141,7 +141,7 @@ export function MobileNav() {
             aria-label="Close menu"
             onClick={closeMenu}
           />
-          <div className="absolute bottom-0 left-0 right-0 flex max-h-[70vh] min-h-48 flex-col rounded-t-2xl bg-white pb-20 shadow-[0_-8px_24px_rgba(15,23,42,0.12)]">
+          <div className="absolute bottom-0 left-0 right-0 flex max-h-[70vh] min-h-48 flex-col rounded-t-2xl bg-white pb-[calc(5rem+env(safe-area-inset-bottom,0px))] shadow-[0_-8px_24px_rgba(15,23,42,0.12)]">
             <div className="flex shrink-0 items-center justify-between gap-3 px-4 pb-2 pt-3.5">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 All modules
@@ -181,7 +181,7 @@ export function MobileNav() {
         </div>
       )}
 
-      <nav className="no-print fixed bottom-0 left-0 right-0 z-50 border-t bg-white md:hidden">
+      <nav className="no-print fixed bottom-0 left-0 right-0 z-50 border-t bg-white pb-[env(safe-area-inset-bottom,0px)] md:hidden">
         <div className="flex justify-around px-0.5 py-1.5">
           {mobileNavItems.map((item) => (
             <NavLink
@@ -199,7 +199,7 @@ export function MobileNav() {
               aria-label="More modules"
               onClick={() => setMenuOpen((open) => !open)}
               className={cn(
-                "flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-1 text-[0.625rem]",
+                "flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-2 text-[0.625rem] sm:py-1",
                 menuOpen || isMoreNavScreen ? "text-orange-600" : "text-slate-500"
               )}
             >

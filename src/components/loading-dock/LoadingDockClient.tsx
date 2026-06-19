@@ -21,7 +21,7 @@ import {
   Star,
 } from "lucide-react";
 import Link from "next/link";
-import { Button, Badge, StatCard } from "@/components/ui";
+import { Button, Badge, StatCard, ScrollableTabs, TabPill } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
 import { formatCurrency } from "@/lib/utils";
 import { InvoiceScanModal } from "./InvoiceScanModal";
@@ -451,21 +451,16 @@ export function LoadingDockClient() {
         <StatCard label="Match issues" value={discrepancyCount} subtext="Hold payment" />
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              tab === t.id ? "bg-orange-100 text-orange-800" : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            {t.icon}
-            {t.label}
-          </button>
-        ))}
-        <Button variant="ghost" size="sm" onClick={load} className="ml-auto">
+      <div className="mb-4 flex items-start gap-2 border-b border-slate-200 pb-2">
+        <ScrollableTabs className="min-w-0 flex-1" menuLabel="Loading dock">
+          {tabs.map((t) => (
+            <TabPill key={t.id} id={t.id} active={tab === t.id} onClick={() => setTab(t.id)}>
+              {t.icon}
+              {t.label}
+            </TabPill>
+          ))}
+        </ScrollableTabs>
+        <Button variant="ghost" size="sm" onClick={load} className="hidden shrink-0 sm:inline-flex">
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
         </Button>
       </div>

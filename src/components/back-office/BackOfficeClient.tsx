@@ -5,7 +5,7 @@ import {
   RefreshCw,
   Loader2,
 } from "lucide-react";
-import { Button, Badge, StatCard } from "@/components/ui";
+import { Button, Badge, StatCard, ScrollableTabs, TabPill } from "@/components/ui";
 import { PageSectionShell, PageSection } from "@/components/layout/PageSections";
 import { ForgottenClockOutAlert } from "@/components/staff/ForgottenClockOutAlert";
 import { ComplianceAlertsBanner } from "@/components/staff/ComplianceAlertsBanner";
@@ -123,20 +123,15 @@ export function BackOfficeClient() {
         </PageSection>
       </PageSectionShell>
 
-      <div className="no-print mb-4 flex flex-wrap gap-2 border-b border-slate-200 pb-2">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={`rounded-lg px-3 py-2 text-sm font-medium ${
-              tab === t.id ? "bg-orange-100 text-orange-800" : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-        <Button variant="ghost" size="sm" onClick={load} className="ml-auto">
+      <div className="no-print mb-4 flex items-start gap-2 border-b border-slate-200 pb-2">
+        <ScrollableTabs className="min-w-0 flex-1" menuLabel="Back office">
+          {tabs.map((t) => (
+            <TabPill key={t.id} id={t.id} active={tab === t.id} onClick={() => setTab(t.id)}>
+              {t.label}
+            </TabPill>
+          ))}
+        </ScrollableTabs>
+        <Button variant="ghost" size="sm" onClick={load} className="hidden shrink-0 sm:inline-flex">
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
         </Button>
       </div>

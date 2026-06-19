@@ -9,8 +9,9 @@ import {
   Unplug,
   Zap,
 } from "lucide-react";
-import { Button, Badge } from "@/components/ui";
+import { Button, Badge, ScrollableTabs, TabPill } from "@/components/ui";
 import { cn, formatCurrency } from "@/lib/utils";
+import { IntegrationMarketplace } from "@/components/account/IntegrationMarketplace";
 
 interface IntegrationsPayload {
   canManage: boolean;
@@ -76,6 +77,7 @@ interface IntegrationsPayload {
 }
 
 export function IntegrationsPanel() {
+  const [view, setView] = useState<"connected" | "marketplace">("connected");
   const [data, setData] = useState<IntegrationsPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
@@ -152,9 +154,23 @@ export function IntegrationsPanel() {
       <div>
         <h2 className="text-lg font-semibold text-slate-900">The nervous system</h2>
         <p className="mt-1 text-sm text-slate-600">
-          Connect POS, accounting, and vendor systems so data flows automatically — no re-keying.
+          Connect POS, accounting, vendors, and 280+ restaurant systems — data flows automatically, no re-keying.
         </p>
       </div>
+
+      <ScrollableTabs className="border-b border-slate-200 pb-2" menuLabel="Integrations">
+        <TabPill active={view === "connected"} onClick={() => setView("connected")}>
+          Connected
+        </TabPill>
+        <TabPill active={view === "marketplace"} onClick={() => setView("marketplace")}>
+          Marketplace (280+)
+        </TabPill>
+      </ScrollableTabs>
+
+      {view === "marketplace" ? (
+        <IntegrationMarketplace canManage={data.canManage} onNativeConnect={postAction} />
+      ) : (
+        <>
 
       {message && (
         <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
@@ -432,6 +448,8 @@ export function IntegrationsPanel() {
         <p className={cn("text-sm text-slate-500")}>
           Only the location owner can connect or sync integrations.
         </p>
+      )}
+        </>
       )}
     </div>
   );

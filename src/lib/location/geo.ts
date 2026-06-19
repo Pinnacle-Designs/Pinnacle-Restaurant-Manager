@@ -26,6 +26,7 @@ export interface ResolvedGeo {
   source: "stored" | "geocoded";
   city?: string | null;
   stateProvince?: string | null;
+  countryCode?: string | null;
 }
 
 function normGeoField(value: string | null | undefined): string {
@@ -113,6 +114,7 @@ export async function resolveLocationGeo(
     source: "geocoded",
     city: geocoded.city,
     stateProvince: geocoded.stateProvince,
+    countryCode: geocoded.countryCode,
   };
 }
 
@@ -123,6 +125,7 @@ export interface SyncGeoResult {
   geoLabel: string;
   city?: string | null;
   stateProvince?: string | null;
+  countryCode?: string | null;
 }
 
 /** Geocode from postal/address and return fields to persist on Location. */
@@ -138,5 +141,6 @@ export async function syncLocationGeoFields(
     geoLabel: resolved.label,
     city: resolved.city,
     stateProvince: resolved.stateProvince,
+    countryCode: resolved.countryCode,
   };
 }

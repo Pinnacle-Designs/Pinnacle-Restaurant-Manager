@@ -101,7 +101,8 @@ export async function PATCH(request: NextRequest) {
   const geo = await syncLocationGeoFields(locationForGeocoding(merged));
 
   const backfillFromGeo = Boolean(geo && merged.postalCode?.trim());
-  const regional = resolveLocationLocale(merged.countryCode);
+  const effectiveCountry = geo?.countryCode ?? merged.countryCode ?? "US";
+  const regional = resolveLocationLocale(effectiveCountry);
 
   const updated = await prisma.location.update({
     where: { id: user!.locationId },
@@ -110,8 +111,12 @@ export async function PATCH(request: NextRequest) {
       ...(address !== undefined ? { address: address || null } : {}),
       ...(phone !== undefined ? { phone: phone || null } : {}),
       ...(postalCode !== undefined ? { postalCode: postalCode || null } : {}),
-      ...(countryCode != null ? { countryCode } : {}),
       ...(seatCount != null ? { seatCount } : {}),
+      ...(geo?.countryCode && merged.postalCode?.trim()
+        ? { countryCode: geo.countryCode }
+        : countryCode != null
+          ? { countryCode }
+          : {}),
       currencyCode: regional.currencyCode,
       measurementSystem: regional.measurementSystem,
       volumeStandard: regional.volumeStandard,

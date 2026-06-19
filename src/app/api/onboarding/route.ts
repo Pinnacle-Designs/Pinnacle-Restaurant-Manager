@@ -98,7 +98,8 @@ export async function PATCH(request: NextRequest) {
       timezone: null as string | null,
     };
     const geo = await syncLocationGeoFields(merged);
-    const regional = resolveLocationLocale(countryCode);
+    const effectiveCountry = geo?.countryCode ?? countryCode;
+    const regional = resolveLocationLocale(effectiveCountry);
 
     const updated = await prisma.location.update({
       where: { id: user!.locationId },
@@ -109,7 +110,7 @@ export async function PATCH(request: NextRequest) {
         postalCode,
         city: geo?.city ?? city,
         stateProvince: geo?.stateProvince ?? stateProvince,
-        countryCode,
+        countryCode: geo?.countryCode ?? countryCode,
         seatCount: seatCount ?? undefined,
         currencyCode: regional.currencyCode,
         measurementSystem: regional.measurementSystem,

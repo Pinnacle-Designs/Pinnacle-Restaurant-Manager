@@ -173,7 +173,7 @@ export function ReportsClient() {
 
   return (
     <PageSectionShell pageId="reports">
-      <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,240px)_1fr]">
         <PageSection id="report-catalog" title="Report catalog" defaultOpen>
           <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
             {Object.entries(catalog).map(([category, reports]) => (
@@ -203,7 +203,7 @@ export function ReportsClient() {
           </div>
         </PageSection>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           {selectedDef && (
             <p className="text-sm text-slate-600">{selectedDef.description}</p>
           )}

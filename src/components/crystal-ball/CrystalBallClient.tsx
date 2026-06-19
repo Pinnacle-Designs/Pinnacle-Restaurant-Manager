@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Loader2, CloudRain, Sun, Calendar } from "lucide-react";
-import { Button, Badge, StatCard } from "@/components/ui";
+import { Button, Badge, StatCard, ScrollableTabs, TabPill } from "@/components/ui";
 import { PageSectionShell, PageSection } from "@/components/layout/PageSections";
 import { formatCurrency } from "@/lib/utils";
 
@@ -148,7 +148,7 @@ export function CrystalBallClient() {
 
       <PageSectionShell pageId="crystal-ball-metrics">
         <PageSection id="cb-key-metrics" title="Key metrics" defaultOpen>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <StatCard
               label="Tomorrow multiplier"
               value={tomorrow ? `×${tomorrow.prepMultiplier}` : "—"}
@@ -178,20 +178,13 @@ export function CrystalBallClient() {
         </PageSection>
       </PageSectionShell>
 
-      <div className="no-print mb-4 flex flex-wrap gap-2 border-b border-slate-200 pb-2">
+      <ScrollableTabs className="mb-4 border-b border-slate-200 pb-2" menuLabel="Crystal Ball">
         {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              tab === t.id ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
+          <TabPill key={t.id} active={tab === t.id} onClick={() => setTab(t.id)} variant="dark">
             {t.label}
-          </button>
+          </TabPill>
         ))}
-      </div>
+      </ScrollableTabs>
 
       {loading && !data ? (
         <div className="flex items-center justify-center py-16 text-slate-500">

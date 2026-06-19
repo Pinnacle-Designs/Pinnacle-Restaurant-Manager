@@ -19,12 +19,33 @@ export interface StructuredAddress {
   countryCode?: string;
 }
 
+/** Countries supported by zippopotam.us for postal lookup */
+const ZIPPO_COUNTRY_CODES = [
+  "US", "CA", "GB", "DE", "FR", "ES", "IT", "AU", "NZ", "JP", "MX", "BR",
+  "AT", "CH", "NL", "BE", "PT", "PL", "NO", "SE", "DK", "FI", "CZ", "SK",
+  "HU", "RO", "TR", "IN", "SG", "HK", "IE", "LU", "LI", "MC", "AD", "AR",
+  "CL", "CO", "PK", "MY", "TH", "PH", "ZA", "KR", "TW", "IL", "GR", "BG",
+  "HR", "SI", "EE", "LV", "LT", "IS", "MT", "CY", "PE", "VE", "UY",
+] as const;
+
+const ZIPPO_SET = new Set<string>(ZIPPO_COUNTRY_CODES);
+
 function countryLabel(code: string): string {
-  if (code === "US") return "United States";
-  if (code === "CA") return "Canada";
-  if (code === "GB") return "United Kingdom";
-  if (code === "AU") return "Australia";
-  return code;
+  const labels: Record<string, string> = {
+    US: "United States",
+    CA: "Canada",
+    GB: "United Kingdom",
+    AU: "Australia",
+    DE: "Germany",
+    FR: "France",
+    ES: "Spain",
+    IT: "Italy",
+    MX: "Mexico",
+    BR: "Brazil",
+    JP: "Japan",
+    NZ: "New Zealand",
+  };
+  return labels[code] ?? code;
 }
 
 function normalizePostal(value: string): string {
@@ -60,8 +81,80 @@ function hitToPoint(hit: GeocodeHit, postalCode?: string | null): GeoPoint {
     city: hit.name ?? null,
     stateProvince: hit.admin1 ?? null,
     postalCode: postalCode ?? hit.postcode ?? null,
-    countryCode: hit.country_code ?? null,
+    countryCode: hit.country_code?.toUpperCase() ?? null,
   };
+}
+
+/**
+ * Guess likely ISO countries from postal/ZIP format so we can resolve location
+ * (and measurement system) from postal code alone.
+ */
+export function guessCountriesForPostal(postalCode: string): string[] {
+  const raw = postalCode.trim();
+  const p = normalizePostal(raw);
+  const guesses: string[] = [];
+
+  // UK / Crown dependencies (e.g. SW1A 1AA, M1 1AE)
+  if (/^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$/.test(p)) {
+    guesses.push("GB", "IM", "GG", "JE");
+  }
+
+  // Canada (A1A 1A1)
+  if (/^[A-CEGHJ-NPR-TVXY]\d[A-CEGHJ-NPR-TV-Z]\d[A-CEGHJ-NPR-TV-Z]\d$/.test(p.replace(/\s/g, ""))) {
+    guesses.push("CA");
+  }
+
+  // US ZIP / ZIP+4
+  if (/^\d{5}(-\d{4})?$/.test(raw)) {
+    guesses.push("US");
+  }
+
+  // Japan (123-4567 or 1234567)
+  if (/^\d{3}-?\d{4}$/.test(raw)) {
+    guesses.push("JP");
+  }
+
+  // Brazil (12345-678)
+  if (/^\d{5}-?\d{3}$/.test(raw)) {
+    guesses.push("BR");
+  }
+
+  // Netherlands (1234 AB)
+  if (/^\d{4}\s?[A-Z]{2}$/.test(p)) {
+    guesses.push("NL");
+  }
+
+  // Poland (12-345)
+  if (/^\d{2}-?\d{3}$/.test(raw)) {
+    guesses.push("PL");
+  }
+
+  // Portugal (1234-567)
+  if (/^\d{4}-?\d{3}$/.test(raw)) {
+    guesses.push("PT");
+  }
+
+  // Ireland Eircode (A65 F4E2)
+  if (/^[A-Z]\d{2}\s?[A-Z0-9]{4}$/.test(p)) {
+    guesses.push("IE");
+  }
+
+  // Australia / NZ / many others — 4 digits
+  if (/^\d{4}$/.test(raw)) {
+    guesses.push("AU", "NZ", "NO", "DK", "CH", "AT", "BE", "LU", "ZA");
+  }
+
+  // Generic 5-digit (DE, FR, ES, IT, MX, etc.)
+  if (/^\d{5}$/.test(raw)) {
+    guesses.push("DE", "FR", "ES", "IT", "MX", "TR", "FI", "SE", "CZ", "SK", "GR", "TH", "MY", "PH");
+  }
+
+  // India 6-digit PIN
+  if (/^\d{6}$/.test(raw)) {
+    guesses.push("IN");
+  }
+
+  return [...new Set(guesses)];
 }
 
 /** Build geocode search queries — postal/ZIP first for accuracy. */
@@ -121,13 +214,13 @@ async function searchGeocode(
   }
 }
 
-/** Zippopotam.us — precise lat/lng for US/CA postal codes. */
+/** Zippopotam.us — precise lat/lng + country for postal codes. */
 async function geocodePostalViaZippopotam(
   postalCode: string,
   countryCode: string
 ): Promise<GeoPoint | null> {
   const cc = countryCode.toLowerCase();
-  if (!["us", "ca", "mx", "gb", "de", "fr", "es", "it", "au", "nz", "jp", "br"].includes(cc)) {
+  if (!ZIPPO_SET.has(countryCode.toUpperCase())) {
     return null;
   }
   const zip = postalCode.trim();
@@ -137,6 +230,7 @@ async function geocodePostalViaZippopotam(
     if (!res.ok) return null;
     const data = (await res.json()) as {
       country?: string;
+      "country abbreviation"?: string;
       "post code"?: string;
       places?: Array<{
         latitude: string;
@@ -153,6 +247,7 @@ async function geocodePostalViaZippopotam(
     if (Number.isNaN(lat) || Number.isNaN(lon)) return null;
     const city = place["place name"] ?? null;
     const state = place["state abbreviation"] ?? place.state ?? null;
+    const resolvedCountry = (data["country abbreviation"] ?? countryCode).toUpperCase();
     return {
       lat,
       lon,
@@ -160,21 +255,51 @@ async function geocodePostalViaZippopotam(
       city,
       stateProvince: state,
       postalCode: data["post code"] ?? zip,
-      countryCode: countryCode.toUpperCase(),
+      countryCode: resolvedCountry,
     };
   } catch {
     return null;
   }
 }
 
+/** Resolve postal/ZIP across likely countries — drives auto measurement switch. */
+export async function geocodePostalAutoDetect(
+  postalCode: string,
+  hintCountryCode?: string | null
+): Promise<GeoPoint | null> {
+  const zip = postalCode.trim();
+  if (!zip) return null;
+
+  const fromFormat = guessCountriesForPostal(zip);
+  const hint = hintCountryCode?.trim().toUpperCase();
+  const toTry = [
+    ...(hint ? [hint] : []),
+    ...fromFormat,
+    ...ZIPPO_COUNTRY_CODES.filter((c) => c !== hint && !fromFormat.includes(c)),
+  ];
+  const seen = new Set<string>();
+
+  for (const cc of toTry) {
+    if (seen.has(cc)) continue;
+    seen.add(cc);
+
+    const zippo = await geocodePostalViaZippopotam(zip, cc);
+    if (zippo) return zippo;
+
+    const hit = await searchGeocode(`${zip}, ${countryLabel(cc)}`, { postalCode: zip });
+    if (hit?.countryCode) return hit;
+  }
+
+  return null;
+}
+
 /** Geocode using structured address — prefers postal code and validates the match. */
 export async function geocodeStructured(input: StructuredAddress): Promise<GeoPoint | null> {
-  const cc = input.countryCode ?? "US";
   const zip = input.postalCode?.trim();
 
   if (zip) {
-    const zippo = await geocodePostalViaZippopotam(zip, cc);
-    if (zippo) return zippo;
+    const auto = await geocodePostalAutoDetect(zip, input.countryCode);
+    if (auto) return auto;
 
     for (const query of buildGeocodeQueries(input)) {
       const hit = await searchGeocode(query, { postalCode: zip });

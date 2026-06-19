@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Package, ScanLine, ClipboardList, MapPin } from "lucide-react";
-import { Button, EmptyState } from "@/components/ui";
+import { Button, EmptyState, ScrollableTabs, TabPill } from "@/components/ui";
 import { Input, Select, FormField, Modal } from "@/components/ui/form";
 import { apiPost, apiPatch, apiDelete } from "@/lib/api";
 import { InventoryScanModal } from "@/components/inventory/InventoryScanModal";
@@ -176,21 +176,14 @@ export function InventoryClient({
 
   return (
     <>
-      <div className="no-print mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-2">
+      <ScrollableTabs className="mb-6 border-b border-slate-200 pb-2" menuLabel="Inventory">
         {TABS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setActiveTab(id)}
-            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${
-              tab === id ? "bg-orange-100 text-orange-800" : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            <Icon className="h-4 w-4" />
+          <TabPill key={id} active={tab === id} onClick={() => setActiveTab(id)}>
+            <Icon className="h-4 w-4 shrink-0" />
             {label}
-          </button>
+          </TabPill>
         ))}
-      </div>
+      </ScrollableTabs>
 
       {tab === "count" && <WalkInClient />}
 

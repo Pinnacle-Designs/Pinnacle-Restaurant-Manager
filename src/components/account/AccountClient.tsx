@@ -17,7 +17,7 @@ import {
   AlertCircle,
   Users,
 } from "lucide-react";
-import { PageHeader, Button, Badge } from "@/components/ui";
+import { PageHeader, Button, Badge, ScrollableTabs, TabPill } from "@/components/ui";
 import { PageSectionShell, PageSection } from "@/components/layout/PageSections";
 import { Input, FormField } from "@/components/ui/form";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -312,31 +312,26 @@ export function AccountClient() {
         description="Manage your profile, password, and subscription billing."
       />
 
-      <div className="flex flex-col gap-6 lg:flex-row">
-        <nav className="no-print flex gap-2 overflow-x-auto lg:w-52 lg:flex-col lg:gap-1">
+      <div className="page-content flex flex-col gap-4 sm:gap-6 lg:flex-row">
+        <ScrollableTabs verticalAtLg verticalClassName="lg:w-52 lg:shrink-0 lg:border-b-0" menuLabel="Account">
           {visibleTabs.map((item) => {
             const Icon = item.icon;
-            const active = tab === item.id;
             return (
-              <button
+              <TabPill
                 key={item.id}
-                type="button"
+                id={item.id}
+                active={tab === item.id}
                 onClick={() => setTab(item.id)}
-                className={cn(
-                  "flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  active
-                    ? "bg-orange-50 text-orange-700"
-                    : "text-slate-600 hover:bg-slate-100"
-                )}
+                className="lg:w-full lg:justify-start"
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-4 w-4 shrink-0" />
                 {item.label}
-              </button>
+              </TabPill>
             );
           })}
-        </nav>
+        </ScrollableTabs>
 
-        <div className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           {tab === "profile" && (
             <PageSectionShell pageId="account-profile">
               <PageSection

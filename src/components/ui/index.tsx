@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 
 export { PageHeader } from "@/components/ui/PageHeader";
 export { PrintButton } from "@/components/ui/PrintButton";
+export { ScrollableTabs, TabPill } from "@/components/ui/ScrollableTabs";
 export {
   CollapsibleSection,
   CollapsibleGroup,
@@ -20,10 +21,10 @@ interface StatCardProps {
 
 export function StatCard({ label, value, subtext, className }: StatCardProps) {
   return (
-    <div className={cn("card", className)}>
-      <p className="text-sm font-medium text-slate-500">{label}</p>
-      <p className="mt-2 text-3xl font-bold text-slate-900">{value}</p>
-      {subtext && <p className="mt-1 text-xs text-slate-400">{subtext}</p>}
+    <div className={cn("card min-w-0", className)}>
+      <p className="truncate text-sm font-medium text-slate-500">{label}</p>
+      <p className="mt-2 truncate text-2xl font-bold text-slate-900 sm:text-3xl">{value}</p>
+      {subtext && <p className="mt-1 truncate text-xs text-slate-400">{subtext}</p>}
     </div>
   );
 }
@@ -47,9 +48,9 @@ export function Button({
     ghost: "text-slate-600 hover:bg-slate-100",
   };
   const sizes = {
-    sm: "px-3 py-1.5 text-sm",
-    md: "px-4 py-2 text-sm",
-    lg: "px-6 py-3 text-base",
+    sm: "min-h-[40px] px-3 py-2 text-sm sm:min-h-0",
+    md: "min-h-[44px] px-4 py-2.5 text-sm sm:min-h-0",
+    lg: "min-h-[48px] px-6 py-3 text-base sm:min-h-0",
   };
 
   return (
