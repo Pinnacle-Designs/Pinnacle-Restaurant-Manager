@@ -3174,6 +3174,126 @@ body.modal-open {
   text-align: center;
 }
 
+/* Group / multi-location pricing */
+.pricing-group-panel {
+  display: grid;
+  gap: 2rem;
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 2rem;
+  border-radius: 1rem;
+  border: 1px solid var(--slate-200);
+  background: #fff;
+}
+
+@media (min-width: 768px) {
+  .pricing-group-panel {
+    grid-template-columns: minmax(0, 17rem) minmax(0, 1fr);
+    gap: 2.5rem;
+    align-items: start;
+    padding: 2.25rem 2.5rem;
+  }
+}
+
+.pricing-group-pricing {
+  text-align: center;
+  padding: 1.25rem 1rem;
+  border-radius: 0.875rem;
+  background: var(--slate-50);
+  border: 1px solid var(--slate-200);
+}
+
+@media (min-width: 768px) {
+  .pricing-group-pricing {
+    text-align: left;
+    padding: 1.5rem;
+    position: sticky;
+    top: 5rem;
+  }
+}
+
+.pricing-group-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--orange);
+}
+
+.pricing-group-lead {
+  margin-top: 0.5rem;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--slate-600);
+}
+
+.pricing-group-breakdown {
+  margin: 1.25rem 0 0;
+  padding: 0;
+}
+
+.pricing-group-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.625rem 0;
+  border-bottom: 1px solid var(--slate-200);
+}
+
+.pricing-group-breakdown-row:last-child {
+  border-bottom: none;
+}
+
+.pricing-group-breakdown-row dt {
+  font-size: 0.875rem;
+  color: var(--slate-600);
+  font-weight: 500;
+}
+
+.pricing-group-breakdown-row dd {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--slate-900);
+  white-space: nowrap;
+}
+
+.pricing-group-meta {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--slate-200);
+  font-size: 0.8125rem;
+  color: var(--slate-500);
+  line-height: 1.5;
+}
+
+.pricing-group-includes {
+  margin: 0 0 1rem;
+  font-size: 0.9375rem;
+  color: var(--slate-600);
+}
+
+.pricing-group-list {
+  margin-top: 0;
+}
+
+.pricing-group-list.check-list-stacked li {
+  background: var(--slate-50);
+}
+
+.pricing-group-features .pricing-group-cta {
+  margin-top: 1.5rem;
+  width: 100%;
+  text-align: center;
+}
+
+@media (min-width: 480px) {
+  .pricing-group-features .pricing-group-cta {
+    width: auto;
+  }
+}
+
 .pricing-tier-panel {
   max-width: 42rem;
   margin: 0 auto;
