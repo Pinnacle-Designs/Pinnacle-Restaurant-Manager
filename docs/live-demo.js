@@ -43,7 +43,7 @@
       base.replace(/\/$/, "") +
       "/api/embed/launch?path=" +
       encodeURIComponent(DEFAULT_PATH) +
-      "&chrome=full";
+      "&chrome=mobile";
     var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
     var timer = controller
       ? setTimeout(function () {
@@ -386,7 +386,7 @@
       }
       heroController = mountLiveEmbed(heroSlot, appUrl, {
         path: DEFAULT_PATH,
-        chrome: "full",
+        chrome: "mobile",
         candidates: buildCandidates(appUrl),
       });
     }

@@ -101,7 +101,7 @@ function NavLink({
   );
 }
 
-export function MobileNav() {
+export function MobileNav({ forceShow = false }: { forceShow?: boolean }) {
   const pathname = usePathname();
   const { user } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -131,7 +131,7 @@ export function MobileNav() {
       {menuOpen && moreNavItems.length > 0 && (
         <div
           id="mobile-more-menu"
-          className="fixed inset-0 z-40 md:hidden"
+          className={cn("fixed inset-0 z-40", forceShow ? "" : "md:hidden")}
           role="dialog"
           aria-label="All modules"
         >
@@ -181,7 +181,12 @@ export function MobileNav() {
         </div>
       )}
 
-      <nav className="no-print fixed bottom-0 left-0 right-0 z-50 border-t bg-white pb-[env(safe-area-inset-bottom,0px)] md:hidden">
+      <nav
+        className={cn(
+          "no-print fixed bottom-0 left-0 right-0 z-50 border-t bg-white pb-[env(safe-area-inset-bottom,0px)]",
+          forceShow ? "" : "md:hidden"
+        )}
+      >
         <div className="flex justify-around px-0.5 py-1.5">
           {mobileNavItems.map((item) => (
             <NavLink

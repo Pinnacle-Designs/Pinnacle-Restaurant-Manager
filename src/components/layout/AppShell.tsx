@@ -68,13 +68,21 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           <NotificationProvider>
             <div className="flex min-h-screen min-w-0 overflow-x-hidden">
               {showSidebar && <Sidebar />}
-              <div className={`flex min-w-0 flex-1 flex-col ${showMobileNav ? "pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-0" : ""}`}>
-                {showMobileHeader && <MobileHeader />}
+              <div
+                className={`flex min-w-0 flex-1 flex-col ${
+                  isEmbedMobile
+                    ? "pb-[calc(5rem+env(safe-area-inset-bottom,0px))]"
+                    : showMobileNav
+                      ? "pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-0"
+                      : ""
+                }`}
+              >
+                {showMobileHeader && <MobileHeader forceShow={isEmbedMobile} />}
                 {showDesktopTopBar && <DesktopTopBar />}
                 {mainInner}
               </div>
             </div>
-            {showMobileNav && <MobileNav />}
+            {showMobileNav && <MobileNav forceShow={isEmbedMobile} />}
           </NotificationProvider>
         </GlobalSearchProvider>
       </LocationLocaleProvider>
