@@ -6,6 +6,7 @@ import {
   workspaceCookieOptions,
 } from "./workspace-cookie";
 import { buildWorkspaceSnapshot } from "./workspace-snapshot";
+import { getSessionVersion } from "./session-version";
 
 export interface PreparedAuthSession {
   sessionUser: SessionUser;
@@ -15,7 +16,9 @@ export interface PreparedAuthSession {
 
 export async function prepareAuthSession(user: SessionUser): Promise<PreparedAuthSession> {
   const sessionUser = await enrichUserWithPlan(user);
-  const sessionToken = await createSessionToken(sessionUser);
+  const sessionVersion = await getSessionVersion(sessionUser.id);
+  const withVersion = { ...sessionUser, sessionVersion };
+  const sessionToken = await createSessionToken(withVersion);
   let workspaceToken: string | null = null;
 
   if (sessionUser.locationId) {

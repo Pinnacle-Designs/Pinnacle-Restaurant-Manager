@@ -5,6 +5,7 @@ import { requireSecureAuth } from "@/lib/api-auth";
 import { isRateLimited } from "@/lib/rate-limit";
 import { validatePassword } from "@/lib/password-policy";
 import { privateJsonResponse } from "@/lib/secure-response";
+import { bumpSessionVersion } from "@/lib/session-version";
 
 export async function POST(request: NextRequest) {
   const { user, error } = await requireSecureAuth(request);
@@ -54,5 +55,10 @@ export async function POST(request: NextRequest) {
     data: { passwordHash: hashPassword(newPassword) },
   });
 
-  return privateJsonResponse({ message: "Password updated" });
+  await bumpSessionVersion(user!.id);
+
+  return privateJsonResponse({
+    message: "Password updated. Sign in again on your other devices.",
+    sessionRevoked: true,
+  });
 }

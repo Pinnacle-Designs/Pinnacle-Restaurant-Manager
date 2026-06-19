@@ -37,6 +37,7 @@
     "lucide-react": "^0.487.0",
     "next": "^15.2.4",
     "openai": "^4.89.0",
+    "otpauth": "^9.5.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "stripe": "^17.7.0",

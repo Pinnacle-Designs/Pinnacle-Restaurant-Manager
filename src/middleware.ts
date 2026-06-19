@@ -17,6 +17,7 @@ import {
 } from "@/lib/workspace-cookie";
 import { hasActiveBilling, isBillingAllowedPath } from "@/lib/plan-billing";
 import type { PlanId } from "@/lib/plans";
+import { isCrossSiteMutation } from "@/lib/csrf";
 
 const PUBLIC_PATHS = [
   "/",
@@ -28,6 +29,7 @@ const PUBLIC_PATHS = [
   "/terms",
   "/docs",
   "/api/auth/login",
+  "/api/auth/mfa/verify",
   "/api/auth/register",
   "/api/auth/seed",
   "/api/auth/plan-demos",
@@ -162,6 +164,17 @@ export async function middleware(request: NextRequest) {
 
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return applyFramePolicy(request, NextResponse.next());
+  }
+
+  if (
+    pathname.startsWith("/api/") &&
+    isCrossSiteMutation(request) &&
+    !pathname.startsWith("/api/webhooks/")
+  ) {
+    return applyFramePolicy(
+      request,
+      NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    );
   }
 
   const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;

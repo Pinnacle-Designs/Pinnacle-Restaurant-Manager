@@ -293,6 +293,15 @@ model User {
   permissionOverride UserPermissionOverride?
   isPlatformAdmin Boolean @default(false)
   active       Boolean  @default(true)
+  /// Incremented to invalidate existing sessions (password change, MFA change, admin revoke).
+  sessionVersion Int    @default(0)
+  mfaEnabled   Boolean  @default(false)
+  /// AES-GCM encrypted TOTP secret (base32).
+  totpSecretEnc String?
+  /// Temporary encrypted secret while enrolling MFA (cleared after enable).
+  mfaPendingSecretEnc String?
+  /// JSON array of scrypt hashes for one-time backup codes.
+  mfaBackupCodesHash String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   webAuthnCredentials WebAuthnCredential[]

@@ -49,6 +49,9 @@ export async function PATCH(request: NextRequest) {
   const data: Record<string, unknown> = {};
   if (body.active !== undefined) data.active = body.active === true;
   if (body.isPlatformAdmin !== undefined) data.isPlatformAdmin = body.isPlatformAdmin === true;
+  if (body.active === false) {
+    data.sessionVersion = { increment: 1 };
+  }
 
   if (!Object.keys(data).length) {
     return privateJsonResponse({ error: "No valid fields to update" }, { status: 400 });

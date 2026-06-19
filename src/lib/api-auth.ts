@@ -20,7 +20,7 @@ export function forbiddenResponse() {
 export async function requireAuth(request: NextRequest) {
   const user = await getSessionUserFromRequest(request);
   if (!user) return { user: null, error: unauthorizedResponse() };
-  return { user, error: null };
+  return requireActiveAccount(user);
 }
 
 /** Re-check the account is still active in the database (revoked/deactivated sessions). */
@@ -39,10 +39,15 @@ export async function requireActiveAccount(user: SessionUser | null) {
       locationId: true,
       avatarUrl: true,
       active: true,
+      sessionVersion: true,
     },
   });
 
   if (!dbUser?.active) {
+    return { user: null, error: unauthorizedResponse() };
+  }
+
+  if ((user.sessionVersion ?? 0) !== dbUser.sessionVersion) {
     return { user: null, error: unauthorizedResponse() };
   }
 
@@ -60,9 +65,7 @@ export async function requireActiveAccount(user: SessionUser | null) {
 }
 
 export async function requireSecureAuth(request: NextRequest) {
-  const { user, error } = await requireAuth(request);
-  if (error) return { user: null, error };
-  return requireActiveAccount(user);
+  return requireAuth(request);
 }
 
 async function userHasPermission(

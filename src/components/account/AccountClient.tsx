@@ -30,6 +30,7 @@ import {
 } from "@/components/billing/SubscriptionContractModal";
 import { IntegrationsPanel } from "@/components/account/IntegrationsPanel";
 import { PaymentSupportPanel } from "@/components/account/PaymentSupportPanel";
+import { MfaSecurityPanel } from "@/components/account/MfaSecurityPanel";
 import { PLAN_BY_ID } from "@/lib/plans";
 import { ROLE_LABELS, ROLE_COLORS } from "@/lib/permissions";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -227,6 +228,10 @@ export function AccountClient() {
       setNewPassword("");
       setConfirmPassword("");
       setPasswordMessage("Password updated successfully");
+      if (json.sessionRevoked) {
+        window.location.assign("/login");
+        return;
+      }
     } catch (err) {
       setPasswordMessage(err instanceof Error ? err.message : "Could not update password");
     } finally {
@@ -467,7 +472,7 @@ export function AccountClient() {
             <PageSectionShell pageId="account-security">
               <PageSection
                 id="account-security-password"
-                title="Security"
+                title="Password"
                 description="Update your password to keep your account secure."
                 defaultOpen
               >
@@ -517,6 +522,7 @@ export function AccountClient() {
                 </Button>
               </form>
               </PageSection>
+              <MfaSecurityPanel />
             </PageSectionShell>
           )}
 

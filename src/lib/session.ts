@@ -1,6 +1,7 @@
 import type { AppRole } from "./app-role";
 import type { PlanId } from "./plans";
 import type { Permission } from "./permissions";
+import { getSecret } from "./session-secret";
 
 export const AUTH_COOKIE_NAME = "pinnacle_session";
 export const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -16,20 +17,7 @@ export interface SessionUser {
   permissions?: Permission[];
   setupComplete?: boolean;
   isPlatformAdmin?: boolean;
-}
-
-function getSecret(): string {
-  const secret = process.env.AUTH_SECRET?.trim();
-  if (secret) {
-    if (process.env.NODE_ENV === "production" && secret.length < 32) {
-      throw new Error("AUTH_SECRET must be at least 32 characters in production");
-    }
-    return secret;
-  }
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("AUTH_SECRET must be set in production");
-  }
-  return "pinnacle-dev-secret-change-me";
+  sessionVersion?: number;
 }
 
 function toBase64Url(bytes: Uint8Array): string {
@@ -116,6 +104,7 @@ export async function parseSessionToken(token: string): Promise<SessionUser | nu
       permissions: data.permissions,
       setupComplete: data.setupComplete,
       isPlatformAdmin: data.isPlatformAdmin,
+      sessionVersion: data.sessionVersion,
     };
   } catch {
     return null;
