@@ -6,13 +6,21 @@ import { isRateLimited } from "@/lib/rate-limit";
 import { privateJsonResponse } from "@/lib/secure-response";
 import { decryptTotpSecret, verifyMfaCode } from "@/lib/mfa";
 import { bumpSessionVersion } from "@/lib/session-version";
+import { ownerCannotDisableMfa } from "@/lib/mfa-policy";
 
 export async function POST(request: NextRequest) {
   const { user, error } = await requireSecureAuth(request);
   if (error) return error;
 
-  if (isRateLimited(`mfa-disable:${user!.id}`, 5, 60_000)) {
+  if (await isRateLimited(`mfa-disable:${user!.id}`, 5, 60_000)) {
     return privateJsonResponse({ error: "Too many attempts" }, { status: 429 });
+  }
+
+  if (ownerCannotDisableMfa(user!)) {
+    return privateJsonResponse(
+      { error: "Two-factor authentication is required for owner accounts in production." },
+      { status: 403 }
+    );
   }
 
   const body = await request.json();

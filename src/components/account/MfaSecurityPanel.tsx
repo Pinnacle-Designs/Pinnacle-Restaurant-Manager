@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Shield, Smartphone } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
 import { PageSection } from "@/components/layout/PageSections";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 interface MfaStatus {
   mfaEnabled: boolean;
@@ -12,6 +14,9 @@ interface MfaStatus {
 }
 
 export function MfaSecurityPanel() {
+  const searchParams = useSearchParams();
+  const mfaRequired = searchParams.get("mfa") === "required";
+  const { refresh, user } = useAuth();
   const [status, setStatus] = useState<MfaStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -82,6 +87,10 @@ export function MfaSecurityPanel() {
       setSetupCode("");
       setMessage("Two-factor authentication is now enabled.");
       await load();
+      await refresh();
+      if (mfaRequired) {
+        window.location.assign("/dashboard");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not enable 2FA");
     } finally {
@@ -125,6 +134,17 @@ export function MfaSecurityPanel() {
       description="Protect your account and restaurant data with an authenticator app (Google Authenticator, 1Password, Authy, etc.)."
       defaultOpen
     >
+      {mfaRequired && !status?.mfaEnabled && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <Shield className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="font-medium">Two-factor authentication is required</p>
+            <p className="mt-0.5 text-amber-800">
+              Owner accounts must enable 2FA before using the app in production.
+            </p>
+          </div>
+        </div>
+      )}
       {status?.mfaEnabled ? (
         <div className="space-y-4">
           <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
@@ -158,6 +178,11 @@ export function MfaSecurityPanel() {
             <Button type="submit" variant="secondary" disabled={busy}>
               Disable 2FA
             </Button>
+            {user?.role === "OWNER" && (
+              <p className="text-xs text-slate-500">
+                Required for owner accounts in production.
+              </p>
+            )}
           </form>
         </div>
       ) : (

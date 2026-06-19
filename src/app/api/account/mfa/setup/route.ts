@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   const { user, error } = await requireSecureAuth(request);
   if (error) return error;
 
-  if (isRateLimited(`mfa-setup:${user!.id}`, 5, 60_000)) {
+  if (await isRateLimited(`mfa-setup:${user!.id}`, 5, 60_000)) {
     return privateJsonResponse({ error: "Too many setup attempts" }, { status: 429 });
   }
 

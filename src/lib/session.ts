@@ -18,6 +18,8 @@ export interface SessionUser {
   setupComplete?: boolean;
   isPlatformAdmin?: boolean;
   sessionVersion?: number;
+  mfaEnabled?: boolean;
+  emailVerifiedAt?: string | null;
 }
 
 function toBase64Url(bytes: Uint8Array): string {
@@ -105,6 +107,8 @@ export async function parseSessionToken(token: string): Promise<SessionUser | nu
       setupComplete: data.setupComplete,
       isPlatformAdmin: data.isPlatformAdmin,
       sessionVersion: data.sessionVersion,
+      mfaEnabled: data.mfaEnabled,
+      emailVerifiedAt: data.emailVerifiedAt,
     };
   } catch {
     return null;

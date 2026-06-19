@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     if (plan === "STARTER") {
       const dayKey = `ai-starter:${locationId}:${new Date().toISOString().slice(0, 10)}`;
-      if (isRateLimited(dayKey, STARTER_AI_DAILY_LIMIT, 86_400_000)) {
+      if (await isRateLimited(dayKey, STARTER_AI_DAILY_LIMIT, 86_400_000)) {
         return NextResponse.json(
           {
             error: `Starter includes ${STARTER_AI_DAILY_LIMIT} AI questions per day. Upgrade to Growth for unlimited Command Center access.`,

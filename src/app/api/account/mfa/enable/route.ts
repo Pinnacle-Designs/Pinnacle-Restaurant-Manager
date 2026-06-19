@@ -11,12 +11,13 @@ import {
   verifyTotpCode,
 } from "@/lib/mfa";
 import { bumpSessionVersion } from "@/lib/session-version";
+import { applyAuthCookies } from "@/lib/auth-cookies";
 
 export async function POST(request: NextRequest) {
   const { user, error } = await requireSecureAuth(request);
   if (error) return error;
 
-  if (isRateLimited(`mfa-enable:${user!.id}`, 8, 60_000)) {
+  if (await isRateLimited(`mfa-enable:${user!.id}`, 8, 60_000)) {
     return privateJsonResponse({ error: "Too many attempts" }, { status: 429 });
   }
 
@@ -63,8 +64,10 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  return privateJsonResponse({
+  const response = privateJsonResponse({
     message: "Two-factor authentication enabled",
     backupCodes: plain,
   });
+  await applyAuthCookies(response, { ...user!, mfaEnabled: true });
+  return response;
 }

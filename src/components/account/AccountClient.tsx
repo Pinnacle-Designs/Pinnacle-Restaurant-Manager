@@ -159,7 +159,27 @@ export function AccountClient() {
       );
       void loadAccount();
     }
+    if (searchParams.get("mfa") === "required") setTab("security");
+    if (searchParams.get("verify") === "required") setTab("profile");
   }, [searchParams, loadAccount]);
+
+  const [verifySending, setVerifySending] = useState(false);
+  const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
+
+  const resendVerification = async () => {
+    setVerifySending(true);
+    setVerifyMessage(null);
+    try {
+      const res = await fetch("/api/auth/resend-verification", { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Could not send email");
+      setVerifyMessage(json.devLink ? `Dev link: ${json.devLink}` : json.message);
+    } catch (err) {
+      setVerifyMessage(err instanceof Error ? err.message : "Could not send email");
+    } finally {
+      setVerifySending(false);
+    }
+  };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -371,6 +391,31 @@ export function AccountClient() {
         <div className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           {tab === "profile" && (
             <PageSectionShell pageId="account-profile">
+              {!user?.emailVerifiedAt && (
+                <div className="mb-4 flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <div>
+                      <p className="font-medium">Verify your email address</p>
+                      <p className="mt-0.5 text-amber-800">
+                        Check your inbox for a verification link, or resend below.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={verifySending}
+                    onClick={() => void resendVerification()}
+                  >
+                    {verifySending ? "Sending…" : "Resend email"}
+                  </Button>
+                </div>
+              )}
+              {verifyMessage && (
+                <p className="mb-4 text-sm text-slate-600">{verifyMessage}</p>
+              )}
               <PageSection
                 id="account-profile-photo"
                 title="Profile"

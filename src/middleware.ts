@@ -18,6 +18,12 @@ import {
 import { hasActiveBilling, isBillingAllowedPath } from "@/lib/plan-billing";
 import type { PlanId } from "@/lib/plans";
 import { isCrossSiteMutation } from "@/lib/csrf";
+import {
+  emailVerificationRequired,
+  isEmailVerificationAllowedPath,
+  isMfaSetupAllowedPath,
+  ownerMfaRequired,
+} from "@/lib/mfa-policy";
 
 const PUBLIC_PATHS = [
   "/",
@@ -25,12 +31,18 @@ const PUBLIC_PATHS = [
   "/embed",
   "/login",
   "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/verify-email",
   "/privacy",
   "/terms",
   "/docs",
   "/api/auth/login",
   "/api/auth/mfa/verify",
   "/api/auth/register",
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
+  "/api/auth/verify-email",
   "/api/auth/seed",
   "/api/auth/plan-demos",
   "/api/embed/launch",
@@ -227,6 +239,35 @@ export async function middleware(request: NextRequest) {
       );
     }
     return applyFramePolicy(request, NextResponse.redirect(new URL("/onboarding", request.url)));
+  }
+
+  if (ownerMfaRequired(user) && !isMfaSetupAllowedPath(pathname)) {
+    if (pathname.startsWith("/api/")) {
+      return applyFramePolicy(
+        request,
+        NextResponse.json(
+          { error: "Two-factor authentication is required for owner accounts." },
+          { status: 403 }
+        )
+      );
+    }
+    const securityUrl = new URL("/account", request.url);
+    securityUrl.searchParams.set("tab", "security");
+    securityUrl.searchParams.set("mfa", "required");
+    return applyFramePolicy(request, NextResponse.redirect(securityUrl));
+  }
+
+  if (emailVerificationRequired(user) && !isEmailVerificationAllowedPath(pathname)) {
+    if (pathname.startsWith("/api/")) {
+      return applyFramePolicy(
+        request,
+        NextResponse.json({ error: "Verify your email address to continue." }, { status: 403 })
+      );
+    }
+    const profileUrl = new URL("/account", request.url);
+    profileUrl.searchParams.set("tab", "profile");
+    profileUrl.searchParams.set("verify", "required");
+    return applyFramePolicy(request, NextResponse.redirect(profileUrl));
   }
 
   if (

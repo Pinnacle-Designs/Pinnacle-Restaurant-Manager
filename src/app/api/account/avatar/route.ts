@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   const { user, error } = await requireSecureAuth(request);
   if (error) return error;
 
-  if (isRateLimited(`avatar:${user!.id}`, 10, 60_000)) {
+  if (await isRateLimited(`avatar:${user!.id}`, 10, 60_000)) {
     return privateJsonResponse(
       { error: "Too many upload attempts. Try again shortly." },
       { status: 429 }

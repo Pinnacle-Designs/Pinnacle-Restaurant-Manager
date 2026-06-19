@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
-  if (isRateLimited(`login:ip:${ip}`, 20, 60_000)) {
+  if (await isRateLimited(`login:ip:${ip}`, 20, 60_000)) {
     return privateJsonResponse(
       { error: "Too many login attempts. Try again shortly." },
       { status: 429 }
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const email = String(body.email || "").trim().toLowerCase();
 
-  if (email && isRateLimited(`login:email:${email}`, 10, 60_000)) {
+  if (email && (await isRateLimited(`login:email:${email}`, 10, 60_000))) {
     return privateJsonResponse(
       { error: "Too many login attempts. Try again shortly." },
       { status: 429 }

@@ -20,7 +20,7 @@ export async function PATCH(request: NextRequest) {
   if (error) return error;
 
   if (
-    isRateLimited(`billing:${user!.id}`, 8, 60_000)
+    await isRateLimited(`billing:${user!.id}`, 8, 60_000)
   ) {
     return privateJsonResponse(
       { error: "Too many billing attempts. Try again shortly." },

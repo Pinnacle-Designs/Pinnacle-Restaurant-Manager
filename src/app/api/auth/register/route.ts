@@ -9,12 +9,14 @@ import { getClientIp } from "@/lib/client-ip";
 import { isRateLimited } from "@/lib/rate-limit";
 import { validatePassword } from "@/lib/password-policy";
 import { privateJsonResponse } from "@/lib/secure-response";
+import { createAuthToken } from "@/lib/auth-tokens";
+import { sendVerificationEmail } from "@/lib/email";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
-  if (isRateLimited(`register:ip:${ip}`, 5, 60_000)) {
+  if (await isRateLimited(`register:ip:${ip}`, 5, 60_000)) {
     return privateJsonResponse(
       { error: "Too many sign-up attempts. Try again shortly." },
       { status: 429 }
@@ -66,6 +68,8 @@ export async function POST(request: NextRequest) {
 
   await ensureDefaultStorageZones(location.id);
 
+  const autoVerifyEmail = process.env.NODE_ENV !== "production";
+
   const user = await prisma.user.create({
     data: {
       email,
@@ -74,8 +78,16 @@ export async function POST(request: NextRequest) {
       role: "OWNER",
       locationId: location.id,
       active: true,
+      emailVerifiedAt: autoVerifyEmail ? new Date() : null,
     },
   });
+
+  let verificationDevLink: string | undefined;
+  if (!autoVerifyEmail) {
+    const token = await createAuthToken(user.id, "EMAIL_VERIFY", 24 * 60 * 60_000);
+    const emailResult = await sendVerificationEmail(email, token);
+    verificationDevLink = emailResult.devLink;
+  }
 
   const prepared = await prepareAuthSession({
     id: user.id,
@@ -93,6 +105,7 @@ export async function POST(request: NextRequest) {
       locationName: location.name,
       plan: location.plan,
     },
+    verificationDevLink,
   });
 
   attachAuthCookies(response, prepared);

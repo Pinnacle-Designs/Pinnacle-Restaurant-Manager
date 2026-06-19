@@ -302,9 +302,25 @@ model User {
   mfaPendingSecretEnc String?
   /// JSON array of scrypt hashes for one-time backup codes.
   mfaBackupCodesHash String?
+  /// Set when the user confirms their email address.
+  emailVerifiedAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   webAuthnCredentials WebAuthnCredential[]
+  authTokens   AuthToken[]
+}
+
+model AuthToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, type])
 }
 
 model WebAuthnCredential {

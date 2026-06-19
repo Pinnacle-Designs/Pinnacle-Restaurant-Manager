@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { parseOAuthState } from "@/lib/payments/oauth-state";
 import { exchangeSquareOAuthCode } from "@/lib/payments/square-server";
 import { appBaseUrl } from "@/lib/payments/providers";
+import { encryptCredential } from "@/lib/credential-crypto";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -29,6 +30,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${base}&pos=square-error`);
     }
 
+    const encryptedRefresh = encryptCredential(token.refresh_token ?? null);
+
     await prisma.paymentProviderConnection.upsert({
       where: {
         locationId_purpose: { locationId: parsed.locationId, purpose: "POS" },
@@ -38,13 +41,13 @@ export async function GET(request: NextRequest) {
         provider: "SQUARE",
         purpose: "POS",
         accountId: token.merchant_id,
-        credential: token.refresh_token ?? null,
+        credential: encryptedRefresh,
         status: "connected",
       },
       update: {
         provider: "SQUARE",
         accountId: token.merchant_id,
-        credential: token.refresh_token ?? null,
+        credential: encryptedRefresh,
         status: "connected",
       },
     });

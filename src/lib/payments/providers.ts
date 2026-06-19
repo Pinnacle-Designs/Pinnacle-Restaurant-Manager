@@ -2,6 +2,7 @@ import type { PaymentProviderConnection } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { ProviderOption } from "./types";
 import { kindToPosId, kindToSubscriptionId } from "./types";
+import { decryptCredential } from "@/lib/credential-crypto";
 
 export { kindToPosId, kindToSubscriptionId };
 
@@ -40,6 +41,13 @@ export async function getProviderConnection(
   return prisma.paymentProviderConnection.findUnique({
     where: { locationId_purpose: { locationId, purpose } },
   });
+}
+
+/** Decrypt stored OAuth refresh token or other provider credential. */
+export function readConnectionCredential(
+  connection: Pick<PaymentProviderConnection, "credential"> | null | undefined
+): string | null {
+  return decryptCredential(connection?.credential ?? null);
 }
 
 function parseMetadata(raw: string | null | undefined): Record<string, string> {

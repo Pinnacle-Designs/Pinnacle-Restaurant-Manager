@@ -18,6 +18,8 @@ export interface AuthUser {
   permissions?: Permission[];
   setupComplete?: boolean;
   isPlatformAdmin?: boolean;
+  mfaEnabled?: boolean;
+  emailVerifiedAt?: string | null;
 }
 
 interface AuthContextValue {

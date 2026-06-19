@@ -32,7 +32,7 @@ export async function OPTIONS(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
-  if (isRateLimited(`pitch-request:ip:${ip}`, 5, 60_000)) {
+  if (await isRateLimited(`pitch-request:ip:${ip}`, 5, 60_000)) {
     return withMarketingCors(
       request,
       NextResponse.json({ error: "Too many requests. Try again shortly." }, { status: 429 })
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (isRateLimited(`pitch-request:email:${email}`, 3, 60 * 60_000)) {
+  if (await isRateLimited(`pitch-request:email:${email}`, 3, 60 * 60_000)) {
     return withMarketingCors(
       request,
       NextResponse.json({ error: "A request was already submitted recently." }, { status: 429 })

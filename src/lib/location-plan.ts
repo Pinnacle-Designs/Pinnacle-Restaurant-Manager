@@ -31,13 +31,21 @@ export async function enrichUserWithPlan(user: SessionUser): Promise<SessionUser
   let avatarUrl: string | null | undefined;
   let setupComplete = user.setupComplete ?? true;
   let isAdmin = user.isPlatformAdmin ?? false;
+  let mfaEnabled = user.mfaEnabled ?? false;
+  let emailVerifiedAt: string | null | undefined = user.emailVerifiedAt;
 
   try {
     const [resolvedPlan, dbUser, resolvedSetup] = await Promise.all([
       getLocationPlan(user.locationId),
       prisma.user.findUnique({
         where: { id: user.id },
-        select: { avatarUrl: true, name: true, isPlatformAdmin: true },
+        select: {
+          avatarUrl: true,
+          name: true,
+          isPlatformAdmin: true,
+          mfaEnabled: true,
+          emailVerifiedAt: true,
+        },
       }),
       getLocationSetupComplete(user.locationId),
     ]);
@@ -49,6 +57,8 @@ export async function enrichUserWithPlan(user: SessionUser): Promise<SessionUser
       email: user.email,
       isPlatformAdmin: dbUser?.isPlatformAdmin ?? false,
     });
+    mfaEnabled = dbUser?.mfaEnabled ?? false;
+    emailVerifiedAt = dbUser?.emailVerifiedAt?.toISOString() ?? null;
   } catch {
     try {
       plan = await getLocationPlan(user.locationId);
@@ -58,13 +68,15 @@ export async function enrichUserWithPlan(user: SessionUser): Promise<SessionUser
     }
     const dbUser = await prisma.user.findUnique({
       where: { id: user.id },
-      select: { name: true, isPlatformAdmin: true },
+      select: { name: true, isPlatformAdmin: true, mfaEnabled: true, emailVerifiedAt: true },
     });
     name = dbUser?.name ?? user.name;
     isAdmin = isPlatformAdmin({
       email: user.email,
       isPlatformAdmin: dbUser?.isPlatformAdmin ?? false,
     });
+    mfaEnabled = dbUser?.mfaEnabled ?? mfaEnabled;
+    emailVerifiedAt = dbUser?.emailVerifiedAt?.toISOString() ?? emailVerifiedAt;
   }
 
   return {
@@ -74,6 +86,8 @@ export async function enrichUserWithPlan(user: SessionUser): Promise<SessionUser
     avatarUrl,
     setupComplete,
     isPlatformAdmin: isAdmin,
+    mfaEnabled,
+    emailVerifiedAt,
     permissions: await resolveEffectivePermissions(user.role, user.locationId, user.id),
   };
 }

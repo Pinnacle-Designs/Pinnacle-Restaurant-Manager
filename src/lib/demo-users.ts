@@ -1,9 +1,10 @@
 import type { AppRole, SubscriptionPlan } from "@prisma/client";
 import { prisma } from "./prisma";
 import { hashPassword } from "./auth";
+import { OWNER_DEMO_EMAIL } from "./demo-email";
 
 /** Embed / marketing live-demo accounts — not for normal sign-in. */
-export const OWNER_DEMO_EMAIL = "owner@pinnacle.com";
+export { OWNER_DEMO_EMAIL, isDemoAccountEmail, isPlanDemoAccountEmail } from "./demo-email";
 
 export const DEMO_USERS: Array<{
   email: string;
@@ -53,17 +54,6 @@ export const PLAN_DEMO_USERS: Array<{
   },
 ];
 
-const DEMO_EMAILS = new Set(DEMO_USERS.map((u) => u.email.toLowerCase()));
-const PLAN_DEMO_EMAILS = new Set(PLAN_DEMO_USERS.map((u) => u.email.toLowerCase()));
-
-export function isDemoAccountEmail(email: string): boolean {
-  return DEMO_EMAILS.has(email.trim().toLowerCase());
-}
-
-export function isPlanDemoAccountEmail(email: string): boolean {
-  return PLAN_DEMO_EMAILS.has(email.trim().toLowerCase());
-}
-
 /** True when private plan demo accounts may sign in via /login (never on public marketing). */
 export function planDemoLoginEnabled(): boolean {
   return (
@@ -88,12 +78,14 @@ export async function seedDemoUsers() {
         name: user.name,
         role: user.role,
         active: true,
+        emailVerifiedAt: new Date(),
       },
       update: {
         passwordHash: hashPassword(user.password),
         name: user.name,
         role: user.role,
         active: true,
+        emailVerifiedAt: new Date(),
       },
     });
   }
@@ -147,6 +139,7 @@ export async function seedPlanDemoUsers() {
         role: demo.role,
         locationId: location.id,
         active: true,
+        emailVerifiedAt: new Date(),
       },
       update: {
         passwordHash: hashPassword(demo.password),
@@ -154,6 +147,7 @@ export async function seedPlanDemoUsers() {
         role: demo.role,
         locationId: location.id,
         active: true,
+        emailVerifiedAt: new Date(),
       },
     });
 

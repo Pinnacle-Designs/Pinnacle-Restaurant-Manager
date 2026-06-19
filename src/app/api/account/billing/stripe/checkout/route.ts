@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (isRateLimited(`stripe-checkout:${user!.id}`, 5, 60_000)) {
+  if (await isRateLimited(`stripe-checkout:${user!.id}`, 5, 60_000)) {
     return privateJsonResponse({ error: "Too many requests. Try again shortly." }, { status: 429 });
   }
 

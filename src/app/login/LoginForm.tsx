@@ -120,6 +120,11 @@ export default function LoginForm() {
                   required
                 />
               </FormField>
+              <p className="text-right text-sm">
+                <Link href="/forgot-password" className="text-orange-600 hover:text-orange-500">
+                  Forgot password?
+                </Link>
+              </p>
               {error && <p className="text-sm text-red-600">{error}</p>}
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Signing in…" : "Sign in"}

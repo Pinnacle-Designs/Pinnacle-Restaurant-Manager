@@ -13,7 +13,7 @@ import { completeUserLogin } from "@/lib/complete-login";
 
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
-  if (isRateLimited(`mfa:ip:${ip}`, 30, 60_000)) {
+  if (await isRateLimited(`mfa:ip:${ip}`, 30, 60_000)) {
     return privateJsonResponse({ error: "Too many attempts. Try again shortly." }, { status: 429 });
   }
 
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     return privateJsonResponse({ error: "Session expired. Sign in again." }, { status: 401 });
   }
 
-  if (isRateLimited(`mfa:user:${pending.userId}`, 10, 60_000)) {
+  if (await isRateLimited(`mfa:user:${pending.userId}`, 10, 60_000)) {
     return privateJsonResponse({ error: "Too many attempts. Try again shortly." }, { status: 429 });
   }
 

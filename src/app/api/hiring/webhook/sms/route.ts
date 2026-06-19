@@ -2,24 +2,47 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { normalizePhone } from "@/lib/hiring/utils";
 import { sendSms } from "@/lib/hiring/sms";
+import {
+  twilioAuthTokenConfigured,
+  validateTwilioSignature,
+} from "@/lib/twilio-webhook";
 
 /** Twilio inbound SMS webhook — text-to-apply and replies. */
 export async function POST(request: NextRequest) {
   let from = "";
   let to = "";
   let body = "";
+  let formParams: Record<string, string> = {};
 
   const contentType = request.headers.get("content-type") || "";
   if (contentType.includes("application/x-www-form-urlencoded")) {
     const form = await request.formData();
-    from = String(form.get("From") || "");
-    to = String(form.get("To") || "");
-    body = String(form.get("Body") || "").trim();
+    formParams = Object.fromEntries(
+      [...form.entries()].map(([key, value]) => [key, String(value)])
+    );
+    from = formParams.From || "";
+    to = formParams.To || "";
+    body = (formParams.Body || "").trim();
   } else {
-    const json = await request.json();
+    const json = (await request.json()) as Record<string, unknown>;
     from = String(json.From || json.from || "");
     to = String(json.To || json.to || "");
     body = String(json.Body || json.body || "").trim();
+    for (const [key, value] of Object.entries(json)) {
+      if (typeof value === "string") formParams[key] = value;
+    }
+  }
+
+  const authToken = process.env.TWILIO_AUTH_TOKEN?.trim() || "";
+  if (twilioAuthTokenConfigured()) {
+    const signature = request.headers.get("x-twilio-signature") || "";
+    const url = request.nextUrl.origin + request.nextUrl.pathname;
+    if (!validateTwilioSignature(authToken, signature, url, formParams)) {
+      return NextResponse.json({ error: "Invalid Twilio signature" }, { status: 403 });
+    }
+  } else if (process.env.NODE_ENV === "production") {
+    console.warn("[twilio] TWILIO_AUTH_TOKEN not set — rejecting webhook in production");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
   }
 
   if (!from || !body) {

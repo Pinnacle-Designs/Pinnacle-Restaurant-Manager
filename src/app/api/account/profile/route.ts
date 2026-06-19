@@ -11,7 +11,7 @@ export async function PATCH(request: NextRequest) {
   const { user, error } = await requireSecureAuth(request);
   if (error) return error;
 
-  if (isRateLimited(`profile:${user!.id}`, 20, 60_000)) {
+  if (await isRateLimited(`profile:${user!.id}`, 20, 60_000)) {
     return privateJsonResponse(
       { error: "Too many profile updates. Try again shortly." },
       { status: 429 }
