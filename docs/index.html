@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Pinnacle Restaurant Manager — POS with kitchen routing, menu engineering, omnichannel sync, split checks, Stripe billing, 12-tab analytics, and AI Command Center. Try the live demo." />
+  <meta name="description" content="Pinnacle Restaurant Manager — POS, KDS, sub-recipe costing, omnichannel menu sync, payroll &amp; holiday pay, 280+ integrations, loading dock &amp; purchasing, 12-tab analytics, Stripe billing, and AI Command Center. Try the live demo." />
   <meta name="theme-color" content="#0f172a" />
   <title>Pinnacle Restaurant Manager — AI-Powered Restaurant Operations</title>
   <link rel="icon" href="./assets/logo.png" type="image/png" />
@@ -43,7 +43,8 @@
             <h1>Run your restaurant.<span class="accent">Know your numbers.</span></h1>
             <p class="hero-lead">
               Pinnacle is an all-in-one manager — full POS with split checks and kitchen routing,
-              menu engineering with recipe costing, omnichannel menu sync to six channels,
+              menu engineering with sub-recipes and rolled-up ingredient tracking, omnichannel sync to six channels,
+              payroll with holiday-pay rules, 280+ integration partners, loading dock &amp; purchasing,
               12-tab analytics, and an AI command center that answers questions like
               <em>"What's hurting my profit this week?"</em> using live data from every
               part of your business.
@@ -52,7 +53,7 @@
               <a href="#top" class="btn btn-primary btn-lg">⚡ Try live demo</a>
               <a href="#features" class="btn btn-outline-light btn-lg">Explore features</a>
             </div>
-            <p class="hero-note">Hero shows the real app (mobile layout) — hit Expand for full desktop with sidebar</p>
+            <p class="hero-note">Hero shows the real app (mobile layout) — hit Expand for full desktop. Tab menus collapse to a hamburger on small screens.</p>
           </div>
 
           <div class="hero-app-embed" id="hero-app-embed-wrap">
@@ -77,6 +78,7 @@
         <div class="stats-bar">
           <div><div class="stat-value">12</div><div class="stat-label">Analytics modules</div></div>
           <div><div class="stat-value">6</div><div class="stat-label">Menu channels synced</div></div>
+          <div><div class="stat-value">280+</div><div class="stat-label">Integration partners</div></div>
           <div><div class="stat-value">350+</div><div class="stat-label">AI question library</div></div>
           <div><div class="stat-value">5</div><div class="stat-label">Staff roles &amp; permissions</div></div>
         </div>
@@ -121,7 +123,7 @@
           <article class="feature-card highlight">
             <div class="feature-icon">🍽️</div>
             <h3>Menu as Revenue Asset</h3>
-            <p>Engineering matrix (stars &amp; dogs), sales categories for accounting, recipe builds, and theoretical food cost with inventory depletion on sale.</p>
+            <p>Engineering matrix (stars &amp; dogs), sales categories, direct ingredients, and <strong>sub-recipes</strong> — nest sauces and prep batches; all ingredients roll up for cost and depletion.</p>
           </article>
           <article class="feature-card highlight">
             <div class="feature-icon">📡</div>
@@ -141,7 +143,27 @@
           <article class="feature-card highlight">
             <div class="feature-icon">👥</div>
             <h3>Staff, Schedule &amp; Hiring</h3>
-            <p>Five role types with permissions, shift scheduling, timeclock, and text-to-apply hiring flows.</p>
+            <p>Five role types with permissions, scheduling, timeclock, text-to-apply hiring, training &amp; certifications, and retention analytics.</p>
+          </article>
+          <article class="feature-card highlight">
+            <div class="feature-icon">💵</div>
+            <h3>Payroll &amp; Holiday Pay</h3>
+            <p>Pay runs from approved punches, jurisdiction-aware holiday premium rules, and embedded payroll provider hooks.</p>
+          </article>
+          <article class="feature-card highlight">
+            <div class="feature-icon">🛡️</div>
+            <h3>Compliance &amp; Log Book</h3>
+            <p>Minor labor guardrails, incident &amp; OSHA tracking, digital log book, and audit-ready records.</p>
+          </article>
+          <article class="feature-card highlight">
+            <div class="feature-icon">🚚</div>
+            <h3>Purchasing &amp; Loading Dock</h3>
+            <p>POs, goods receipt, invoice scan, 3-way match, credit memos, and vendor EDI catalogs.</p>
+          </article>
+          <article class="feature-card highlight">
+            <div class="feature-icon">📐</div>
+            <h3>Back Office &amp; Crystal Ball</h3>
+            <p>Live COGS, AVT variance, printable reports, and scenario forecasting for labor and sales.</p>
           </article>
           <article class="feature-card highlight">
             <div class="feature-icon">🪑</div>
@@ -166,7 +188,7 @@
           <article class="feature-card highlight">
             <div class="feature-icon">🔗</div>
             <h3>Integrations Hub</h3>
-            <p>Real-time POS inventory sync, QuickBooks/Xero/Sage journal posting, and Sysco/US Foods vendor EDI.</p>
+            <p>280+ partner marketplace, live POS inventory sync, QuickBooks/Xero/Sage journals, and Sysco/US Foods EDI.</p>
           </article>
           <article class="feature-card highlight">
             <div class="feature-icon">📷</div>
@@ -203,7 +225,7 @@
               <li><strong>Fractional modifiers</strong> — half-and-half pizza toppings and combo splits</li>
               <li><strong>Station routing</strong> — grill, fry, cold, pizza, service bar, expo</li>
               <li><strong>KDS display</strong> — kitchen sees only what matters at each station</li>
-              <li><strong>Recipe depletion</strong> — firing an order deducts exact ingredient quantities from inventory</li>
+              <li><strong>Recipe depletion</strong> — firing deducts ingredients; sub-recipes roll up to raw inventory automatically</li>
             </ul>
             <a href="#top" class="btn btn-primary btn-lg" style="margin-top:2rem">Try POS in the live demo ↑</a>
           </div>
@@ -243,7 +265,12 @@
           <div class="highlight-card">
             <div class="icon">🧮</div>
             <h3>Recipe costing</h3>
-            <p>Build each plate from inventory ingredients. See food cost % and margin on every item before you reprice.</p>
+            <p>Build each plate from inventory — or nest existing recipes (sauces, batches) and see every ingredient rolled up per portion.</p>
+          </div>
+          <div class="highlight-card">
+            <div class="icon">🧩</div>
+            <h3>Sub-recipes</h3>
+            <p>Add a prep item or sauce recipe inside a menu item. Cost and inventory depletion flatten automatically — no double entry.</p>
           </div>
           <div class="highlight-card">
             <div class="icon">🏷️</div>
@@ -289,10 +316,84 @@
             <h3>Vendor EDI</h3>
             <p>Connect Sysco or US Foods — live catalogs, warehouse out-of-stock signals, and purchase orders submitted directly.</p>
           </div>
+          <div class="highlight-card">
+            <div class="icon">🛒</div>
+            <h3>Integration marketplace</h3>
+            <p>Browse 280+ POS, payroll, accounting, reservations, and delivery partners — connect live integrations or plan roadmap items.</p>
+          </div>
         </div>
         <p style="margin-top:2rem;text-align:center;color:var(--slate-300);font-size:0.9375rem">
-          Configure under <strong>Account → Integrations</strong> in the live demo.
+          Configure under <strong>Account → Integrations</strong> in the live demo — Twilio SMS, OpenTable/Resy, and more on the roadmap.
         </p>
+      </div>
+    </section>
+
+    <!-- Team & Payroll -->
+    <section class="section section-alt" id="team-payroll">
+      <div class="container">
+        <div class="section-header">
+          <p class="eyebrow">People &amp; payroll</p>
+          <h2>Schedule, pay, and stay compliant — in one place</h2>
+          <p>From the first shift on the floor to holiday premium calculations, team tools connect to labor analytics and payroll export.</p>
+        </div>
+        <div class="two-col">
+          <div>
+            <ul class="check-list">
+              <li><strong>Roles &amp; permissions</strong> — Owner, Manager, Server, Kitchen, Host with scoped access</li>
+              <li><strong>Scheduling &amp; swaps</strong> — build schedules, shift swaps, and minor labor rule checks</li>
+              <li><strong>Timeclock &amp; punches</strong> — approve punches before they hit payroll</li>
+              <li><strong>Payroll runs</strong> — preview pay from approved time, finalize runs, export-ready totals</li>
+              <li><strong>Holiday pay rules</strong> — templates for US, California, Canada &amp; more; premium + substitute-day accrual</li>
+              <li><strong>Hiring pipeline</strong> — text-to-apply, interview stages, and onboarding packets</li>
+              <li><strong>Training &amp; certs</strong> — ServSafe, alcohol service, expiration alerts</li>
+              <li><strong>Retention</strong> — shift feedback and turnover analytics tied to labor cost</li>
+            </ul>
+          </div>
+          <div class="panel-dark" style="background:var(--slate-800);border-radius:1rem;padding:1.5rem">
+            <h3 style="font-size:1.125rem;font-weight:700;margin-bottom:1rem;color:#fff">Embedded payroll partners</h3>
+            <div class="pill-row">
+              <span class="pill hot">Gusto</span>
+              <span class="pill hot">Wagepoint</span>
+              <span class="pill hot">Papaya Global</span>
+            </div>
+            <p style="margin-top:1.25rem;color:var(--slate-300);font-size:0.9375rem;line-height:1.7">
+              Pinnacle calculates holiday premiums and pay previews in-app, then hands off disbursement to your connected payroll provider when configured.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Operations & Purchasing -->
+    <section class="section" id="operations">
+      <div class="container">
+        <div class="section-header">
+          <p class="eyebrow">Inventory &amp; back office</p>
+          <h2>From loading dock to month-end COGS</h2>
+          <p>Purchasing, receiving, and count workflows feed the same theoretical usage engine as your POS recipes.</p>
+        </div>
+        <div class="highlight-grid">
+          <div class="highlight-card">
+            <div class="icon">📋</div>
+            <h3>Purchase orders</h3>
+            <p>Draft, send, and receive against POs — link lines to inventory and vendor catalogs.</p>
+          </div>
+          <div class="highlight-card">
+            <div class="icon">📥</div>
+            <h3>Loading dock</h3>
+            <p>Invoice OCR, 3-way match (PO · receipt · invoice), credit memo requests, and price spike alerts.</p>
+          </div>
+          <div class="highlight-card">
+            <div class="icon">🧊</div>
+            <h3>Walk-in &amp; counts</h3>
+            <p>FIFO alerts, monthly cycle counts with zone routes, barcode scan, and variance vs. theoretical usage.</p>
+          </div>
+          <div class="highlight-card">
+            <div class="icon">📊</div>
+            <h3>Back office &amp; reports</h3>
+            <p>Live COGS, AVT variance, Crystal Ball forecasting, and print-ready financial reports.</p>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -447,6 +548,7 @@
               <li>Omnichannel menu sync <span class="pricing-muted">(6 channels)</span></li>
               <li>Full inventory, waste logs &amp; barcode scan</li>
               <li>Recipe costing &amp; menu engineering matrix</li>
+              <li>Sub-recipes with rolled-up ingredients</li>
               <li>Staff scheduling &amp; labor analytics</li>
               <li>Receipt OCR <span class="pricing-muted">(limited/month)</span></li>
               <li>AI Command Center <span class="pricing-muted">(standard)</span></li>
@@ -470,6 +572,10 @@
               <li>BOH controls &amp; daypart menus</li>
               <li>Square / Stripe Connect guest payments</li>
               <li>Hiring &amp; text-to-apply</li>
+              <li>Payroll runs &amp; holiday pay rules</li>
+              <li>Loading dock &amp; purchase orders</li>
+              <li>Integration marketplace <span class="pricing-muted">(280+)</span></li>
+              <li>Compliance, training &amp; log book</li>
               <li>Profit by item, employee, shift, hour &amp; channel</li>
               <li>Forecasting &amp; purchasing analytics</li>
               <li>Marketing ROI &amp; guest experience</li>
@@ -607,7 +713,7 @@
       <div class="footer-grid">
         <div>
           <img src="./assets/logo.png" alt="Pinnacle Restaurant Manager" class="footer-logo" width="220" height="44" />
-          <p class="footer-tagline">AI-powered restaurant management — POS, kitchen routing, menu engineering, omnichannel sync, analytics, and a command center that answers the questions owners actually ask.</p>
+          <p class="footer-tagline">AI-powered restaurant management — POS, KDS, sub-recipe costing, payroll &amp; holiday pay, omnichannel menu sync, loading dock, 280+ integrations, analytics, and a command center that answers the questions owners actually ask.</p>
         </div>
         <div class="footer-cols">
           <div class="footer-col">
@@ -618,6 +724,8 @@
               <li><a href="#pos-kitchen">POS &amp; Kitchen</a></li>
               <li><a href="#menu-platform">Menu platform</a></li>
               <li><a href="#integrations">Integrations</a></li>
+              <li><a href="#team-payroll">Team &amp; payroll</a></li>
+              <li><a href="#operations">Operations</a></li>
               <li><a href="#analytics">Analytics</a></li>
               <li><a href="#pricing">Pricing</a></li>
             </ul>

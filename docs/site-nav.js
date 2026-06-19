@@ -8,6 +8,8 @@
     { hash: "#pos-kitchen", label: "POS" },
     { hash: "#menu-platform", label: "Menu" },
     { hash: "#integrations", label: "Integrations" },
+    { hash: "#team-payroll", label: "Team" },
+    { hash: "#operations", label: "Ops" },
     { hash: "#command-center", label: "AI" },
     { hash: "#analytics", label: "Analytics" },
     { hash: "#pricing", label: "Pricing" },
