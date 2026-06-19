@@ -9,6 +9,11 @@ import { getSessionUserFromRequest } from "@/lib/auth";
 import { userCan } from "@/lib/permission-resolve";
 import { forbiddenResponse, unauthorizedResponse } from "@/lib/api-auth";
 import type { PhotoCategory } from "@prisma/client";
+import {
+  base64Input,
+  filesToBase64,
+  parseScanFormData,
+} from "@/lib/scan/parse-scan-form";
 
 export async function GET(request: NextRequest) {
   const user = await getSessionUserFromRequest(request);
@@ -42,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     const locationId = await getLocationIdFromRequest(request);
     const formData = await request.formData();
-    const file = formData.get("file") as File | null;
+    const { files, panoramic, pageCount } = parseScanFormData(formData);
     const category = (formData.get("category") as string) || "OTHER";
 
     if (category === "RECEIPT" && !(await userCan(user, "view_receipts"))) {
@@ -52,13 +57,15 @@ export async function POST(request: NextRequest) {
     const description = formData.get("description") as string | null;
     const analyzeWithAI = formData.get("analyzeWithAI") === "true";
 
-    if (!file) {
+    if (files.length === 0) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const ext = file.name.split(".").pop() || "jpg";
+    const explicitFile = formData.get("file");
+    const uploadFile =
+      explicitFile instanceof File && explicitFile.size > 0 ? explicitFile : files[0];
+    const buffer = Buffer.from(await uploadFile.arrayBuffer());
+    const ext = uploadFile.name.split(".").pop() || "jpg";
     const filename = `${uuidv4()}.${ext}`;
 
     const uploadsDir = join(process.cwd(), "public", "uploads");
@@ -71,8 +78,11 @@ export async function POST(request: NextRequest) {
     let tags: string[] = [];
 
     if (analyzeWithAI) {
-      const base64 = buffer.toString("base64");
-      const analysis = await analyzePhoto(base64, category);
+      const base64Images = await filesToBase64(files);
+      const analysis = await analyzePhoto(base64Input(base64Images), category, {
+        panoramic: panoramic && base64Images.length === 1,
+        pageCount,
+      });
       aiAnalysis = analysis.description;
       tags = analysis.tags;
       if (!photoTitle) photoTitle = analysis.suggestedTitle;

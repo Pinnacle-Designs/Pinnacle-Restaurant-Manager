@@ -1,22 +1,13 @@
 "use client";
 
-import { useState, useRef } from "react";
-import Image from "next/image";
-import { Camera, Upload, Loader2, Receipt, CheckCircle } from "lucide-react";
+import { useState } from "react";
+import { Loader2, Receipt, CheckCircle } from "lucide-react";
 import { Button, Badge } from "@/components/ui";
 import { Input, Select, FormField } from "@/components/ui/form";
 import { formatCurrency } from "@/lib/utils";
-import { readFileAsDataUrl } from "@/lib/receipt/panorama-stitch";
-import {
-  DocumentScanModeToggle,
-  type DocumentScanMode,
-} from "@/components/scan/DocumentScanModeToggle";
-import {
-  MultiPageScanCapture,
-  type ScanPage,
-  type StitchedDocument,
-} from "@/components/scan/MultiPageScanCapture";
-import { PanoramicScanCapture } from "@/components/scan/PanoramicScanCapture";
+import { DocumentScanModeToggle } from "@/components/scan/DocumentScanModeToggle";
+import { DocumentQuickScanCapture } from "@/components/scan/DocumentQuickScanCapture";
+import { useDocumentQuickScan } from "@/hooks/useDocumentQuickScan";
 
 interface Expense {
   id: string;
@@ -52,51 +43,20 @@ const EXPENSE_CATEGORIES = [
 ];
 
 export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
-  const [scanMode, setScanMode] = useState<DocumentScanMode>("single");
-  const [preview, setPreview] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [pages, setPages] = useState<ScanPage[]>([]);
-  const [stitched, setStitched] = useState<StitchedDocument | null>(null);
-  const [sessionComplete, setSessionComplete] = useState(false);
+  const scan = useDocumentQuickScan();
   const [scanning, setScanning] = useState(false);
   const [saving, setSaving] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [pageCountScanned, setPageCountScanned] = useState(1);
   const [wasPanoramic, setWasPanoramic] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  const hasCapture =
-    scanMode === "multi" ? pages.length > 0 : !!preview;
-  const canExtractMulti =
-    scanMode === "multi" && pages.length > 0 && (sessionComplete || pages.length > 1);
-
-  const clear = () => {
-    setPreview(null);
-    setFile(null);
-    setPages([]);
-    setStitched(null);
-    setSessionComplete(false);
+  const resetAll = () => {
+    scan.clear();
     setReceiptData(null);
     setPageCountScanned(1);
     setWasPanoramic(false);
     setError(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    if (cameraInputRef.current) cameraInputRef.current.value = "";
-  };
-
-  const switchMode = (mode: DocumentScanMode) => {
-    if (mode === scanMode) return;
-    clear();
-    setScanMode(mode);
-  };
-
-  const handleSingleFile = async (selectedFile: File) => {
-    setFile(selectedFile);
-    setReceiptData(null);
-    setError(null);
-    setPreview(await readFileAsDataUrl(selectedFile));
   };
 
   const scanReceipt = async () => {
@@ -104,26 +64,13 @@ export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
     setError(null);
 
     try {
-      const formData = new FormData();
-      formData.append("scanMode", scanMode);
-      if (scanMode === "panorama") formData.append("panoramic", "true");
-
-      if (scanMode === "single" || scanMode === "panorama") {
-        if (!file) return;
-        formData.append("file", file);
-      } else {
-        if (pages.length === 0) return;
-        for (const page of pages) {
-          formData.append("files", page.file);
-        }
-      }
-
+      const formData = scan.buildScanFormData();
       const res = await fetch("/api/receipts/scan", { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Scan failed");
 
       setReceiptData(data.receipt);
-      setPageCountScanned(data.pageCount ?? (scanMode === "multi" ? pages.length : 1));
+      setPageCountScanned(data.pageCount ?? scan.getPageCount());
       setWasPanoramic(Boolean(data.panoramic));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Scan failed");
@@ -138,30 +85,21 @@ export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
     setError(null);
 
     try {
-      const formData = new FormData();
-      formData.append("scanMode", scanMode);
-      if (scanMode === "panorama" || wasPanoramic) formData.append("panoramic", "true");
-
-      const saveFile =
-        scanMode === "multi"
-          ? stitched?.file ?? pages[0]?.file ?? null
-          : file;
-      if (saveFile) formData.append("file", saveFile);
-      formData.append("description", receiptData.description);
-      formData.append("amount", String(receiptData.amount));
-      formData.append("category", receiptData.category);
-      formData.append("date", receiptData.date);
-      formData.append(
-        "pageCount",
-        String(scanMode === "multi" ? pages.length : 1)
-      );
+      const saveFile = scan.getSaveFile();
+      const formData = scan.buildScanFormData({
+        description: receiptData.description,
+        amount: String(receiptData.amount),
+        category: receiptData.category,
+        date: receiptData.date,
+      });
+      if (saveFile && !formData.has("file")) formData.append("file", saveFile);
 
       const res = await fetch("/api/receipts/scan", { method: "PUT", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Save failed");
 
       onExpenseCreated(data.expense);
-      clear();
+      resetAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -182,248 +120,43 @@ export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
             reports.
           </p>
         </div>
-        <DocumentScanModeToggle mode={scanMode} onChange={switchMode} accent="green" />
+        <DocumentScanModeToggle mode={scan.scanMode} onChange={scan.switchMode} accent="green" />
       </div>
 
       <div className="mt-4">
-        {scanMode === "single" && (
-          !preview ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => cameraInputRef.current?.click()}
-                className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-slate-200 p-6 transition-colors hover:border-green-300 hover:bg-green-50"
-              >
-                <Camera className="h-6 w-6 text-green-600" />
-                <span className="text-sm font-medium">Scan Receipt</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-slate-200 p-6 transition-colors hover:border-green-300 hover:bg-green-50"
-              >
-                <Upload className="h-6 w-6 text-green-600" />
-                <span className="text-sm font-medium">Upload Receipt</span>
-              </button>
-              <input
-                ref={cameraInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void handleSingleFile(f);
-                }}
-              />
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void handleSingleFile(f);
-                }}
-              />
-            </div>
-          ) : (
-            <CaptureActions
-              preview={preview}
-              previewAlt="Receipt"
-              previewClass="max-w-xs"
-              scanning={scanning}
-              receiptData={receiptData}
-              extractLabel="Extract Receipt Data"
-              onScan={scanReceipt}
-              onClear={clear}
-              extractedForm={
-                receiptData ? (
-                  <ExtractedForm
-                    receiptData={receiptData}
-                    pageCountScanned={pageCountScanned}
-                    wasPanoramic={wasPanoramic}
-                    saving={saving}
-                    onChange={setReceiptData}
-                    onClear={clear}
-                    onSave={saveExpense}
-                  />
-                ) : null
-              }
-            />
-          )
-        )}
-
-        {scanMode === "panorama" && (
-          <div className="space-y-4">
-            <PanoramicScanCapture
-              documentLabel="receipt"
-              preview={preview}
-              onSelectFile={(f) => void handleSingleFile(f)}
-              onClear={clear}
-              disabled={scanning || saving}
-            />
-            {preview && (
-              <CaptureActions
-                preview={preview}
-                previewAlt="Panoramic receipt"
-                previewClass="max-w-md"
-                tallPreview
-                scanning={scanning}
-                receiptData={receiptData}
-                extractLabel="Extract panoramic receipt"
-                onScan={scanReceipt}
-                onClear={clear}
-                extractedForm={
-                  receiptData ? (
-                    <ExtractedForm
-                      receiptData={receiptData}
-                      pageCountScanned={pageCountScanned}
-                      wasPanoramic={wasPanoramic || scanMode === "panorama"}
-                      saving={saving}
-                      onChange={setReceiptData}
-                      onClear={clear}
-                      onSave={saveExpense}
-                    />
-                  ) : null
-                }
-              />
-            )}
-          </div>
-        )}
-
-        {scanMode === "multi" && (
-          <div className="space-y-4">
-            <MultiPageScanCapture
-              documentLabel="receipt"
-              pages={pages}
-              onPagesChange={(next) => {
-                setPages(next);
-                setReceiptData(null);
-              }}
-              onStitchedChange={setStitched}
-              sessionComplete={sessionComplete}
-              onSessionCompleteChange={setSessionComplete}
-              disabled={scanning || saving}
-            />
-
-            {hasCapture && !receiptData && (
-              <>
-                <Button
-                  onClick={scanReceipt}
-                  disabled={scanning || !canExtractMulti}
-                  className="w-full"
-                >
-                  {scanning ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Reading {pages.length} page{pages.length === 1 ? "" : "s"}…
-                    </>
-                  ) : (
-                    `Extract from ${pages.length} page${pages.length === 1 ? "" : "s"} (panoramic stitch)`
-                  )}
-                </Button>
-                {!canExtractMulti && pages.length === 1 && !sessionComplete && (
-                  <p className="text-center text-xs text-slate-500">
-                    Scan more pages or tap &quot;Done scanning&quot; to extract this report.
-                  </p>
-                )}
-                <Button variant="secondary" onClick={clear} className="w-full">
-                  Cancel
-                </Button>
-              </>
-            )}
-
-            {receiptData && (
-              <ExtractedForm
-                receiptData={receiptData}
-                pageCountScanned={pageCountScanned}
-                wasPanoramic={wasPanoramic}
-                saving={saving}
-                onChange={setReceiptData}
-                onClear={clear}
-                onSave={saveExpense}
-              />
-            )}
-          </div>
+        {!receiptData ? (
+          <DocumentQuickScanCapture
+            scan={scan}
+            documentLabel="receipt"
+            accent="green"
+            disabled={scanning || saving}
+            hideToggle
+            showExtract
+            extracting={scanning}
+            onExtract={scanReceipt}
+            extractLabel={
+              scan.scanMode === "multi"
+                ? `Extract from ${scan.pages.length} page${scan.pages.length === 1 ? "" : "s"} (panoramic stitch)`
+                : scan.scanMode === "panorama"
+                  ? "Extract panoramic receipt"
+                  : "Extract Receipt Data"
+            }
+            onCancel={scan.hasCapture ? resetAll : undefined}
+          />
+        ) : (
+          <ExtractedForm
+            receiptData={receiptData}
+            pageCountScanned={pageCountScanned}
+            wasPanoramic={wasPanoramic || scan.scanMode === "panorama"}
+            saving={saving}
+            onChange={setReceiptData}
+            onClear={resetAll}
+            onSave={saveExpense}
+          />
         )}
       </div>
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-    </div>
-  );
-}
-
-function CaptureActions({
-  preview,
-  previewAlt,
-  previewClass,
-  tallPreview,
-  scanning,
-  receiptData,
-  extractLabel,
-  onScan,
-  onClear,
-  extractedForm,
-}: {
-  preview: string;
-  previewAlt: string;
-  previewClass: string;
-  tallPreview?: boolean;
-  scanning: boolean;
-  receiptData: ReceiptData | null;
-  extractLabel: string;
-  onScan: () => void;
-  onClear: () => void;
-  extractedForm: React.ReactNode;
-}) {
-  if (receiptData) return <>{extractedForm}</>;
-
-  if (tallPreview) {
-    return (
-      <>
-        <Button onClick={onScan} disabled={scanning} className="w-full">
-          {scanning ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Reading panoramic image…
-            </>
-          ) : (
-            extractLabel
-          )}
-        </Button>
-        <Button variant="secondary" onClick={onClear} className="w-full">
-          Cancel
-        </Button>
-      </>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className={`relative mx-auto ${previewClass}`}>
-        <Image
-          src={preview}
-          alt={previewAlt}
-          width={300}
-          height={400}
-          className="rounded-lg object-contain"
-          unoptimized
-        />
-      </div>
-      <Button onClick={onScan} disabled={scanning} className="w-full">
-        {scanning ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Extracting data…
-          </>
-        ) : (
-          extractLabel
-        )}
-      </Button>
-      <Button variant="secondary" onClick={onClear} className="w-full">
-        Cancel
-      </Button>
     </div>
   );
 }
@@ -511,7 +244,14 @@ function ExtractedForm({
           Cancel
         </Button>
         <Button onClick={onSave} disabled={saving} className="flex-1">
-          {saving ? "Saving..." : `Save Expense (${formatCurrency(receiptData.amount)})`}
+          {saving ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Saving…
+            </>
+          ) : (
+            `Save Expense (${formatCurrency(receiptData.amount)})`
+          )}
         </Button>
       </div>
     </div>

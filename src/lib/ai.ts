@@ -1,4 +1,6 @@
 import OpenAI from "openai";
+import type { VisionScanOptions } from "@/lib/scan/parse-scan-form";
+import { visionScanHint } from "@/lib/scan/parse-scan-form";
 import { prisma } from "./prisma";
 import { getLocationId } from "./location";
 import { computeAnalytics, buildAnalyticsSnapshotForAI } from "./analytics/compute";
@@ -13,9 +15,14 @@ const openai = process.env.OPENAI_API_KEY
   : null;
 
 export async function analyzePhoto(
-  imageBase64: string,
-  category: string
+  imageBase64: string | string[],
+  category: string,
+  options?: VisionScanOptions & { pageCount?: number }
 ): Promise<{ description: string; tags: string[]; suggestedTitle: string }> {
+  const images = Array.isArray(imageBase64) ? imageBase64 : [imageBase64];
+  const multiPage = images.length > 1;
+  const panoramic = options?.panoramic ?? false;
+
   if (!openai) {
     return {
       description: "AI analysis unavailable — set OPENAI_API_KEY in .env",
@@ -25,30 +32,36 @@ export async function analyzePhoto(
   }
 
   try {
+    const hint = visionScanHint(`restaurant photo (category: ${category})`, {
+      panoramic,
+      multiPage,
+      pageCount: options?.pageCount ?? images.length,
+    });
+
+    const content: Array<
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string } }
+    > = [
+      {
+        type: "text",
+        text: `${hint} Return JSON with: description (brief), tags (array of strings), suggestedTitle (short title). Focus on restaurant operations relevance.`,
+      },
+      ...images.map((b64) => ({
+        type: "image_url" as const,
+        image_url: { url: `data:image/jpeg;base64,${b64}` },
+      })),
+    ];
+
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `Analyze this restaurant photo (category: ${category}). Return JSON with: description (brief), tags (array of strings), suggestedTitle (short title). Focus on restaurant operations relevance.`,
-            },
-            {
-              type: "image_url",
-              image_url: { url: `data:image/jpeg;base64,${imageBase64}` },
-            },
-          ],
-        },
-      ],
-      max_tokens: 300,
+      messages: [{ role: "user", content }],
+      max_tokens: multiPage || panoramic ? 600 : 300,
       response_format: { type: "json_object" },
     });
 
-    const content = response.choices[0]?.message?.content;
-    if (content) {
-      const parsed = JSON.parse(content);
+    const responseContent = response.choices[0]?.message?.content;
+    if (responseContent) {
+      const parsed = JSON.parse(responseContent);
       return {
         description: parsed.description || "No description",
         tags: parsed.tags || [],

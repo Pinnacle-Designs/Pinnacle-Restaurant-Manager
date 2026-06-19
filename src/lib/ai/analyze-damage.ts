@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { visionScanHint, type VisionScanOptions } from "@/lib/scan/parse-scan-form";
 
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -14,7 +15,14 @@ export interface DamageAnalysis {
   unit: string;
 }
 
-export async function analyzeDamagePhoto(imageBase64: string): Promise<DamageAnalysis> {
+export async function analyzeDamagePhoto(
+  imageBase64: string | string[],
+  options?: VisionScanOptions & { pageCount?: number }
+): Promise<DamageAnalysis> {
+  const images = Array.isArray(imageBase64) ? imageBase64 : [imageBase64];
+  const multiPage = images.length > 1;
+  const panoramic = options?.panoramic ?? false;
+
   const fallback: DamageAnalysis = {
     vendor: "",
     itemDescription: "Damaged goods",
@@ -28,15 +36,21 @@ export async function analyzeDamagePhoto(imageBase64: string): Promise<DamageAna
   if (!openai) return fallback;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `This is a photo from a restaurant loading dock or back of house showing damaged, spoiled, or missing vendor goods (e.g. shattered glass cups, rotten produce, crushed boxes).
+    const hint = visionScanHint("loading dock damage photo", {
+      panoramic,
+      multiPage,
+      pageCount: options?.pageCount ?? images.length,
+    });
+
+    const content: Array<
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string } }
+    > = [
+      {
+        type: "text",
+        text: `${hint}
+
+This photo shows damaged, spoiled, or missing vendor goods (e.g. shattered glass cups, rotten produce, crushed boxes).
 
 Return JSON:
 - vendor (supplier name if visible on box/label, else empty string)
@@ -46,22 +60,24 @@ Return JSON:
 - reason (one sentence for vendor credit memo)
 - qtyAffected (number)
 - unit (case, each, lb, etc.)`,
-            },
-            {
-              type: "image_url",
-              image_url: { url: `data:image/jpeg;base64,${imageBase64}` },
-            },
-          ],
-        },
-      ],
-      max_tokens: 500,
+      },
+      ...images.map((b64) => ({
+        type: "image_url" as const,
+        image_url: { url: `data:image/jpeg;base64,${b64}` },
+      })),
+    ];
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content }],
+      max_tokens: multiPage || panoramic ? 800 : 500,
       response_format: { type: "json_object" },
     });
 
-    const content = response.choices[0]?.message?.content;
-    if (!content) return fallback;
+    const responseContent = response.choices[0]?.message?.content;
+    if (!responseContent) return fallback;
 
-    const parsed = JSON.parse(content);
+    const parsed = JSON.parse(responseContent);
     const category = String(parsed.category || "DAMAGED").toUpperCase();
     const valid = ["DAMAGED", "SPOILED", "SHORT_SHIP", "MISSING", "OTHER"];
 
@@ -78,3 +94,6 @@ Return JSON:
     return fallback;
   }
 }
+
+// re-export for callers that pass single image
+export { base64Input } from "@/lib/scan/parse-scan-form";

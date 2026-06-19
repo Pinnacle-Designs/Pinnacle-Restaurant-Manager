@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useRef } from "react";
-import Image from "next/image";
-import { Camera, Upload, Loader2, CheckCircle, AlertTriangle, Mail, Lock } from "lucide-react";
+import { useState } from "react";
+import { Loader2, CheckCircle, AlertTriangle, Mail, Lock, Camera } from "lucide-react";
 import { Button } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
 import { formatCurrency } from "@/lib/utils";
+import { DocumentQuickScanCapture } from "@/components/scan/DocumentQuickScanCapture";
+import { useDocumentQuickScan } from "@/hooks/useDocumentQuickScan";
 
 interface CreditMemoModalProps {
   invoices?: Array<{ id: string; vendor: string; invoiceNumber: string | null; amount: number }>;
@@ -35,8 +36,8 @@ export function CreditMemoModal({
   onSaved,
   onClose,
 }: CreditMemoModalProps) {
-  const [preview, setPreview] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const scan = useDocumentQuickScan();
+  const [manualOnly, setManualOnly] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
@@ -48,25 +49,18 @@ export function CreditMemoModal({
     invoiceId: defaultInvoiceId ?? "",
   });
   const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = (selectedFile: File) => {
-    setFile(selectedFile);
-    setError(null);
-    const reader = new FileReader();
-    reader.onload = (e) => setPreview(e.target?.result as string);
-    reader.readAsDataURL(selectedFile);
-  };
+  const showForm = manualOnly || scan.hasCapture;
 
   const scanPhoto = async () => {
-    if (!file) return;
+    if (!scan.canExtract) return;
     setScanning(true);
     setError(null);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/purchasing/credits/scan", { method: "POST", body: formData });
+      const res = await fetch("/api/purchasing/credits/scan", {
+        method: "POST",
+        body: scan.buildScanFormData(),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Scan failed");
       const a = data.analysis;
@@ -93,8 +87,9 @@ export function CreditMemoModal({
     setSubmitting(true);
     setError(null);
     try {
+      const saveFile = scan.getSaveFile();
       const formData = new FormData();
-      if (file) formData.append("file", file);
+      if (saveFile) formData.append("file", saveFile);
       formData.append("vendor", form.vendor);
       formData.append("amount", String(amount));
       formData.append("reason", form.reason);
@@ -129,35 +124,38 @@ export function CreditMemoModal({
           <strong>locks accounting sync</strong> on the linked invoice so your bookkeeper will not pay the full amount.
         </p>
 
-        {!preview ? (
-          <div className="flex flex-col gap-3">
-            <Button onClick={() => cameraInputRef.current?.click()}>
-              <Camera className="mr-2 h-4 w-4" /> Take photo of damage
-            </Button>
-            <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="mr-2 h-4 w-4" /> Upload photo
-            </Button>
-            <Button variant="ghost" onClick={() => setPreview("skip")}>
-              Skip photo — enter manually
-            </Button>
-            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])} />
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])} />
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {preview !== "skip" && (
-              <div className="relative h-40 w-full overflow-hidden rounded-lg bg-slate-100">
-                <Image src={preview} alt="Damage preview" fill className="object-contain" unoptimized />
-              </div>
-            )}
-
-            {file && (
-              <Button onClick={scanPhoto} disabled={scanning} variant="secondary" className="w-full">
+        {!manualOnly && (
+          <div className="space-y-3">
+            <DocumentQuickScanCapture
+              scan={scan}
+              documentLabel="damage photo"
+              accent="orange"
+              disabled={scanning || submitting}
+              onCancel={scan.hasCapture ? scan.clear : undefined}
+            />
+            {scan.hasCapture && (
+              <Button onClick={scanPhoto} disabled={scanning || !scan.canExtract} variant="secondary" className="w-full">
                 {scanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Camera className="mr-2 h-4 w-4" />}
                 {scanning ? "Analyzing damage…" : "AI: detect item & estimate credit"}
               </Button>
             )}
+          </div>
+        )}
 
+        {!showForm && (
+          <Button variant="ghost" className="mt-3 w-full" onClick={() => setManualOnly(true)}>
+            Skip photo — enter manually
+          </Button>
+        )}
+
+        {manualOnly && !scan.hasCapture && (
+          <Button variant="ghost" className="mb-3 w-full" onClick={() => setManualOnly(false)}>
+            Add damage photo
+          </Button>
+        )}
+
+        {showForm && (
+          <div className="mt-4 space-y-4 border-t border-slate-100 pt-4">
             <FormField label="Vendor">
               <Input value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} placeholder="Sysco, US Foods…" />
             </FormField>

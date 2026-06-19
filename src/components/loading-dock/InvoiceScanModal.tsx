@@ -1,23 +1,13 @@
 "use client";
 
-import { useState, useRef } from "react";
-import Image from "next/image";
-import { Camera, Upload, Loader2, FileText, CheckCircle, Scale } from "lucide-react";
+import { useState } from "react";
+import { Loader2, CheckCircle, Scale } from "lucide-react";
 import { Button } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
 import { formatCurrency } from "@/lib/utils";
 import { showCriticalNotifications } from "@/lib/notifications";
-import { readFileAsDataUrl } from "@/lib/receipt/panorama-stitch";
-import {
-  DocumentScanModeToggle,
-  type DocumentScanMode,
-} from "@/components/scan/DocumentScanModeToggle";
-import {
-  MultiPageScanCapture,
-  type ScanPage,
-  type StitchedDocument,
-} from "@/components/scan/MultiPageScanCapture";
-import { PanoramicScanCapture } from "@/components/scan/PanoramicScanCapture";
+import { DocumentQuickScanCapture } from "@/components/scan/DocumentQuickScanCapture";
+import { useDocumentQuickScan } from "@/hooks/useDocumentQuickScan";
 
 export interface InvoiceLineData {
   description: string;
@@ -57,72 +47,27 @@ interface InvoiceScanModalProps {
   onClose: () => void;
 }
 
-type ScanMode = DocumentScanMode;
-
 export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceScanModalProps) {
-  const [scanMode, setScanMode] = useState<ScanMode>("single");
-  const [preview, setPreview] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [pages, setPages] = useState<ScanPage[]>([]);
-  const [stitched, setStitched] = useState<StitchedDocument | null>(null);
-  const [sessionComplete, setSessionComplete] = useState(false);
+  const scan = useDocumentQuickScan();
   const [scanning, setScanning] = useState(false);
   const [saving, setSaving] = useState(false);
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
   const [pageCountScanned, setPageCountScanned] = useState(1);
   const [wasPanoramic, setWasPanoramic] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-
-  const canExtractMulti =
-    pages.length > 0 && (sessionComplete || pages.length > 1);
-
-  const clear = () => {
-    setPreview(null);
-    setFile(null);
-    setPages([]);
-    setStitched(null);
-    setSessionComplete(false);
-    setInvoiceData(null);
-    setPageCountScanned(1);
-    setWasPanoramic(false);
-    setError(null);
-  };
-
-  const switchMode = (mode: ScanMode) => {
-    if (mode === scanMode) return;
-    clear();
-    setScanMode(mode);
-  };
-
-  const handleFileSelect = async (selectedFile: File) => {
-    setFile(selectedFile);
-    setInvoiceData(null);
-    setError(null);
-    setPreview(await readFileAsDataUrl(selectedFile));
-  };
 
   const scanInvoice = async () => {
     setScanning(true);
     setError(null);
     try {
-      const formData = new FormData();
-      formData.append("scanMode", scanMode);
-      if (scanMode === "panorama") formData.append("panoramic", "true");
-      if (scanMode === "single" || scanMode === "panorama") {
-        if (!file) return;
-        formData.append("file", file);
-      } else {
-        for (const page of pages) {
-          formData.append("files", page.file);
-        }
-      }
-      const res = await fetch("/api/purchasing/invoices/scan", { method: "POST", body: formData });
+      const res = await fetch("/api/purchasing/invoices/scan", {
+        method: "POST",
+        body: scan.buildScanFormData(),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Scan failed");
       setInvoiceData(data.invoice);
-      setPageCountScanned(data.pageCount ?? pages.length);
+      setPageCountScanned(data.pageCount ?? scan.getPageCount());
       setWasPanoramic(Boolean(data.panoramic));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Scan failed");
@@ -142,20 +87,17 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
     setSaving(true);
     setError(null);
     try {
-      const formData = new FormData();
-      formData.append("scanMode", scanMode);
-      if (scanMode === "panorama" || wasPanoramic) formData.append("panoramic", "true");
-      const saveFile =
-        scanMode === "multi" ? stitched?.file ?? pages[0]?.file ?? null : file;
-      if (saveFile) formData.append("file", saveFile);
-      formData.append("vendor", invoiceData.vendor);
-      formData.append("amount", String(invoiceData.amount));
-      formData.append("invoiceDate", invoiceData.invoiceDate);
-      formData.append("invoiceNumber", invoiceData.invoiceNumber);
-      if (poId) formData.append("poId", poId);
-      if (receiptId) formData.append("receiptId", receiptId);
-      formData.append("lines", JSON.stringify(invoiceData.lines));
-      formData.append("pageCount", String(scanMode === "multi" ? pages.length : 1));
+      const saveFile = scan.getSaveFile();
+      const formData = scan.buildScanFormData({
+        vendor: invoiceData.vendor,
+        amount: String(invoiceData.amount),
+        invoiceDate: invoiceData.invoiceDate,
+        invoiceNumber: invoiceData.invoiceNumber,
+        lines: JSON.stringify(invoiceData.lines),
+        ...(poId ? { poId } : {}),
+        ...(receiptId ? { receiptId } : {}),
+      });
+      if (saveFile && !formData.has("file")) formData.append("file", saveFile);
 
       const res = await fetch("/api/purchasing/invoices/scan", { method: "PUT", body: formData });
       const data = (await res.json()) as InvoiceSaveResult;
@@ -174,11 +116,6 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
     }
   };
 
-  const showSingleCapture = scanMode === "single" && !preview && !invoiceData;
-  const showSinglePreview = scanMode === "single" && preview && !invoiceData;
-  const showPanoramaCapture = scanMode === "panorama" && !invoiceData;
-  const showMultiCapture = scanMode === "multi" && !invoiceData;
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="card max-h-[90vh] w-full max-w-lg overflow-y-auto">
@@ -189,120 +126,31 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
           </button>
         </div>
 
-        <DocumentScanModeToggle mode={scanMode} onChange={switchMode} accent="orange" className="mb-4" />
-
-        {showSingleCapture && (
-          <div className="flex flex-col gap-3">
-            <p className="text-sm text-slate-500">
+        {!invoiceData && (
+          <>
+            <p className="mb-4 text-sm text-slate-500">
               Snap a photo of a crumpled invoice — OCR reads every line item, updates inventory,
-              logs the expense, flags price spikes, and audits catch-weight.
+              logs the expense, flags price spikes, and audits catch-weight. Use multi-page or
+              panoramic mode for long invoices.
             </p>
-            <Button onClick={() => cameraInputRef.current?.click()}>
-              <Camera className="mr-2 h-4 w-4" /> Take Photo
-            </Button>
-            <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="mr-2 h-4 w-4" /> Upload Image
-            </Button>
-            <input
-              ref={cameraInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && void handleFileSelect(e.target.files[0])}
-            />
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && void handleFileSelect(e.target.files[0])}
-            />
-          </div>
-        )}
-
-        {showSinglePreview && (
-          <div className="space-y-4">
-            <div className="relative h-40 w-full overflow-hidden rounded-lg bg-slate-100">
-              <Image src={preview} alt="Invoice preview" fill className="object-contain" unoptimized />
-            </div>
-            <Button onClick={scanInvoice} disabled={scanning} className="w-full">
-              {scanning ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <FileText className="mr-2 h-4 w-4" />
-              )}
-              {scanning ? "Reading invoice…" : "Extract line items"}
-            </Button>
-          </div>
-        )}
-
-        {showPanoramaCapture && (
-          <div className="space-y-4">
-            <PanoramicScanCapture
+            <DocumentQuickScanCapture
+              scan={scan}
               documentLabel="invoice"
-              accentClass="orange"
-              preview={preview}
-              onSelectFile={(f) => void handleFileSelect(f)}
-              onClear={clear}
+              accent="orange"
               disabled={scanning || saving}
+              showExtract
+              extracting={scanning}
+              onExtract={scanInvoice}
+              extractLabel={
+                scan.scanMode === "multi"
+                  ? `Extract from ${scan.pages.length} page${scan.pages.length === 1 ? "" : "s"} (panoramic stitch)`
+                  : scan.scanMode === "panorama"
+                    ? "Extract panoramic invoice"
+                    : "Extract line items"
+              }
+              onCancel={scan.hasCapture ? scan.clear : undefined}
             />
-            {preview && (
-              <Button onClick={scanInvoice} disabled={scanning} className="w-full">
-                {scanning ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <FileText className="mr-2 h-4 w-4" />
-                )}
-                {scanning ? "Reading panoramic invoice…" : "Extract panoramic invoice"}
-              </Button>
-            )}
-          </div>
-        )}
-
-        {showMultiCapture && (
-          <div className="space-y-4">
-            <p className="text-sm text-slate-500">
-              Long invoices and packing reports — scan each page top to bottom, then extract all
-              line items together.
-            </p>
-            <MultiPageScanCapture
-              documentLabel="invoice"
-              accentClass="orange"
-              pages={pages}
-              onPagesChange={(next) => {
-                setPages(next);
-                setInvoiceData(null);
-              }}
-              onStitchedChange={setStitched}
-              sessionComplete={sessionComplete}
-              onSessionCompleteChange={setSessionComplete}
-              disabled={scanning || saving}
-            />
-            {pages.length > 0 && (
-              <>
-                <Button
-                  onClick={scanInvoice}
-                  disabled={scanning || !canExtractMulti}
-                  className="w-full"
-                >
-                  {scanning ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <FileText className="mr-2 h-4 w-4" />
-                  )}
-                  {scanning
-                    ? `Reading ${pages.length} pages…`
-                    : `Extract from ${pages.length} page${pages.length === 1 ? "" : "s"} (panoramic stitch)`}
-                </Button>
-                {!canExtractMulti && pages.length === 1 && !sessionComplete && (
-                  <p className="text-center text-xs text-slate-500">
-                    Scan more pages or tap &quot;Done scanning&quot; to extract.
-                  </p>
-                )}
-              </>
-            )}
-          </div>
+          </>
         )}
 
         {invoiceData && (
