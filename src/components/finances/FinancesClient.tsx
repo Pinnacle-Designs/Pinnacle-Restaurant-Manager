@@ -142,7 +142,7 @@ export function FinancesClient({
           </div>
         </CollapsibleSection>
 
-        <CollapsibleSection id="receipts" title="Scan receipts" className="mt-4" defaultOpen>
+        <CollapsibleSection id="receipts" title="Scan receipts & reports" className="mt-4" defaultOpen>
           <ReceiptScanner onExpenseCreated={handleReceiptExpense} />
         </CollapsibleSection>
 

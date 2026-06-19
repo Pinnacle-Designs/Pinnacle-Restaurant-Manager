@@ -8,22 +8,39 @@ import { getLocationIdFromRequest } from "@/lib/location";
 import { requirePermission } from "@/lib/api-auth";
 import { processDigitizedInvoice } from "@/lib/purchasing/invoice-digitization";
 
+async function fileToBase64(file: File): Promise<string> {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  return buffer.toString("base64");
+}
+
 export async function POST(request: NextRequest) {
   const { error } = await requirePermission(request, "manage_inventory");
   if (error) return error;
 
   try {
     const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-    if (!file) {
+    const multiFiles = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
+    const singleFile = formData.get("file");
+    const file = singleFile instanceof File && singleFile.size > 0 ? singleFile : null;
+    const files = multiFiles.length > 0 ? multiFiles : file ? [file] : [];
+
+    if (files.length === 0) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    const bytes = await file.arrayBuffer();
-    const base64 = Buffer.from(bytes).toString("base64");
-    const invoice = await analyzeInvoice(base64);
+    const base64Images = await Promise.all(files.map(fileToBase64));
+    const panoramic =
+      formData.get("panoramic") === "true" || formData.get("scanMode") === "panorama";
+    const invoice = await analyzeInvoice(
+      base64Images.length === 1 ? base64Images[0] : base64Images,
+      { panoramic: panoramic && base64Images.length === 1 }
+    );
 
-    return NextResponse.json({ invoice });
+    return NextResponse.json({
+      invoice,
+      pageCount: files.length,
+      panoramic: panoramic || files.length > 1,
+    });
   } catch (err) {
     console.error("Invoice scan error:", err);
     return NextResponse.json({ error: "Scan failed" }, { status: 500 });
@@ -46,6 +63,7 @@ export async function PUT(request: NextRequest) {
     const receiptId = (formData.get("receiptId") as string) || null;
     const linesJson = formData.get("lines") as string;
     const lines = linesJson ? JSON.parse(linesJson) : [];
+    const pageCount = parseInt(String(formData.get("pageCount") || "1"), 10);
 
     let imageUrl: string | null = null;
     if (file) {

@@ -75,7 +75,14 @@ export interface ReceiptData {
   items: string[];
 }
 
-export async function analyzeReceipt(imageBase64: string): Promise<ReceiptData> {
+export async function analyzeReceipt(
+  imageBase64: string | string[],
+  options?: { panoramic?: boolean }
+): Promise<ReceiptData> {
+  const images = Array.isArray(imageBase64) ? imageBase64 : [imageBase64];
+  const multiPage = images.length > 1;
+  const panoramic = options?.panoramic ?? false;
+
   const fallback: ReceiptData = {
     description: "Receipt expense",
     amount: 0,
@@ -88,35 +95,44 @@ export async function analyzeReceipt(imageBase64: string): Promise<ReceiptData> 
   if (!openai) {
     return {
       ...fallback,
-      description: "Receipt (manual entry required — set OPENAI_API_KEY)",
+      description:
+        multiPage || panoramic
+          ? "Long receipt (manual entry required — set OPENAI_API_KEY)"
+          : "Receipt (manual entry required — set OPENAI_API_KEY)",
     };
   }
 
   try {
+    const pageHint = multiPage
+      ? `This is a long receipt captured in ${images.length} photos, in order from top to bottom (first image = top of receipt). Read all images as one continuous receipt. Combine line items across pages, avoid duplicates at page overlaps, and use the final total from the bottom section.`
+      : panoramic
+        ? "This is a single panoramic photo of a long receipt — the camera was swept vertically from top to bottom in one continuous shot. Read the entire tall image from top to bottom as one receipt."
+        : "Extract data from this receipt image for a restaurant expense record.";
+
+    const content: Array<
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string } }
+    > = [
+      {
+        type: "text",
+        text: `${pageHint} Return JSON with: description (vendor + brief summary), amount (total as number), category (one of: Food & Supplies, Utilities, Maintenance, Labor, Marketing, Equipment, Insurance, Other), date (YYYY-MM-DD), vendor (store name), items (array of line item strings). Use the total amount including tax.`,
+      },
+      ...images.map((b64) => ({
+        type: "image_url" as const,
+        image_url: { url: `data:image/jpeg;base64,${b64}` },
+      })),
+    ];
+
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `Extract data from this receipt image for a restaurant expense record. Return JSON with: description (vendor + brief summary), amount (total as number), category (one of: Food & Supplies, Utilities, Maintenance, Labor, Marketing, Equipment, Insurance, Other), date (YYYY-MM-DD), vendor (store name), items (array of line item strings). Use the total amount including tax.`,
-            },
-            {
-              type: "image_url",
-              image_url: { url: `data:image/jpeg;base64,${imageBase64}` },
-            },
-          ],
-        },
-      ],
-      max_tokens: 500,
+      messages: [{ role: "user", content }],
+      max_tokens: multiPage ? 1200 : panoramic ? 800 : 500,
       response_format: { type: "json_object" },
     });
 
-    const content = response.choices[0]?.message?.content;
-    if (content) {
-      const parsed = JSON.parse(content);
+    const responseContent = response.choices[0]?.message?.content;
+    if (responseContent) {
+      const parsed = JSON.parse(responseContent);
       return {
         description: parsed.description || parsed.vendor || "Receipt",
         amount: parseFloat(parsed.amount) || 0,

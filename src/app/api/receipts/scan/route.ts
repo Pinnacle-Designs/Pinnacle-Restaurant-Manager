@@ -8,25 +8,40 @@ import { getLocationIdFromRequest } from "@/lib/location";
 import { requirePermission } from "@/lib/api-auth";
 import type { PhotoCategory } from "@prisma/client";
 
+async function fileToBase64(file: File): Promise<string> {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  return buffer.toString("base64");
+}
+
 export async function POST(request: NextRequest) {
   const { error } = await requirePermission(request, "view_receipts");
   if (error) return error;
 
   try {
     const formData = await request.formData();
-    const file = formData.get("file") as File | null;
+    const multiFiles = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
+    const singleFile = formData.get("file");
+    const file = singleFile instanceof File && singleFile.size > 0 ? singleFile : null;
 
-    if (!file) {
+    const files = multiFiles.length > 0 ? multiFiles : file ? [file] : [];
+
+    if (files.length === 0) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const base64 = buffer.toString("base64");
+    const base64Images = await Promise.all(files.map(fileToBase64));
+    const panoramic =
+      formData.get("panoramic") === "true" || formData.get("scanMode") === "panorama";
+    const receipt = await analyzeReceipt(
+      base64Images.length === 1 ? base64Images[0] : base64Images,
+      { panoramic: panoramic && base64Images.length === 1 }
+    );
 
-    const receipt = await analyzeReceipt(base64);
-
-    return NextResponse.json({ receipt });
+    return NextResponse.json({
+      receipt,
+      pageCount: files.length,
+      panoramic: panoramic || files.length > 1,
+    });
   } catch (error) {
     console.error("Receipt scan error:", error);
     return NextResponse.json({ error: "Scan failed" }, { status: 500 });
@@ -45,6 +60,9 @@ export async function PUT(request: NextRequest) {
     const amount = parseFloat(formData.get("amount") as string);
     const category = formData.get("category") as string;
     const date = formData.get("date") as string;
+    const pageCount = parseInt(String(formData.get("pageCount") || "1"), 10);
+    const panoramic =
+      formData.get("panoramic") === "true" || formData.get("scanMode") === "panorama";
 
     let receiptUrl: string | null = null;
 
@@ -65,7 +83,12 @@ export async function PUT(request: NextRequest) {
           url: receiptUrl,
           category: "RECEIPT" as PhotoCategory,
           title: description,
-          description: `Receipt: ${description}`,
+          description:
+            pageCount > 1
+              ? `Panoramic receipt (${pageCount} pages): ${description}`
+              : panoramic
+                ? `Panoramic receipt: ${description}`
+                : `Receipt: ${description}`,
         },
       });
     }
@@ -87,7 +110,12 @@ export async function PUT(request: NextRequest) {
         action: "RECEIPT_OCR",
         entity: "expense",
         entityId: expense.id,
-        details: `Receipt scanned: ${description} $${amount}`,
+        details:
+          pageCount > 1
+            ? `Panoramic receipt (${pageCount} pages): ${description} $${amount}`
+            : panoramic
+              ? `Panoramic receipt scan: ${description} $${amount}`
+              : `Receipt scanned: ${description} $${amount}`,
       },
     });
 

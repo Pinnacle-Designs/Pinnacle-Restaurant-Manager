@@ -24,7 +24,39 @@ export interface InvoiceData {
   lines: InvoiceLineData[];
 }
 
-export async function analyzeInvoice(imageBase64: string): Promise<InvoiceData> {
+function parseInvoiceJson(parsed: Record<string, unknown>, today: string): InvoiceData {
+  const rawLines = Array.isArray(parsed.lines) ? parsed.lines : [];
+  const lines: InvoiceLineData[] = rawLines.map((l: Record<string, unknown>) => ({
+      description: String(l.description ?? "Item"),
+      qty: parseFloat(String(l.qty)) || 0,
+      unit: String(l.unit ?? "each"),
+      unitPrice: parseFloat(String(l.unitPrice)) || 0,
+      lineTotal: parseFloat(String(l.lineTotal)) || 0,
+      sku: l.sku ? String(l.sku) : undefined,
+      catchWeightBilled:
+        l.catchWeightBilled != null ? parseFloat(String(l.catchWeightBilled)) : undefined,
+      catchWeightUnit: l.catchWeightUnit ? String(l.catchWeightUnit) : undefined,
+    }));
+
+  const amount =
+    parseFloat(String(parsed.amount)) || lines.reduce((s, l) => s + l.lineTotal, 0);
+
+  return {
+    vendor: String(parsed.vendor ?? "Unknown"),
+    invoiceNumber: String(parsed.invoiceNumber ?? ""),
+    amount,
+    invoiceDate: String(parsed.invoiceDate ?? today),
+    lines,
+  };
+}
+
+export async function analyzeInvoice(
+  imageBase64: string | string[],
+  options?: { panoramic?: boolean }
+): Promise<InvoiceData> {
+  const images = Array.isArray(imageBase64) ? imageBase64 : [imageBase64];
+  const multiPage = images.length > 1;
+  const panoramic = options?.panoramic ?? false;
   const today = new Date().toISOString().split("T")[0]!;
   const fallback: InvoiceData = {
     vendor: "Unknown vendor",
@@ -37,23 +69,27 @@ export async function analyzeInvoice(imageBase64: string): Promise<InvoiceData> 
   if (!openai) {
     return {
       ...fallback,
-      vendor: "Vendor (manual entry — set OPENAI_API_KEY)",
-      lines: [
-        { description: "Line item 1", qty: 1, unit: "case", unitPrice: 0, lineTotal: 0 },
-      ],
+      vendor: multiPage
+        ? "Vendor (manual entry — set OPENAI_API_KEY)"
+        : "Vendor (manual entry — set OPENAI_API_KEY)",
+      lines: [{ description: "Line item 1", qty: 1, unit: "case", unitPrice: 0, lineTotal: 0 }],
     };
   }
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `Extract data from this vendor invoice image for a restaurant accounts payable record. Return JSON with:
+    const pageHint = multiPage
+      ? `This vendor invoice or delivery report spans ${images.length} photos in order from top to bottom (first image = top). Read all pages as one document. Merge line items across pages, skip duplicates at overlaps, and use the invoice total from the final page when present.`
+      : panoramic
+        ? "This is a single panoramic photo of a long vendor invoice or delivery report — captured in one continuous vertical sweep. Read the entire tall image from top to bottom."
+        : "Extract data from this vendor invoice image for a restaurant accounts payable record.";
+
+    const content: Array<
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string } }
+    > = [
+      {
+        type: "text",
+        text: `${pageHint} Return JSON with:
 - vendor (supplier name)
 - invoiceNumber (invoice or PO number if visible)
 - amount (invoice total as number, including tax)
@@ -61,46 +97,24 @@ export async function analyzeInvoice(imageBase64: string): Promise<InvoiceData> 
 - lines: array of { description, qty (number), unit (string like lbs/case/each), unitPrice (number), lineTotal (number), sku (optional), catchWeightBilled (optional number — actual weight in lbs when sold by case/box, e.g. brisket 42.5 lbs), catchWeightUnit (optional, default lbs) }
 
 Read crinkled or stained paper carefully. For meat/seafood sold by case with a billed weight, capture catchWeightBilled separately from case qty. Use line totals that match qty * unitPrice when possible.`,
-            },
-            {
-              type: "image_url",
-              image_url: { url: `data:image/jpeg;base64,${imageBase64}` },
-            },
-          ],
-        },
-      ],
-      max_tokens: 1200,
+      },
+      ...images.map((b64) => ({
+        type: "image_url" as const,
+        image_url: { url: `data:image/jpeg;base64,${b64}` },
+      })),
+    ];
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content }],
+      max_tokens: multiPage ? 2000 : panoramic ? 1600 : 1200,
       response_format: { type: "json_object" },
     });
 
-    const content = response.choices[0]?.message?.content;
-    if (!content) return fallback;
+    const responseContent = response.choices[0]?.message?.content;
+    if (!responseContent) return fallback;
 
-    const parsed = JSON.parse(content);
-    const lines: InvoiceLineData[] = (parsed.lines ?? []).map(
-      (l: Record<string, unknown>) => ({
-        description: String(l.description ?? "Item"),
-        qty: parseFloat(String(l.qty)) || 0,
-        unit: String(l.unit ?? "each"),
-        unitPrice: parseFloat(String(l.unitPrice)) || 0,
-        lineTotal: parseFloat(String(l.lineTotal)) || 0,
-        sku: l.sku ? String(l.sku) : undefined,
-        catchWeightBilled: l.catchWeightBilled != null ? parseFloat(String(l.catchWeightBilled)) : undefined,
-        catchWeightUnit: l.catchWeightUnit ? String(l.catchWeightUnit) : undefined,
-      })
-    );
-
-    const amount =
-      parseFloat(String(parsed.amount)) ||
-      lines.reduce((s, l) => s + l.lineTotal, 0);
-
-    return {
-      vendor: String(parsed.vendor ?? "Unknown"),
-      invoiceNumber: String(parsed.invoiceNumber ?? ""),
-      amount,
-      invoiceDate: String(parsed.invoiceDate ?? today),
-      lines,
-    };
+    return parseInvoiceJson(JSON.parse(responseContent), today);
   } catch {
     return fallback;
   }
