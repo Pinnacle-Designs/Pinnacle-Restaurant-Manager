@@ -1,6 +1,8 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { getAuthSecret } from "@/lib/env";
 
+const STATE_TTL_MS = 15 * 60 * 1000;
+
 export function createOAuthState(payload: Record<string, string>): string {
   const exp = String(Date.now() + STATE_TTL_MS);
   const body = Buffer.from(JSON.stringify({ ...payload, exp })).toString("base64url");

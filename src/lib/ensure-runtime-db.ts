@@ -1,5 +1,6 @@
 import { copyFileSync, existsSync } from "fs";
 import path from "path";
+import { isSqliteDatabase } from "./env";
 
 const TMP_DB = "/tmp/pinnacle.db";
 
@@ -9,11 +10,12 @@ function isVercelServerlessRuntime(): boolean {
 }
 
 /**
- * Vercel lambdas have a read-only filesystem except /tmp.
- * Copy the build-time seeded SQLite file to /tmp before Prisma connects.
+ * Legacy SQLite on Vercel: copy build-time DB to /tmp.
+ * Skipped when DATABASE_URL points to PostgreSQL (Neon, Vercel Postgres, etc.).
  */
 export function ensureRuntimeDatabase(): void {
   if (!isVercelServerlessRuntime()) return;
+  if (!isSqliteDatabase()) return;
 
   if (existsSync(TMP_DB)) {
     process.env.DATABASE_URL = `file:${TMP_DB}`;

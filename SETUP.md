@@ -179,11 +179,25 @@ Static marketing site with live embedded demo.
 
 ## Deploy (Vercel)
 
-1. Set environment variables in Vercel project settings
-2. `vercel-build` runs `db:deploy-seed` then `next build`
-3. SQLite deploy database is copied to `/tmp` at runtime
-4. Register Stripe webhook to production URL
-5. Set Node.js **24.x** in Vercel project settings
+### Automated checklist
+
+```bash
+npm run production:checklist    # generates secrets, pushes schema, writes .env.vercel.production
+npm run production:verify       # validates production env + integration health
+```
+
+### Production requirements
+
+1. **PostgreSQL** — Neon, Vercel Postgres, or Supabase (`DATABASE_URL=postgresql://...`). SQLite is preview/embed only.
+2. **Environment variables** — copy from `.env.vercel.production` into Vercel → Settings → Environment Variables (Production).
+3. **Stripe live** — `APP_URL=https://your-app.vercel.app npm run stripe:setup:live`
+4. **Webhook** — `https://your-app.vercel.app/api/webhooks/stripe` → copy `STRIPE_WEBHOOK_SECRET` to Vercel.
+5. **Deploy** — connect GitHub repo in Vercel, or `npx vercel --prod`
+6. Set Node.js **24.x** in Vercel project settings.
+
+`vercel-build` runs `tsx scripts/vercel-build.ts` (Prisma generate + schema push; no demo seed unless `SEED_DEMO_DATA=true`).
+
+Local Postgres (optional): `docker compose up -d` then `npm run production:checklist -- --postgres`
 
 ## Platform admin panel
 
@@ -200,7 +214,8 @@ Access: `/admin` (requires `PLATFORM_ADMIN_EMAILS` or `isPlatformAdmin`)
 |--------|-------------|
 | `npm run dev` | Development server |
 | `npm run build` | Production build |
-| `npm run db:push` | Apply Prisma schema to local DB |
+| `npm run production:checklist` | Generate secrets, DB push, Vercel env template |
+| `npm run production:verify` | Validate production env + integration health |
 | `npm run db:studio` | Prisma Studio GUI |
 | `npm run db:deploy-seed` | Build deploy SQLite with seed data |
 | `npm run stripe:setup` | Create test-mode Stripe prices (+ optional `--webhook`) |
