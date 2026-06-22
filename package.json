@@ -19,6 +19,7 @@
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
+    "db:neon": "tsx scripts/connect-neon.ts",
     "db:reseed": "tsx scripts/full-reseed.ts",
     "db:studio": "prisma studio",
     "stripe:listen": "stripe listen --forward-to localhost:3000/api/webhooks/stripe",

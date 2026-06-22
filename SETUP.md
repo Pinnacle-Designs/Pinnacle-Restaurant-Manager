@@ -199,6 +199,14 @@ npm run production:verify       # validates production env + integration health
 
 Local Postgres (optional): `docker compose up -d` then `npm run production:checklist -- --postgres`
 
+**Neon (recommended):** Copy your connection string from [Neon console](https://console.neon.tech) → Connect → into `.env` as `DATABASE_URL`, then:
+
+```bash
+npm run db:neon
+```
+
+Set the same `DATABASE_URL` in Vercel production environment variables.
+
 ## Platform admin panel
 
 Access: `/admin` (requires `PLATFORM_ADMIN_EMAILS` or `isPlatformAdmin`)
