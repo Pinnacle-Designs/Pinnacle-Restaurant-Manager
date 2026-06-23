@@ -74,19 +74,18 @@ export async function buildEmbedLaunchResponse(
   const path = resolveEmbedPath(pathParam);
   const chrome = resolveEmbedChrome(request.nextUrl.searchParams.get("chrome"));
   const embedValue = embedQueryValue(chrome);
-  const existing = await getSessionUserFromRequest(request);
 
-  if (existing) {
+  // Only reuse session when it is already the public demo owner account.
+  const existing = await getSessionUserFromRequest(request);
+  if (existing && isDemoAccountEmail(existing.email)) {
     let locationId = existing.locationId ?? "";
 
-    if (isDemoAccountEmail(existing.email)) {
-      locationId =
-        (await resolveDemoAccountLocationId(
-          existing.id,
-          existing.email,
-          locationId || existing.locationId
-        )) ?? locationId;
-    }
+    locationId =
+      (await resolveDemoAccountLocationId(
+        existing.id,
+        existing.email,
+        locationId || existing.locationId
+      )) ?? locationId;
 
     if (!locationId) {
       return NextResponse.json({ error: "Demo workspace not found" }, { status: 500 });

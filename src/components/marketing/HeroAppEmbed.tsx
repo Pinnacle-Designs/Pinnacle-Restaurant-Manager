@@ -34,7 +34,7 @@ export function HeroAppEmbed({
   const readyRef = useRef(false);
   const loadCountRef = useRef(0);
 
-  const mobileSrc = embedLaunchUrl(undefined, "mobile");
+  const mobileSrc = embedLaunchUrl(undefined, embedChrome);
   const fullSrc = embedLaunchUrl(undefined, "full");
 
   const retryEmbed = useCallback(() => {
@@ -101,7 +101,7 @@ export function HeroAppEmbed({
   };
 
   const frame = (expandedView: boolean) => {
-    const src = expandedView ? fullSrc : mobileSrc;
+    const src = embedLaunchUrl(undefined, expandedView ? "full" : embedChrome);
     return (
     <iframe
       key={expandedView ? `modal-${iframeKey}` : `hero-${iframeKey}`}
@@ -131,7 +131,9 @@ export function HeroAppEmbed({
             <span className="h-3 w-3 shrink-0 rounded-full bg-red-400" />
             <span className="h-3 w-3 shrink-0 rounded-full bg-amber-400" />
             <span className="h-3 w-3 shrink-0 rounded-full bg-emerald-400" />
-            <span className="ml-1 truncate text-xs text-slate-400">Live demo — mobile app view</span>
+            <span className="ml-1 truncate text-xs text-slate-400">
+              Live demo — {embedChrome === "full" ? "full app" : "mobile app view"}
+            </span>
           </div>
           <button
             type="button"

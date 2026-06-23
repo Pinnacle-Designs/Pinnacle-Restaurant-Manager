@@ -12,12 +12,12 @@ import {
 import { MarketingNav } from "./MarketingNav";
 import { DEMO_TOUR_STOPS } from "@/lib/marketing-content";
 import { embedLaunchUrl } from "@/lib/embed-config";
-import { useEmbedChrome } from "@/hooks/useEmbedChrome";
 import { cn } from "@/lib/utils";
 import { PageSectionShell, PageSection } from "@/components/layout/PageSections";
 
 export function DemoPage() {
-  const embedChrome = useEmbedChrome();
+  /** Always show full desktop app (sidebar + all modules) for customer demos. */
+  const embedChrome = "full" as const;
   const [iframeLoading, setIframeLoading] = useState(true);
   const [activeStop, setActiveStop] = useState<(typeof DEMO_TOUR_STOPS)[number]>(DEMO_TOUR_STOPS[0]);
   const [iframeKey, setIframeKey] = useState(0);
@@ -27,7 +27,7 @@ export function DemoPage() {
     readyRef.current = false;
     setIframeLoading(true);
     setIframeKey((k) => k + 1);
-  }, [embedChrome]);
+  }, []);
 
   const reloadIframe = () => {
     readyRef.current = false;
@@ -129,7 +129,7 @@ export function DemoPage() {
         </aside>
 
         {/* Live app iframe — bootstraps demo session via /api/embed/launch */}
-        <div className="relative flex flex-1 flex-col">
+        <div className="relative flex flex-1 flex-col overflow-x-auto">
           {iframeLoading && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-950/90">
               <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
@@ -141,7 +141,7 @@ export function DemoPage() {
             key={`${activeStop.path}-${embedChrome}-${iframeKey}`}
             src={embedLaunchUrl(activeStop.path, embedChrome)}
             title={`Pinnacle demo — ${activeStop.label}`}
-            className="h-[calc(100vh-8rem)] w-full flex-1 bg-white lg:h-[calc(100vh-7rem)]"
+            className="h-[calc(100vh-8rem)] min-w-[1024px] w-full flex-1 bg-white lg:h-[calc(100vh-7rem)]"
             onLoad={(e) => {
               if (readyRef.current) return;
               try {
@@ -155,7 +155,7 @@ export function DemoPage() {
                   (search.includes("embed=full") ||
                     search.includes("embed=mobile") ||
                     search.includes("embed=1") ||
-                    path === "/dashboard")
+                    search.includes("_st="))
                 ) {
                   readyRef.current = true;
                   setIframeLoading(false);

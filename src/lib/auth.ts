@@ -39,15 +39,17 @@ export function verifyPassword(password: string, stored: string): boolean {
 }
 
 export async function getSessionUser(): Promise<SessionUser | null> {
+  const hdrs = await headers();
+  const embedHeader = hdrs.get(EMBED_SESSION_HEADER);
+  if (embedHeader) {
+    const fromHeader = await parseSessionToken(embedHeader);
+    if (fromHeader) return fromHeader;
+  }
+
   const cookieStore = await cookies();
-  let token =
+  const token =
     cookieStore.get(AUTH_COOKIE_NAME)?.value ??
     cookieStore.get(EMBED_API_COOKIE_NAME)?.value;
-
-  if (!token) {
-    const hdrs = await headers();
-    token = hdrs.get(EMBED_SESSION_HEADER) ?? undefined;
-  }
 
   if (!token) return null;
   return parseSessionToken(token);

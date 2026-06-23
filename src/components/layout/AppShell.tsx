@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { MobileHeader } from "@/components/layout/MobileHeader";
@@ -13,14 +13,12 @@ import { LocationLocaleProvider } from "@/components/location/LocationLocaleProv
 import { GlobalSearchProvider } from "@/components/search/GlobalSearch";
 import { PageSearchStrip } from "@/components/search/PageSearchStrip";
 import { isEmbeddableEmbedParam } from "@/lib/embed-config";
-import { MOBILE_EMBED_MEDIA } from "@/hooks/useEmbedChrome";
 import { bootstrapEmbedSession } from "@/lib/embed-api-client";
 import { EmbedSessionBootstrap } from "@/components/layout/EmbedSessionBootstrap";
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [narrowViewport, setNarrowViewport] = useState(false);
   const isMarketing = pathname === "/" || pathname === "/demo";
   const isLogin = pathname === "/login";
   const isSignup = pathname === "/signup";
@@ -32,18 +30,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const embedParam = searchParams.get("embed");
   const isEmbed = isEmbeddableEmbedParam(embedParam);
 
-  useEffect(() => {
-    const mq = window.matchMedia(MOBILE_EMBED_MEDIA);
-    const sync = () => setNarrowViewport(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
-
-  const isEmbedMobile =
-    embedParam === "mobile" ||
-    embedParam === "1" ||
-    (isEmbed && narrowViewport);
+  const isEmbedMobile = embedParam === "mobile" || embedParam === "1";
 
   if (typeof window !== "undefined" && isEmbed) {
     bootstrapEmbedSession(embedParam);

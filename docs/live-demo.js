@@ -43,7 +43,7 @@
       base.replace(/\/$/, "") +
       "/api/embed/launch?path=" +
       encodeURIComponent(DEFAULT_PATH) +
-      "&chrome=mobile";
+      "&chrome=full";
     var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
     var timer = controller
       ? setTimeout(function () {

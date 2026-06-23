@@ -45,12 +45,17 @@ const LocationLocaleContext = createContext<LocationLocaleContextValue>({
 });
 
 export function LocationLocaleProvider({ children }: { children: React.ReactNode }) {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, embedSession } = useAuth();
   const [settings, setSettings] = useState<LocationLocaleSettings>(DEFAULT_LOCALE_SETTINGS);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    if (!user?.locationId) {
+    const locationId = user?.locationId;
+    if (!locationId) {
+      if (embedSession) {
+        setLoading(false);
+        return;
+      }
       setSettings(DEFAULT_LOCALE_SETTINGS);
       setActiveLocationLocale(DEFAULT_LOCALE_SETTINGS);
       setLoading(false);
@@ -77,7 +82,7 @@ export function LocationLocaleProvider({ children }: { children: React.ReactNode
     } finally {
       setLoading(false);
     }
-  }, [user?.locationId]);
+  }, [user?.locationId, embedSession]);
 
   useEffect(() => {
     if (authLoading) return;

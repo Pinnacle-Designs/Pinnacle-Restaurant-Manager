@@ -37,6 +37,13 @@ export function persistEmbedSessionToken(token: string | null | undefined): void
 export function getEmbedSessionToken(): string | null {
   if (typeof window === "undefined") return null;
 
+  // URL `_st` always wins — normal browsers may have stale memory/cookie sessions.
+  const fromUrl = new URLSearchParams(window.location.search).get(EMBED_SESSION_PARAM);
+  if (fromUrl) {
+    persistEmbedSessionToken(fromUrl);
+    return fromUrl;
+  }
+
   if (memoryCachedToken) return memoryCachedToken;
 
   if (window.__PINNACLE_EMBED_ST__) {
@@ -44,17 +51,14 @@ export function getEmbedSessionToken(): string | null {
     return memoryCachedToken;
   }
 
-  const fromUrl = new URLSearchParams(window.location.search).get(EMBED_SESSION_PARAM);
-  if (fromUrl) {
-    persistEmbedSessionToken(fromUrl);
-    return fromUrl;
-  }
-
   const match = document.cookie.match(
     new RegExp(`(?:^|;\\s*)${EMBED_API_COOKIE_NAME}=([^;]+)`)
   );
   if (match?.[1]) {
     const token = decodeURIComponent(match[1]);
+    if (!parseEmbedSessionUser(token)) {
+      return null;
+    }
     persistEmbedSessionToken(token);
     return token;
   }
@@ -62,8 +66,12 @@ export function getEmbedSessionToken(): string | null {
   try {
     const stored = sessionStorage.getItem(STORAGE_KEY);
     if (stored) {
-      memoryCachedToken = stored;
-      return stored;
+      if (!parseEmbedSessionUser(stored)) {
+        sessionStorage.removeItem(STORAGE_KEY);
+      } else {
+        memoryCachedToken = stored;
+        return stored;
+      }
     }
   } catch {
     /* ignore */
@@ -105,10 +113,26 @@ export function bootstrapEmbedSession(embedParam: string | null): void {
   if (!isEmbeddableEmbedParam(embedParam)) return;
   const params = new URLSearchParams(window.location.search);
   const st = params.get(EMBED_SESSION_PARAM);
-  if (st) persistEmbedSessionToken(st);
-  else getEmbedSessionToken();
+  if (st) {
+    persistEmbedSessionToken(st);
+  } else {
+    getEmbedSessionToken();
+  }
   installEmbedFetchPatch();
   ensureEmbedUrlHasSession();
+}
+
+/** Drop cached embed tokens when starting a fresh demo launch. */
+export function clearEmbedSessionCache(): void {
+  memoryCachedToken = null;
+  if (typeof window !== "undefined") {
+    delete window.__PINNACLE_EMBED_ST__;
+    try {
+      sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 let fetchPatched = false;
@@ -168,4 +192,67 @@ export function clientFetch(input: RequestInfo | URL, init?: RequestInit): Promi
 /** True when the demo iframe has (or can restore) an embed session token. */
 export function hasEmbedSession(): boolean {
   return isEmbedMode() && Boolean(getEmbedSessionToken());
+}
+
+/** Decode session JWT payload for instant embed UI (API still validates server-side). */
+export function parseEmbedSessionUser(token: string | null | undefined): {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  locationId: string | null;
+  plan?: string;
+  permissions?: string[];
+  setupComplete?: boolean;
+  isPlatformAdmin?: boolean;
+  mfaEnabled?: boolean;
+  emailVerifiedAt?: string | null;
+} | null {
+  if (!token?.trim()) return null;
+  try {
+    const payload = token.trim().split(".")[0];
+    if (!payload) return null;
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const data = JSON.parse(new TextDecoder().decode(bytes)) as {
+      exp?: number;
+      id?: string;
+      email?: string;
+      name?: string;
+      role?: string;
+      locationId?: string | null;
+      plan?: string;
+      permissions?: string[];
+      setupComplete?: boolean;
+      isPlatformAdmin?: boolean;
+      mfaEnabled?: boolean;
+      emailVerifiedAt?: string | null;
+    };
+    if (data.exp && data.exp < Date.now()) return null;
+    if (!data.id || !data.email || !data.name || !data.role) return null;
+    return {
+      id: data.id,
+      email: data.email,
+      name: data.name,
+      role: data.role,
+      locationId: data.locationId ?? null,
+      plan: data.plan,
+      permissions: data.permissions,
+      setupComplete: data.setupComplete,
+      isPlatformAdmin: data.isPlatformAdmin,
+      mfaEnabled: data.mfaEnabled,
+      emailVerifiedAt: data.emailVerifiedAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Bootstrap embed session and return decoded demo user when available. */
+export function bootstrapEmbedUser(embedParam: string | null): ReturnType<typeof parseEmbedSessionUser> {
+  bootstrapEmbedSession(embedParam);
+  return parseEmbedSessionUser(getEmbedSessionToken());
 }

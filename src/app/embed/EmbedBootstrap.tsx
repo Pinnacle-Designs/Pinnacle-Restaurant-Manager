@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { resolveEmbedPath } from "@/lib/embed-config";
@@ -8,7 +8,6 @@ import { resolveEmbedPath } from "@/lib/embed-config";
 export function EmbedBootstrap() {
   const searchParams = useSearchParams();
   const pathParam = searchParams.get("path");
-  const [error, setError] = useState<string | null>(null);
   const startedRef = useRef(false);
 
   useEffect(() => {
@@ -20,17 +19,6 @@ export function EmbedBootstrap() {
       `/api/embed/launch?path=${encodeURIComponent(path)}&chrome=mobile`
     );
   }, [pathParam]);
-
-  if (error) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 px-4 text-center text-white">
-        <p className="text-red-400">{error}</p>
-        <a href="/login" className="mt-4 text-sm text-orange-400 underline">
-          Sign in manually
-        </a>
-      </div>
-    );
-  }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 text-white">

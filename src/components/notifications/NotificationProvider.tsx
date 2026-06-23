@@ -5,6 +5,7 @@ import { showCriticalNotifications, type CriticalInsight } from "@/lib/notificat
 import { useAuth } from "@/components/auth/AuthProvider";
 import { parseJsonResponse } from "@/lib/fetch-json";
 import { registerPwaServiceWorker } from "@/lib/pwa";
+import { clientFetch } from "@/lib/embed-api-client";
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const { user, loading, can } = useAuth();
@@ -16,7 +17,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     if (loading || !user || !can("view_insights")) return;
 
-    fetch("/api/insights/critical")
+    clientFetch("/api/insights/critical")
       .then(async (res) => {
         if (!res.ok) return null;
         return parseJsonResponse<{ insights?: CriticalInsight[] }>(res);
