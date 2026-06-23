@@ -1,7 +1,7 @@
 import type { NextResponse } from "next/server";
 import { enrichUserWithPlan } from "./location-plan";
 import { createSessionToken, sessionCookieOptions, type SessionUser } from "./session";
-import { EMBED_API_COOKIE_NAME } from "./embed-api-client";
+import { EMBED_API_COOKIE_NAME } from "./embed-constants";
 import { AUTH_COOKIE_MAX_AGE } from "./session";
 import {
   createWorkspaceCookieToken,

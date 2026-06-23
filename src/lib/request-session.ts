@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { AUTH_COOKIE_NAME, parseSessionToken, type SessionUser } from "./session";
-import { EMBED_SESSION_PARAM } from "./embed-session-middleware";
+import { EMBED_SESSION_PARAM } from "./embed-constants";
 
 /** Read session JWT from cookie, embed `_st` query param, or Authorization bearer. */
 export function getRequestSessionToken(request: NextRequest): string | undefined {

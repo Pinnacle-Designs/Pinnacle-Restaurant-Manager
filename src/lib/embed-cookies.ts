@@ -1,7 +1,7 @@
 import type { NextRequest, NextResponse } from "next/server";
 import { sessionCookieOptions, AUTH_COOKIE_MAX_AGE } from "@/lib/auth";
 import { LOCATION_COOKIE_NAME } from "@/lib/location";
-import { EMBED_API_COOKIE_NAME } from "@/lib/embed-api-client";
+import { EMBED_API_COOKIE_NAME } from "@/lib/embed-constants";
 
 export function requestIsHttps(request: NextRequest): boolean {
   if (request.nextUrl.protocol === "https:") return true;

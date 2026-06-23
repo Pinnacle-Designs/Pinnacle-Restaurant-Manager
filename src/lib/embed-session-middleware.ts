@@ -3,9 +3,10 @@ import { NextResponse } from "next/server";
 import { parseSessionToken } from "@/lib/session";
 import { applyEmbedAuthCookies } from "@/lib/embed-cookies";
 import { LOCATION_COOKIE_NAME } from "@/lib/location-constants";
+import { EMBED_SESSION_PARAM } from "@/lib/embed-constants";
 import { isEmbeddableEmbedParam } from "@/lib/embed-config";
 
-export const EMBED_SESSION_PARAM = "_st";
+export { EMBED_SESSION_PARAM } from "@/lib/embed-constants";
 
 /** Strip `_st` from embed URLs and persist session cookies for cross-origin iframes. */
 export async function applyEmbedSessionParam(

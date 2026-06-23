@@ -16,9 +16,9 @@ import { seedDemoUsers } from "@/lib/demo-users";
 import { LOCATION_COOKIE_NAME } from "@/lib/location";
 import { resolveEmbedPath, resolveEmbedChrome, embedQueryValue } from "@/lib/embed-config";
 import { applyEmbedAuthCookies } from "@/lib/embed-cookies";
-import { EMBED_SESSION_PARAM } from "@/lib/embed-session-middleware";
+import { EMBED_SESSION_PARAM } from "@/lib/embed-constants";
 
-export { EMBED_SESSION_PARAM };
+export { EMBED_SESSION_PARAM } from "@/lib/embed-constants";
 
 const DEMO_EMAIL = "owner@pinnacle.com";
 const DEMO_PASSWORD = "demo1234";

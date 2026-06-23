@@ -1,7 +1,6 @@
-import { EMBED_SESSION_PARAM } from "./embed-session-middleware";
+import { EMBED_API_COOKIE_NAME, EMBED_SESSION_PARAM } from "./embed-constants";
 
-/** Non-httpOnly cookie so embedded iframes can attach `_st` to API fetches (CHIPS / 3rd-party cookie limits). */
-export const EMBED_API_COOKIE_NAME = "pinnacle_embed_st";
+export { EMBED_API_COOKIE_NAME, EMBED_SESSION_PARAM } from "./embed-constants";
 
 export function getEmbedSessionToken(): string | null {
   if (typeof document === "undefined") return null;
