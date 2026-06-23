@@ -13,11 +13,22 @@ import { privateJsonResponse } from "@/lib/secure-response";
 import { getProviderConnection } from "@/lib/payments/providers";
 import { validateSubscriptionTermsAcceptance } from "@/lib/subscription-contracts";
 import { recordSubscriptionTermsAcceptance } from "@/lib/subscription-terms-record";
+import { billingRequired } from "@/lib/plan-billing";
 import type { PlanId } from "@/lib/plans";
 
 export async function PATCH(request: NextRequest) {
   const { user, error } = await requireSecureAuth(request);
   if (error) return error;
+
+  if (billingRequired()) {
+    return privateJsonResponse(
+      {
+        error:
+          "Subscription billing is managed through Stripe. Use Manage billing to update your payment method.",
+      },
+      { status: 403 }
+    );
+  }
 
   if (
     await isRateLimited(`billing:${user!.id}`, 8, 60_000)

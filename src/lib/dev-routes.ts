@@ -1,10 +1,10 @@
-/** Dev-only maintenance routes must stay disabled in production by default (FTC Safeguards / least privilege). */
+/** Dev-only maintenance routes must stay disabled in production (FTC Safeguards / least privilege). */
 export function isProductionRuntime(): boolean {
   return process.env.NODE_ENV === "production";
 }
 
 export function isAuthSeedRouteEnabled(): boolean {
-  return !isProductionRuntime() || process.env.ENABLE_AUTH_SEED === "true";
+  return !isProductionRuntime();
 }
 
 export function devOnlyNotFoundResponse() {

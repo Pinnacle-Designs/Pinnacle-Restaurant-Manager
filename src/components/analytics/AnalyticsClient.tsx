@@ -10,6 +10,13 @@ import { normalizeAnalyticsPayload } from "@/lib/analytics/normalize";
 import { SectionAnalysisPanel } from "@/components/analytics/SectionAnalysisPanel";
 import { AnalyticsTabShell, AnalyticsBlock } from "@/components/analytics/AnalyticsCollapsible";
 import {
+  AnalyticsViewModeProvider,
+  DataView,
+  ViewModeToggle,
+  ANALYTICS_VIEW_OPTIONS,
+  type DataViewMode,
+} from "@/components/charts";
+import {
   analyticsTabsForPlan,
   canAccessAnalyticsTab,
   PLAN_BY_ID,
@@ -46,66 +53,6 @@ function formatHourLabel(hour: number) {
   return `${h}:00 ${suffix}`;
 }
 
-function HourlyBarChart({
-  hours,
-}: {
-  hours: Array<{ hour: number; sales: number; orders: number }>;
-}) {
-  if (hours.length === 0) return <p className="text-sm text-slate-500">No hourly data yet.</p>;
-  const maxOrders = Math.max(...hours.map((h) => h.orders), 1);
-  return (
-    <div className="space-y-2">
-      {hours.map((h) => (
-        <div key={h.hour} className="flex items-center gap-3 text-sm">
-          <span className="w-16 shrink-0 text-slate-500">{formatHourLabel(h.hour)}</span>
-          <div className="h-5 flex-1 rounded bg-slate-100">
-            <div
-              className="h-full rounded bg-orange-400 transition-all"
-              style={{ width: `${(h.orders / maxOrders) * 100}%` }}
-            />
-          </div>
-          <span className="w-20 shrink-0 text-right text-slate-600">{h.orders} orders</span>
-          <span className="w-24 shrink-0 text-right font-medium text-slate-800">
-            {formatCurrency(h.sales)}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function DataTable({
-  headers,
-  rows,
-}: {
-  headers: string[];
-  rows: Array<Array<string | number>>;
-}) {
-  if (rows.length === 0) return <p className="text-sm text-slate-500">No data yet.</p>;
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b text-left text-slate-500">
-            {headers.map((h) => (
-              <th key={h} className="pb-2 pr-4 font-medium">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i} className="border-b border-slate-100">
-              {row.map((cell, j) => (
-                <td key={j} className="py-2 pr-4 text-slate-700">{cell}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 export function AnalyticsClient({ plan }: { plan: PlanId }) {
   const allowedTabs = useMemo(() => analyticsTabsForPlan(plan), [plan]);
   const [data, setData] = useState<AnalyticsPayload | null>(null);
@@ -114,6 +61,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
   const [error, setError] = useState<string | null>(null);
   const [seeding, setSeeding] = useState(false);
   const [weatherSyncing, setWeatherSyncing] = useState(false);
+  const [viewMode, setViewMode] = useState<DataViewMode>("table");
 
   useEffect(() => {
     if (!canAccessAnalyticsTab(plan, tab)) {
@@ -195,12 +143,19 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
   const hasSalesData = data.sales.netSales > 0 || data.sales.byMenuItem.length > 0;
 
   return (
+    <AnalyticsViewModeProvider mode={viewMode}>
     <div>
       <PageHeader
         title="Analytics"
         description={`Restaurant intelligence — last ${data.periodDays} days`}
         reportId="sales-by-item"
-      />
+      >
+        <ViewModeToggle
+          value={viewMode}
+          onChange={setViewMode}
+          options={ANALYTICS_VIEW_OPTIONS}
+        />
+      </PageHeader>
 
       {!hasSalesData && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
@@ -269,7 +224,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
           </AnalyticsBlock>
 
           <AnalyticsBlock id="exec-trends" title="Last 7 days trends">
-            <DataTable
+            <DataView
               headers={["Date", "Sales", "Profit Est.", "Avg Rating"]}
               rows={e.last7Days.salesTrend.map((s, i) => [
                 s.date,
@@ -350,13 +305,13 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
           </AnalyticsBlock>
 
           <AnalyticsBlock id="sales-daypart" title="By daypart">
-            <DataTable
+            <DataView
               headers={["Daypart", "Net Sales", "Orders"]}
               rows={data.sales.byDaypart.map((d) => [d.daypart, formatCurrency(d.sales), d.orders])}
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="sales-channel" title="By channel">
-            <DataTable
+            <DataView
               headers={["Channel", "Net Sales", "Profit", "Margin", "Orders"]}
               rows={data.sales.byChannel.map((c) => [
                 c.channel,
@@ -368,16 +323,30 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="sales-hourly" title="Sales by hour" description="Peak hours drive staffing and prep.">
-            <HourlyBarChart hours={data.sales.byHour} />
+            <DataView
+              headers={["Hour", "Orders", "Sales"]}
+              rows={data.sales.byHour.map((h) => [
+                formatHourLabel(h.hour),
+                h.orders,
+                formatCurrency(h.sales),
+              ])}
+              chartPoints={data.sales.byHour.map((h) => ({
+                label: formatHourLabel(h.hour),
+                value: h.orders,
+              }))}
+              chartKind="bar"
+              valueLabel="Orders"
+              formatValue={(v) => `${v} orders`}
+            />
           </AnalyticsBlock>
           <AnalyticsBlock id="sales-items" title="Top menu items">
-            <DataTable
+            <DataView
               headers={["Item", "Sales", "Qty"]}
               rows={data.sales.byMenuItem.map((i) => [i.name, formatCurrency(i.sales), i.quantity])}
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="sales-category" title="By category">
-            <DataTable
+            <DataView
               headers={["Category", "Sales", "Qty"]}
               rows={data.sales.byCategory.map((c) => [c.category, formatCurrency(c.sales), c.quantity])}
             />
@@ -466,7 +435,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
           </AnalyticsBlock>
 
           <AnalyticsBlock id="food-inventory-counts" title="Inventory Counts">
-            <DataTable
+            <DataView
               headers={["Item", "Qty", "Value", "Yield %"]}
               rows={data.foodCost.inventoryCounts.map((i) => [
                 i.name,
@@ -477,7 +446,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="food-portion-yield" title="Portion & Yield Costs">
-            <DataTable
+            <DataView
               headers={["Item", "Cost/Unit", "Portion", "Portion Cost", "Yield"]}
               rows={data.foodCost.inventoryCounts
                 .filter((i) => i.portionCost !== null)
@@ -491,7 +460,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="food-recipe-costs" title="Recipe Costs">
-            <DataTable
+            <DataView
               headers={["Menu Item", "Price", "Recipe Cost", "FC %"]}
               rows={data.foodCost.recipeCosts.map((r) => [
                 r.name,
@@ -502,7 +471,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="food-waste-spoilage" title="Waste & Spoilage">
-            <DataTable
+            <DataView
               headers={["Reason", "Cost", "Qty"]}
               rows={data.foodCost.wasteByReason.map((w) => [
                 w.reason,
@@ -512,7 +481,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="food-vendor-price-changes" title="Vendor Price Changes">
-            <DataTable
+            <DataView
               headers={["Vendor", "Category", "Latest Δ%"]}
               rows={data.foodCost.pricingChanges.map((p) => [
                 p.vendor,
@@ -522,7 +491,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="food-vendor-comparison" title="Vendor Comparison">
-            <DataTable
+            <DataView
               headers={["Item", "Current", "Cheapest", "Savings"]}
               rows={data.foodCost.vendorComparison.map((v) => [
                 v.itemName,
@@ -533,7 +502,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="food-pricing-over-time" title="Pricing Over Time">
-            <DataTable
+            <DataView
               headers={["Vendor", "Date", "Amount", "Unit Price", "Change %"]}
               rows={data.foodCost.pricingChanges.flatMap((p) =>
                 p.trend.slice(-4).map((t) => [
@@ -547,13 +516,13 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="food-top-cost-drivers" title="Top Cost Drivers">
-            <DataTable
+            <DataView
               headers={["Item", "Value", "Price Δ%"]}
               rows={data.foodCost.topCostDrivers.map((i) => [i.name, formatCurrency(i.cost), `${i.changePct.toFixed(1)}%`])}
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="food-low-stock" title="Low Stock">
-            <DataTable
+            <DataView
               headers={["Item", "Qty", "Min"]}
               rows={data.foodCost.lowStockItems.map((i) => [i.name, i.quantity, i.minQuantity])}
             />
@@ -630,13 +599,13 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
           </AnalyticsBlock>
 
           <AnalyticsBlock id="labor-by-position" title="Labor Cost by Position">
-            <DataTable
+            <DataView
               headers={["Role", "Hours", "Cost"]}
               rows={data.labor.byPosition.map((p) => [p.role, p.hours.toFixed(1), formatCurrency(p.cost)])}
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="labor-by-shift" title="Labor Cost by Shift">
-            <DataTable
+            <DataView
               headers={["Shift", "Hours", "Labor Cost", "Sales", "Sales/Labor Hr"]}
               rows={data.labor.byShift.map((s) => [
                 s.label,
@@ -652,7 +621,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             title="Labor Cost by Sales Hour"
             description="Staffing vs revenue by hour — spot over- and under-staffed periods."
           >
-            <DataTable
+            <DataView
               headers={["Hour", "Labor Hrs", "Labor Cost", "Sales", "Sales/Labor Hr"]}
               rows={data.labor.bySalesHour.map((h) => [
                 h.label,
@@ -664,7 +633,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="labor-employee-productivity" title="Employee Productivity">
-            <DataTable
+            <DataView
               headers={["Employee", "Role", "Sched Hrs", "Actual Hrs", "Sales Attr.", "Sales/Labor Hr", "Guests/Hr"]}
               rows={data.labor.byEmployee.map((e) => [
                 e.name,
@@ -749,7 +718,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
           </AnalyticsBlock>
 
           <AnalyticsBlock id="menu-mix" title="Menu Mix by Category">
-            <DataTable
+            <DataView
               headers={["Category", "Sales", "Mix %", "Qty", "Contribution"]}
               rows={data.menuEngineering.menuMix.map((c) => [
                 c.category,
@@ -761,7 +730,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="menu-quadrant" title="Quadrant Breakdown">
-            <DataTable
+            <DataView
               headers={["Quadrant", "Count", "Top Item"]}
               rows={[
                 ["Stars", data.menuEngineering.byQuadrant.star.length, data.menuEngineering.byQuadrant.star[0]?.name ?? "—"],
@@ -776,7 +745,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             title="Menu Engineering Matrix"
             description={`Items classified vs avg popularity (${data.menuEngineering.avgPopularityPct.toFixed(1)}%) and avg margin (${data.menuEngineering.avgMarginPct.toFixed(1)}%).`}
           >
-            <DataTable
+            <DataView
               headers={["Item", "Quadrant", "Price", "Recipe Cost", "Margin %", "Popularity %", "Sold", "Contribution"]}
               rows={data.menuEngineering.items.map((m) => [
                 m.name,
@@ -849,7 +818,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
           </AnalyticsBlock>
 
           <AnalyticsBlock id="marketing-campaigns" title="Campaign Performance">
-            <DataTable
+            <DataView
               headers={["Campaign", "Channel", "Spend", "Clicks", "Conv.", "Revenue", "ROAS"]}
               rows={data.marketing.campaigns.map((c) => [
                 c.name,
@@ -863,7 +832,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="marketing-channel-profit" title="Channel Profitability">
-            <DataTable
+            <DataView
               headers={["Channel", "Profit", "Margin", "Orders", "Mkt Spend", "ROAS"]}
               rows={data.marketing.highlights.profitableChannels.map((c) => [
                 c.channel,
@@ -876,7 +845,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="marketing-coupons" title="Coupon Usage">
-            <DataTable
+            <DataView
               headers={["Metric", "Value"]}
               rows={[
                 ["Orders with discount", data.marketing.couponUsage.ordersWithCoupon],
@@ -887,7 +856,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="marketing-email" title="Email Performance">
-            <DataTable
+            <DataView
               headers={["Metric", "Value"]}
               rows={[
                 ["Campaigns", data.marketing.emailPerformance.campaigns],
@@ -900,7 +869,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="marketing-social" title="Social Media">
-            <DataTable
+            <DataView
               headers={["Platform", "Followers", "Posts"]}
               rows={data.marketing.socialMedia.accounts.map((a) => [
                 a.platform,
@@ -910,7 +879,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="marketing-google-business" title="Google Business">
-            <DataTable
+            <DataView
               headers={["Metric", "Value"]}
               rows={[
                 ["Reviews", data.marketing.googleBusiness.reviewCount],
@@ -926,7 +895,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
               title="Website Traffic"
               description={data.marketing.websiteTraffic.url}
             >
-              <DataTable
+              <DataView
                 headers={["Metric", "Value"]}
                 rows={[
                   ["Visitors (30d)", data.marketing.websiteTraffic.visitors30d],
@@ -1010,7 +979,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
           </AnalyticsBlock>
 
           <AnalyticsBlock id="customer-star-distribution" title="Star Rating Distribution">
-            <DataTable
+            <DataView
               headers={["Stars", "Count", "Share"]}
               rows={data.customerExperience.starDistribution.map((s) => [
                 `${s.stars}★`,
@@ -1020,7 +989,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="customer-surveys" title="Survey Results by Category">
-            <DataTable
+            <DataView
               headers={["Category", "Responses", "Avg Score", "Satisfied %"]}
               rows={data.customerExperience.surveyResults.map((s) => [
                 s.category,
@@ -1031,13 +1000,13 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="customer-complaint-categories" title="Complaint Categories">
-            <DataTable
+            <DataView
               headers={["Category", "Count"]}
               rows={data.customerExperience.complaintCategories.map((c) => [c.category, c.count])}
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="customer-complaints-by-shift" title="Complaints by Shift / Daypart">
-            <DataTable
+            <DataView
               headers={["Daypart", "Negative Reviews", "Avg Rating", "Top Issue"]}
               rows={data.customerExperience.complaintsByDaypart.map((d) => [
                 d.daypart,
@@ -1143,7 +1112,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
           </AnalyticsBlock>
 
           <AnalyticsBlock id="operations-ticket-daypart" title="Ticket Times by Daypart">
-            <DataTable
+            <DataView
               headers={["Daypart", "Avg Minutes", "Orders"]}
               rows={data.operations.ticketTimesByDaypart.map((d) => [
                 d.daypart,
@@ -1153,7 +1122,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="operations-ticket-hour" title="Ticket Times by Hour">
-            <DataTable
+            <DataView
               headers={["Hour", "Avg Minutes", "Orders"]}
               rows={data.operations.ticketTimesByHour.map((h) => [
                 h.label,
@@ -1163,7 +1132,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="operations-voids-discounts" title="Voids, Discounts & Comps">
-            <DataTable
+            <DataView
               headers={["Type", "Total", "Rate"]}
               rows={[
                 ["Voids", formatCurrency(data.operations.voidTotal), `${data.operations.voidRatePct.toFixed(2)}%`],
@@ -1174,7 +1143,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="operations-accuracy" title="Accuracy & Throughput">
-            <DataTable
+            <DataView
               headers={["Metric", "Value"]}
               rows={[
                 ["Order accuracy", `${data.operations.orderAccuracyPct.toFixed(1)}%`],
@@ -1217,10 +1186,10 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             </div>
           </AnalyticsBlock>
           <AnalyticsBlock id="purchasing-top-vendors" title="Top Vendors">
-            <DataTable headers={["Vendor", "Spend", "Orders"]} rows={data.purchasing.topVendors.map((v) => [v.vendor, formatCurrency(v.spend), v.orders])} />
+            <DataView headers={["Vendor", "Spend", "Orders"]} rows={data.purchasing.topVendors.map((v) => [v.vendor, formatCurrency(v.spend), v.orders])} />
           </AnalyticsBlock>
           <AnalyticsBlock id="purchasing-invoices" title="Recent Invoices">
-            <DataTable headers={["Vendor", "Amount", "Δ%"]} rows={data.purchasing.invoices.map((i) => [i.vendor, formatCurrency(i.amount), `${i.priceChangePct.toFixed(1)}%`])} />
+            <DataView headers={["Vendor", "Amount", "Δ%"]} rows={data.purchasing.invoices.map((i) => [i.vendor, formatCurrency(i.amount), `${i.priceChangePct.toFixed(1)}%`])} />
           </AnalyticsBlock>
           <AnalyticsBlock id="purchasing-ai" title="AI analysis">
             <SectionAnalysisPanel section="purchasing" questions={data.purchasing.questions} />
@@ -1271,7 +1240,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
                 </p>
                 {data.forecasting.highlights.inventoryOrderTomorrow.length > 0 ? (
                   <div className="mt-3 max-h-48 overflow-y-auto">
-                    <DataTable
+                    <DataView
                       headers={["Item", "On Hand", "Order", "Unit"]}
                       rows={data.forecasting.highlights.inventoryOrderTomorrow.map((i) => [
                         i.name,
@@ -1288,13 +1257,13 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             </div>
           </AnalyticsBlock>
           <AnalyticsBlock id="forecasting-sales-7d" title="Sales Forecast (7d)">
-            <DataTable headers={["Date", "Predicted"]} rows={data.forecasting.salesForecast7d.map((f) => [f.date, formatCurrency(f.predicted)])} />
+            <DataView headers={["Date", "Predicted"]} rows={data.forecasting.salesForecast7d.map((f) => [f.date, formatCurrency(f.predicted)])} />
           </AnalyticsBlock>
           <AnalyticsBlock id="forecasting-labor-7d" title="Labor Hours Forecast (7d)">
-            <DataTable headers={["Date", "Hours"]} rows={data.forecasting.laborHoursForecast7d.map((f) => [f.date, f.hours.toFixed(0)])} />
+            <DataView headers={["Date", "Hours"]} rows={data.forecasting.laborHoursForecast7d.map((f) => [f.date, f.hours.toFixed(0)])} />
           </AnalyticsBlock>
           <AnalyticsBlock id="forecasting-catering-7d" title="Catering Demand Forecast (7d)">
-            <DataTable
+            <DataView
               headers={["Date", "Orders", "Sales"]}
               rows={data.forecasting.cateringDemandForecast7d.map((f) => [
                 f.date,
@@ -1313,7 +1282,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             </ul>
           </AnalyticsBlock>
           <AnalyticsBlock id="forecasting-order-plan" title="Tomorrow's Order Plan (All Items)">
-            <DataTable
+            <DataView
               headers={["Item", "On Hand", "Order Qty", "Unit"]}
               rows={data.forecasting.highlights.inventoryOrderTomorrow.map((i) => [
                 i.name,
@@ -1390,34 +1359,34 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             </div>
           </AnalyticsBlock>
           <AnalyticsBlock id="profitability-by-menu-item" title="Profit by Menu Item">
-            <DataTable headers={["Item", "Profit", "Margin %"]} rows={data.profitability.byMenuItem.map((i) => [i.name, formatCurrency(i.profit), `${i.marginPct.toFixed(0)}%`])} />
+            <DataView headers={["Item", "Profit", "Margin %"]} rows={data.profitability.byMenuItem.map((i) => [i.name, formatCurrency(i.profit), `${i.marginPct.toFixed(0)}%`])} />
           </AnalyticsBlock>
           <AnalyticsBlock id="profitability-by-category" title="Profit by Category">
-            <DataTable headers={["Category", "Profit", "Margin %"]} rows={data.profitability.byCategory.map((c) => [c.category, formatCurrency(c.profit), `${c.marginPct.toFixed(0)}%`])} />
+            <DataView headers={["Category", "Profit", "Margin %"]} rows={data.profitability.byCategory.map((c) => [c.category, formatCurrency(c.profit), `${c.marginPct.toFixed(0)}%`])} />
           </AnalyticsBlock>
           <AnalyticsBlock id="profitability-by-hour" title="Profit by Hour">
-            <DataTable headers={["Hour", "Profit", "Sales"]} rows={data.profitability.byHour.map((h) => [h.label, formatCurrency(h.profit), formatCurrency(h.sales)])} />
+            <DataView headers={["Hour", "Profit", "Sales"]} rows={data.profitability.byHour.map((h) => [h.label, formatCurrency(h.profit), formatCurrency(h.sales)])} />
           </AnalyticsBlock>
           <AnalyticsBlock id="profitability-by-day" title="Profit by Day">
-            <DataTable headers={["Date", "Profit", "Sales"]} rows={data.profitability.byDay.map((d) => [d.date, formatCurrency(d.profit), formatCurrency(d.sales)])} />
+            <DataView headers={["Date", "Profit", "Sales"]} rows={data.profitability.byDay.map((d) => [d.date, formatCurrency(d.profit), formatCurrency(d.sales)])} />
           </AnalyticsBlock>
           <AnalyticsBlock id="profitability-by-employee" title="Profit by Employee">
-            <DataTable headers={["Employee", "Role", "Profit"]} rows={data.profitability.byEmployee.map((e) => [e.name, e.role, formatCurrency(e.profit)])} />
+            <DataView headers={["Employee", "Role", "Profit"]} rows={data.profitability.byEmployee.map((e) => [e.name, e.role, formatCurrency(e.profit)])} />
           </AnalyticsBlock>
           <AnalyticsBlock id="profitability-by-shift" title="Profit by Shift">
-            <DataTable headers={["Shift", "Profit", "Labor"]} rows={data.profitability.byShift.map((s) => [s.shift, formatCurrency(s.profit), formatCurrency(s.laborCost)])} />
+            <DataView headers={["Shift", "Profit", "Labor"]} rows={data.profitability.byShift.map((s) => [s.shift, formatCurrency(s.profit), formatCurrency(s.laborCost)])} />
           </AnalyticsBlock>
           <AnalyticsBlock id="profitability-by-daypart" title="Profit by Daypart">
-            <DataTable headers={["Daypart", "Profit", "Margin %"]} rows={data.profitability.byDaypart.map((d) => [d.daypart, formatCurrency(d.profit), `${d.marginPct.toFixed(0)}%`])} />
+            <DataView headers={["Daypart", "Profit", "Margin %"]} rows={data.profitability.byDaypart.map((d) => [d.daypart, formatCurrency(d.profit), `${d.marginPct.toFixed(0)}%`])} />
           </AnalyticsBlock>
           <AnalyticsBlock id="profitability-by-location" title="Profit by Location">
-            <DataTable headers={["Location", "Profit", "Margin %"]} rows={data.profitability.byLocation.map((l) => [l.name, formatCurrency(l.profit), `${l.marginPct.toFixed(0)}%`])} />
+            <DataView headers={["Location", "Profit", "Margin %"]} rows={data.profitability.byLocation.map((l) => [l.name, formatCurrency(l.profit), `${l.marginPct.toFixed(0)}%`])} />
           </AnalyticsBlock>
           <AnalyticsBlock id="profitability-by-channel" title="Profit by Channel">
-            <DataTable headers={["Channel", "Profit", "Margin %"]} rows={data.profitability.byChannel.map((c) => [c.channel, formatCurrency(c.profit), `${c.marginPct.toFixed(0)}%`])} />
+            <DataView headers={["Channel", "Profit", "Margin %"]} rows={data.profitability.byChannel.map((c) => [c.channel, formatCurrency(c.profit), `${c.marginPct.toFixed(0)}%`])} />
           </AnalyticsBlock>
           <AnalyticsBlock id="profitability-by-delivery" title="Profit by Delivery Provider">
-            <DataTable
+            <DataView
               headers={["Provider", "Profit", "Orders"]}
               rows={data.profitability.byDeliveryProvider.length > 0
                 ? data.profitability.byDeliveryProvider.map((d) => [d.provider, formatCurrency(d.profit), d.orders])
@@ -1425,7 +1394,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="profitability-by-campaign" title="Profit by Marketing Campaign">
-            <DataTable
+            <DataView
               headers={["Campaign", "Channel", "Profit", "Spend", "ROI %"]}
               rows={data.profitability.byCampaign.map((c) => [
                 c.name,
@@ -1437,7 +1406,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="profitability-leaks" title="Profit Leaks">
-            <DataTable headers={["Area", "Amount", "Reason"]} rows={data.profitability.highlights.profitLeaks.map((l) => [l.area, formatCurrency(l.amount), l.reason])} />
+            <DataView headers={["Area", "Amount", "Reason"]} rows={data.profitability.highlights.profitLeaks.map((l) => [l.area, formatCurrency(l.amount), l.reason])} />
           </AnalyticsBlock>
           <AnalyticsBlock id="profitability-ai" title="AI analysis">
             <SectionAnalysisPanel section="profitability" questions={data.profitability.questions} />
@@ -1538,7 +1507,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             </div>
           </AnalyticsBlock>
           <AnalyticsBlock id="external-weather-forecast" title="7-Day Weather Forecast">
-            <DataTable
+            <DataView
               headers={["Date", "Condition", "Precip %", "High/Low"]}
               rows={data.externalFactors.weatherForecast.map((f) => [
                 f.date,
@@ -1562,13 +1531,13 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
             </ul>
           </AnalyticsBlock>
           <AnalyticsBlock id="external-by-category" title="By Category">
-            <DataTable
+            <DataView
               headers={["Category", "Count", "Avg Impact"]}
               rows={data.externalFactors.byCategory.map((c) => [c.category, c.count, `${c.avgImpactPct.toFixed(0)}%`])}
             />
           </AnalyticsBlock>
           <AnalyticsBlock id="external-recorded-factors" title="Recorded Factors">
-            <DataTable
+            <DataView
               headers={["Date", "Category", "Impact", "Description"]}
               rows={data.externalFactors.factors.map((f) => [
                 f.date.split("T")[0],
@@ -1599,5 +1568,6 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
         </AnalyticsBlock>
       </div>
     </div>
+    </AnalyticsViewModeProvider>
   );
 }

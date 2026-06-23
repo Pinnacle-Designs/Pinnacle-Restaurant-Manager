@@ -19,6 +19,11 @@ import { PageSectionShell, PageSection } from "@/components/layout/PageSections"
 import { ReportViewer } from "@/components/reports/ReportViewer";
 import { defaultReportConfig } from "@/lib/reports/registry";
 import {
+  ViewModeToggle,
+  REPORT_VIEW_OPTIONS,
+  type ReportViewMode,
+} from "@/components/charts";
+import {
   downloadReportCsv,
   downloadReportJson,
   printCustomReport,
@@ -433,6 +438,22 @@ export function ReportsClient() {
           </PageSection>
 
           <PageSection id="report-branding" title="Branding & layout" defaultOpen>
+            <div className="mb-4">
+              <p className="mb-2 text-xs font-medium text-slate-600">Preview display</p>
+              <ViewModeToggle
+                value={(config.visualization ?? "table") as ReportViewMode}
+                onChange={(v) =>
+                  setConfig((prev) => ({
+                    ...prev,
+                    visualization: v,
+                  }))
+                }
+                options={REPORT_VIEW_OPTIONS}
+              />
+              <p className="mt-2 text-xs text-slate-500">
+                Switch between table and chart views. Charts use the first label column and first numeric column.
+              </p>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField label="Report title">
                 <Input
@@ -571,7 +592,11 @@ export function ReportsClient() {
           )}
 
           <PageSection id="report-preview" title="Preview" defaultOpen>
-            <ReportViewer result={result} loading={loading} />
+            <ReportViewer
+              result={result}
+              loading={loading}
+              visualization={(config.visualization ?? "table") as ReportViewMode}
+            />
           </PageSection>
         </div>
       </div>

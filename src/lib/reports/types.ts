@@ -49,6 +49,7 @@ export interface ReportConfig {
   sort?: { column: string; direction: "asc" | "desc" };
   branding?: ReportBranding;
   rowLimit?: number | null;
+  visualization?: "table" | "bar" | "line";
 }
 
 export type ReportRow = Record<string, string | number | null | undefined>;

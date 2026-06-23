@@ -1,4 +1,5 @@
 import type { PlanId } from "./plans";
+import { getAuthSecret } from "./env";
 
 export const WORKSPACE_COOKIE_NAME = "pinnacle_workspace";
 export const WORKSPACE_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
@@ -9,17 +10,13 @@ export interface WorkspaceSnapshot {
   autopayEnabled: boolean;
   billingRequired: boolean;
   trialActive: boolean;
+  stripeSubscriptionActive: boolean;
   setupComplete: boolean;
   exp: number;
 }
 
 function getSecret(): string {
-  const secret = process.env.AUTH_SECRET?.trim();
-  if (secret) return secret;
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("AUTH_SECRET must be set in production");
-  }
-  return "pinnacle-dev-secret-change-me";
+  return getAuthSecret();
 }
 
 function toBase64Url(bytes: Uint8Array): string {

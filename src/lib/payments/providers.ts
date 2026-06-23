@@ -1,5 +1,7 @@
 import type { PaymentProviderConnection } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { billingRequired, isActiveStripeSubscriptionStatus } from "@/lib/plan-billing";
+import { getAppBaseUrl } from "@/lib/env";
 import type { ProviderOption } from "./types";
 import { kindToPosId, kindToSubscriptionId } from "./types";
 import { decryptCredential } from "@/lib/credential-crypto";
@@ -7,10 +9,7 @@ import { decryptCredential } from "@/lib/credential-crypto";
 export { kindToPosId, kindToSubscriptionId };
 
 export function appBaseUrl(): string {
-  const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  if (explicit) return explicit.replace(/\/$/, "");
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return "http://localhost:3000";
+  return getAppBaseUrl();
 }
 
 export function stripeConfigured(): boolean {
@@ -72,20 +71,25 @@ export function buildProviderOptions(
       description: "Secure subscription billing with Stripe Checkout and Customer Portal.",
       purpose: "SUBSCRIPTION",
       configured: stripeConfigured(),
-      connected: sub?.provider === "STRIPE" && sub.status === "connected",
+      connected:
+        sub?.provider === "STRIPE" && isActiveStripeSubscriptionStatus(sub.status),
       accountLabel: sub?.accountId ? `Customer ${sub.accountId.slice(-8)}` : null,
       status: sub?.status ?? null,
     },
-    {
-      id: "manual-subscription",
-      name: "Manual entry",
-      description: "Store card last-four only (demo). Use Stripe in production.",
-      purpose: "SUBSCRIPTION",
-      configured: true,
-      connected: !sub || sub.provider === "MANUAL",
-      accountLabel: null,
-      status: sub?.status ?? "manual",
-    },
+    ...(billingRequired()
+      ? []
+      : [
+          {
+            id: "manual-subscription",
+            name: "Manual entry",
+            description: "Store card last-four only (development / demo).",
+            purpose: "SUBSCRIPTION" as const,
+            configured: true,
+            connected: !sub || sub.provider === "MANUAL",
+            accountLabel: null,
+            status: sub?.status ?? "manual",
+          },
+        ]),
     {
       id: "stripe-pos",
       name: "Stripe",

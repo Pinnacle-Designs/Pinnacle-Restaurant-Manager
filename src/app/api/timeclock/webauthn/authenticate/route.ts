@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     })),
   });
 
-  setWebAuthnChallenge(user!.id, options.challenge);
+  await setWebAuthnChallenge(user!.id, options.challenge);
 
   return NextResponse.json(options);
 }
@@ -54,7 +54,8 @@ export async function PUT(request: NextRequest) {
 
   const verification = await verifyAuthenticationResponse({
     response: body,
-    expectedChallenge: (challenge: string) => consumeWebAuthnChallenge(user!.id, challenge),
+    expectedChallenge: async (challenge: string) =>
+      consumeWebAuthnChallenge(user!.id, challenge),
     expectedOrigin: getWebAuthnOrigin(),
     expectedRPID: getWebAuthnRpId(),
     credential: {

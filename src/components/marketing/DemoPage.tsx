@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import {
   ArrowRight,
   Loader2,
@@ -12,14 +12,22 @@ import {
 import { MarketingNav } from "./MarketingNav";
 import { DEMO_TOUR_STOPS } from "@/lib/marketing-content";
 import { embedLaunchUrl } from "@/lib/embed-config";
+import { useEmbedChrome } from "@/hooks/useEmbedChrome";
 import { cn } from "@/lib/utils";
 import { PageSectionShell, PageSection } from "@/components/layout/PageSections";
 
 export function DemoPage() {
+  const embedChrome = useEmbedChrome();
   const [iframeLoading, setIframeLoading] = useState(true);
   const [activeStop, setActiveStop] = useState<(typeof DEMO_TOUR_STOPS)[number]>(DEMO_TOUR_STOPS[0]);
   const [iframeKey, setIframeKey] = useState(0);
   const readyRef = useRef(false);
+
+  useEffect(() => {
+    readyRef.current = false;
+    setIframeLoading(true);
+    setIframeKey((k) => k + 1);
+  }, [embedChrome]);
 
   const reloadIframe = () => {
     readyRef.current = false;
@@ -60,7 +68,7 @@ export function DemoPage() {
               Reset demo
             </button>
             <Link
-              href={embedLaunchUrl(activeStop.path, "full")}
+              href={embedLaunchUrl(activeStop.path, embedChrome)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-400"
@@ -130,8 +138,8 @@ export function DemoPage() {
             </div>
           )}
           <iframe
-            key={`${activeStop.path}-${iframeKey}`}
-            src={embedLaunchUrl(activeStop.path, "full")}
+            key={`${activeStop.path}-${embedChrome}-${iframeKey}`}
+            src={embedLaunchUrl(activeStop.path, embedChrome)}
             title={`Pinnacle demo — ${activeStop.label}`}
             className="h-[calc(100vh-8rem)] w-full flex-1 bg-white lg:h-[calc(100vh-7rem)]"
             onLoad={(e) => {

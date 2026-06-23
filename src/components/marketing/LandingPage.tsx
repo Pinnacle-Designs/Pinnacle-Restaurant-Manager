@@ -145,23 +145,12 @@ export function LandingPage() {
           <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {CORE_FEATURES.map((feature) => {
               const Icon = ICONS[feature.icon as keyof typeof ICONS];
-              const highlighted = "highlight" in feature && feature.highlight;
               return (
                 <div
                   key={feature.id}
-                  className={cn(
-                    "rounded-2xl border p-6 transition hover:shadow-md",
-                    highlighted
-                      ? "border-orange-200 bg-orange-50/50"
-                      : "border-slate-200 bg-white"
-                  )}
+                  className="rounded-2xl border border-orange-200 bg-orange-50/50 p-6 transition hover:shadow-md"
                 >
-                  <div
-                    className={cn(
-                      "inline-flex rounded-xl p-3",
-                      highlighted ? "bg-orange-100 text-orange-600" : "bg-slate-100 text-slate-700"
-                    )}
-                  >
+                  <div className="inline-flex rounded-xl bg-orange-100 p-3 text-orange-600">
                     <Icon className="h-6 w-6" />
                   </div>
                   <h3 className="mt-4 text-lg font-semibold text-slate-900">{feature.title}</h3>

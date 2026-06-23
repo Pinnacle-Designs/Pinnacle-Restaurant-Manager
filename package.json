@@ -9,7 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "db:deploy-seed": "tsx scripts/seed-deploy-db.ts",
-    "vercel-build": "npm run db:deploy-seed && next build",
+    "vercel-build": "tsx scripts/vercel-build.ts",
     "start": "next start",
     "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
     "setup": "npm install && npm run db:push",
@@ -19,12 +19,18 @@
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
+    "db:neon": "tsx scripts/connect-neon.ts",
     "db:reseed": "tsx scripts/full-reseed.ts",
     "db:studio": "prisma studio",
     "stripe:listen": "stripe listen --forward-to localhost:3000/api/webhooks/stripe",
     "stripe:setup": "tsx scripts/setup-stripe-billing.ts --write-env",
+<<<<<<< HEAD
     "stripe:setup:live": "tsx scripts/setup-stripe-billing.ts --live --webhook --write-env",
     "vercel:env:push": "node scripts/push-vercel-env.mjs",
+=======
+    "production:checklist": "tsx scripts/production-checklist.ts --write-env",
+    "production:verify": "tsx scripts/verify-production-readiness.ts",
+>>>>>>> dbb58372ac09fe50cc587fc1e930d5795f24f22d
     "postinstall": "prisma generate"
   },
   "dependencies": {

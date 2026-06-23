@@ -1,7 +1,11 @@
 import type { AppRole } from "./app-role";
 import type { PlanId } from "./plans";
 import type { Permission } from "./permissions";
+<<<<<<< HEAD
 import { getSecret } from "./session-secret";
+=======
+import { getAuthSecret } from "./env";
+>>>>>>> dbb58372ac09fe50cc587fc1e930d5795f24f22d
 
 export const AUTH_COOKIE_NAME = "pinnacle_session";
 export const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -17,9 +21,12 @@ export interface SessionUser {
   permissions?: Permission[];
   setupComplete?: boolean;
   isPlatformAdmin?: boolean;
+<<<<<<< HEAD
   sessionVersion?: number;
   mfaEnabled?: boolean;
   emailVerifiedAt?: string | null;
+=======
+>>>>>>> dbb58372ac09fe50cc587fc1e930d5795f24f22d
 }
 
 function toBase64Url(bytes: Uint8Array): string {
@@ -40,7 +47,7 @@ function fromBase64Url(str: string): Uint8Array {
 async function importHmacKey(): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(getSecret()),
+    new TextEncoder().encode(getAuthSecret()),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign", "verify"]

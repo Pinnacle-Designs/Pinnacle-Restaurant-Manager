@@ -3,13 +3,18 @@
 import type { ReportResult } from "@/lib/reports/types";
 import { formatCellValue } from "@/lib/reports/export";
 import { useLocationLocale } from "@/components/location/LocationLocaleProvider";
+import { chartDataFromReport } from "@/lib/charts/report-chart";
+import { SimpleBarChart } from "@/components/charts/SimpleBarChart";
+import { SimpleLineChart } from "@/components/charts/SimpleLineChart";
+import type { ReportViewMode } from "@/components/charts/ViewModeToggle";
 
 interface ReportViewerProps {
   result: ReportResult | null;
   loading?: boolean;
+  visualization?: ReportViewMode;
 }
 
-export function ReportViewer({ result, loading }: ReportViewerProps) {
+export function ReportViewer({ result, loading, visualization = "table" }: ReportViewerProps) {
   const { settings } = useLocationLocale();
   if (loading) {
     return (
@@ -27,6 +32,15 @@ export function ReportViewer({ result, loading }: ReportViewerProps) {
     );
   }
 
+  const chartData = chartDataFromReport(result, visualization);
+
+  const formatChartValue = (value: number) => {
+    const valueCol = result.columns.find((c) =>
+      ["number", "currency", "percent"].includes(c.type)
+    );
+    return formatCellValue(value, valueCol?.type ?? "number", settings);
+  };
+
   return (
     <>
       <div className="no-print overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -38,46 +52,71 @@ export function ReportViewer({ result, loading }: ReportViewerProps) {
           <p className="mt-1 text-xs text-slate-400">
             {result.rows.length} of {result.meta.totalRows} rows
             {result.meta.locationName ? ` · ${result.meta.locationName}` : ""}
+            {visualization !== "table" ? ` · ${visualization === "bar" ? "Bar chart" : "Line chart"}` : ""}
           </p>
         </div>
-        <div className="table-scroll max-h-[min(480px,60vh)] overflow-y-auto">
-          <table className="report-table w-full min-w-[640px] text-sm">
-            <thead className="sticky top-0 bg-slate-50">
-              <tr>
-                {result.columns.map((col) => (
-                  <th
-                    key={col.id}
-                    className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-600"
-                  >
-                    {col.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {result.rows.length === 0 ? (
+
+        {visualization !== "table" && chartData ? (
+          <div className="p-4">
+            {chartData.kind === "line" ? (
+              <SimpleLineChart
+                points={chartData.points}
+                valueLabel={chartData.valueLabel}
+                formatValue={formatChartValue}
+              />
+            ) : (
+              <SimpleBarChart
+                points={chartData.points}
+                valueLabel={chartData.valueLabel}
+                formatValue={formatChartValue}
+              />
+            )}
+          </div>
+        ) : visualization !== "table" && !chartData ? (
+          <div className="px-4 py-8 text-center text-sm text-slate-500">
+            This report does not have numeric columns suitable for a chart. Switch to table view.
+          </div>
+        ) : (
+          <div className="table-scroll max-h-[min(480px,60vh)] overflow-y-auto">
+            <table className="report-table w-full min-w-[640px] text-sm">
+              <thead className="sticky top-0 bg-slate-50">
                 <tr>
-                  <td
-                    colSpan={result.columns.length}
-                    className="px-4 py-8 text-center text-slate-400"
-                  >
-                    No rows match your filters.
-                  </td>
+                  {result.columns.map((col) => (
+                    <th
+                      key={col.id}
+                      className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-600"
+                    >
+                      {col.label}
+                    </th>
+                  ))}
                 </tr>
-              ) : (
-                result.rows.map((row, i) => (
-                  <tr key={i} className="border-t border-slate-100 hover:bg-slate-50/50">
-                    {result.columns.map((col) => (
-                      <td key={col.id} className="whitespace-nowrap px-4 py-2 text-slate-800">
-                        {formatCellValue(row[col.id], col.type, settings)}
-                      </td>
-                    ))}
+              </thead>
+              <tbody>
+                {result.rows.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={result.columns.length}
+                      className="px-4 py-8 text-center text-slate-400"
+                    >
+                      No rows match your filters.
+                    </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  result.rows.map((row, i) => (
+                    <tr key={i} className="border-t border-slate-100 hover:bg-slate-50/50">
+                      {result.columns.map((col) => (
+                        <td key={col.id} className="whitespace-nowrap px-4 py-2 text-slate-800">
+                          {formatCellValue(row[col.id], col.type, settings)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {result.footer && (
           <div className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
             {result.footer}

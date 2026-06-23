@@ -339,6 +339,7 @@ export function defaultReportConfig(reportId: string): ReportConfig {
       showLocation: true,
     },
     rowLimit: 100,
+    visualization: "table",
   };
 }
 

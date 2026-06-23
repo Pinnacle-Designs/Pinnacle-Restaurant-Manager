@@ -126,16 +126,16 @@ export async function publishToPlatform(input: PublishInput): Promise<PublishRes
   }
 }
 
+/** Platforms with a live publish implementation in publishViaApi. */
+const LIVE_PUBLISH_PLATFORMS = new Set<SocialPlatform>(["X", "FACEBOOK", "INSTAGRAM"]);
+
 function checkPlatformCredentials(platform: SocialPlatform): boolean {
-  const envMap: Record<SocialPlatform, string | undefined> = {
+  if (!LIVE_PUBLISH_PLATFORMS.has(platform)) return false;
+
+  const envMap: Partial<Record<SocialPlatform, string | undefined>> = {
     FACEBOOK: process.env.META_ACCESS_TOKEN,
     INSTAGRAM: process.env.META_ACCESS_TOKEN,
-    TIKTOK: process.env.TIKTOK_ACCESS_TOKEN,
-    SNAPCHAT: process.env.SNAPCHAT_ACCESS_TOKEN,
     X: process.env.X_BEARER_TOKEN,
-    YOUTUBE: process.env.YOUTUBE_ACCESS_TOKEN,
-    LINKEDIN: process.env.LINKEDIN_ACCESS_TOKEN,
-    PINTEREST: process.env.PINTEREST_ACCESS_TOKEN,
   };
   return Boolean(envMap[platform]);
 }

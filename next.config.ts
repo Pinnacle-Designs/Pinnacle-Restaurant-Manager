@@ -1,9 +1,11 @@
 import type { NextConfig } from "next";
 
+const useSqlite = (process.env.DATABASE_URL ?? "").startsWith("file:");
+
 const nextConfig: NextConfig = {
-  outputFileTracingIncludes: {
-    "/*": ["./prisma/deploy.sqlite"],
-  },
+  ...(useSqlite
+    ? { outputFileTracingIncludes: { "/*": ["./prisma/deploy.sqlite"] } }
+    : {}),
   images: {
     remotePatterns: [],
     unoptimized: false,

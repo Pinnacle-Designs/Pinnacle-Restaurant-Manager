@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pinnacle-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: pinnacle
+      POSTGRES_PASSWORD: pinnacle
+      POSTGRES_DB: pinnacle
+    volumes:
+      - pinnacle_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pinnacle -d pinnacle"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pinnacle_pg_data:

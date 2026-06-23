@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { sendEmail, smtpConfigured } from "@/lib/email/smtp";
 
 export interface VendorCreditEmailInput {
   locationId: string;
@@ -33,12 +34,29 @@ function buildCreditEmailBody(input: VendorCreditEmailInput) {
   return lines.join("\n");
 }
 
-/** Queues credit request to vendor rep (logged in activity; configure SMTP for live delivery). */
+/** Send credit request to vendor rep via SMTP when configured; otherwise log in activity. */
 export async function sendVendorCreditRequestEmail(
   input: VendorCreditEmailInput
 ): Promise<{ status: "SENT" | "DEMO" | "FAILED"; message: string }> {
   const subject = `Credit memo request — ${input.vendor} — $${input.amount.toFixed(2)}`;
   const body = buildCreditEmailBody(input);
+
+  if (smtpConfigured()) {
+    const result = await sendEmail({ to: input.to, subject, body });
+    await prisma.activityLog.create({
+      data: {
+        locationId: input.locationId,
+        action: result.ok ? "CREDIT_EMAIL_SENT" : "CREDIT_EMAIL_FAILED",
+        entity: "vendor_credit",
+        entityId: input.creditId,
+        details: `${subject} → ${input.to}: ${result.message}`,
+      },
+    });
+    return {
+      status: result.ok ? "SENT" : "FAILED",
+      message: result.message,
+    };
+  }
 
   await prisma.activityLog.create({
     data: {
@@ -52,6 +70,6 @@ export async function sendVendorCreditRequestEmail(
 
   return {
     status: "DEMO",
-    message: `Credit request queued for ${input.to} (logged in activity — wire SMTP for live email).`,
+    message: `Credit request queued for ${input.to} (logged in activity — configure SMTP for live email).`,
   };
 }

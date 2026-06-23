@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { getSessionUserFromRequest } from "./auth";
+import { isProductionRuntime } from "./env";
 import { resolveAuthorizedLocationId } from "./location-access";
 import { prisma } from "./prisma";
 import { LOCATION_COOKIE_NAME } from "./location-constants";
@@ -21,6 +22,10 @@ export async function getLocationId(): Promise<string> {
 
   if (cookieId && (await locationExists(cookieId))) {
     return cookieId;
+  }
+
+  if (isProductionRuntime()) {
+    throw new Error("No authorized location in production");
   }
 
   const defaultLocation = await prisma.location.findFirst({
@@ -48,6 +53,10 @@ export async function getLocationIdFromRequest(request: Request): Promise<string
 
   if (user?.locationId && (await locationExists(user.locationId))) {
     return user.locationId;
+  }
+
+  if (isProductionRuntime()) {
+    throw new Error("No authorized location in production");
   }
 
   return getLocationId();

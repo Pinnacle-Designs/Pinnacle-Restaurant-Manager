@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSecureAuth } from "@/lib/api-auth";
+import { isProductionRuntime } from "@/lib/env";
 import { privateJsonResponse } from "@/lib/secure-response";
 
 /**
@@ -10,6 +11,13 @@ import { privateJsonResponse } from "@/lib/secure-response";
 export async function POST(request: NextRequest) {
   const secret = process.env.INTEGRATION_WEBHOOK_SECRET;
   let user = null;
+
+  if (isProductionRuntime() && !secret?.trim()) {
+    return privateJsonResponse(
+      { error: "INTEGRATION_WEBHOOK_SECRET is required in production" },
+      { status: 503 }
+    );
+  }
 
   if (secret) {
     const header = request.headers.get("x-pinnacle-webhook-secret");

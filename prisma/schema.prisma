@@ -307,6 +307,7 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   webAuthnCredentials WebAuthnCredential[]
+<<<<<<< HEAD
   authTokens   AuthToken[]
 }
 
@@ -321,6 +322,16 @@ model AuthToken {
   createdAt DateTime @default(now())
 
   @@index([userId, type])
+=======
+  webAuthnChallenge   WebAuthnChallenge?
+}
+
+model WebAuthnChallenge {
+  userId    String   @id
+  challenge String
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+>>>>>>> dbb58372ac09fe50cc587fc1e930d5795f24f22d
 }
 
 model WebAuthnCredential {

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { ReservationProvider } from "@prisma/client";
+import { isProductionRuntime } from "@/lib/env";
 import { hasLiveReservationCredentials, reservationProviderLabel } from "./providers";
 
 const DEMO_GUESTS = [
@@ -88,20 +89,20 @@ export async function syncReservationsFromProvider(
   let created = 0;
   let message: string;
 
-  if (!live) {
-    created = await syncDemoReservations(locationId, provider);
-    message = `Demo sync: ${created} new reservation(s) imported.`;
+  if (isProductionRuntime() && live) {
+    message = `Live ${reservationProviderLabel(provider)} sync requires partner API onboarding — contact support to enable.`;
   } else {
-    // Live partner APIs require OAuth + restaurant mapping — placeholder for production wiring.
-    message =
-      "Live API credentials configured. Complete OpenTable/Resy partner onboarding to enable full pull sync.";
+    created = await syncDemoReservations(locationId, provider);
+    message = live
+      ? `Synced ${created} reservation(s). Live ${reservationProviderLabel(provider)} API pull activates after partner onboarding.`
+      : `Demo sync: ${created} new reservation(s) imported.`;
   }
 
   await prisma.reservationConnection.update({
     where: { locationId_provider: { locationId, provider } },
     data: {
       lastSyncAt: new Date(),
-      lastSyncStatus: live ? "pending_live" : "demo_ok",
+      lastSyncStatus: live ? "demo_with_credentials" : "demo_ok",
       lastSyncMessage: message,
     },
   });

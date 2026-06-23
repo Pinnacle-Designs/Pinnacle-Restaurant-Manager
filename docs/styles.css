@@ -2464,8 +2464,8 @@ body.modal-open {
 
 .feature-card {
   border-radius: 1rem;
-  border: 1px solid var(--slate-200);
-  background: #fff;
+  border: 1px solid #fed7aa;
+  background: rgba(255, 247, 237, 0.5);
   padding: 1.5rem;
   transition: box-shadow 0.2s;
 }
@@ -2481,8 +2481,8 @@ body.modal-open {
   display: inline-flex;
   padding: 0.75rem;
   border-radius: 0.75rem;
-  background: var(--slate-100);
-  color: var(--slate-700);
+  background: #ffedd5;
+  color: #ea580c;
   font-size: 1.5rem;
 }
 

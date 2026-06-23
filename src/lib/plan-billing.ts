@@ -2,6 +2,8 @@ import type { WorkspaceSnapshot } from "./workspace-cookie";
 
 const TRIAL_DAYS = Number(process.env.PLAN_TRIAL_DAYS ?? 14);
 
+const ACTIVE_STRIPE_STATUSES = new Set(["active", "trialing", "past_due", "connected"]);
+
 /** Production + Stripe configured → subscription or trial required for full app access. */
 export function billingRequired(): boolean {
   if (process.env.PLAN_BILLING_OPTIONAL === "true") return false;
@@ -16,8 +18,8 @@ export function isWithinTrial(createdAt: Date): boolean {
 
 export function hasActiveBilling(snapshot: WorkspaceSnapshot): boolean {
   if (!snapshot.billingRequired) return true;
-  if (snapshot.autopayEnabled) return true;
   if (snapshot.trialActive) return true;
+  if (snapshot.stripeSubscriptionActive) return true;
   return false;
 }
 
@@ -32,4 +34,9 @@ export function isBillingAllowedPath(pathname: string): boolean {
     pathname.startsWith("/api/auth/login") ||
     pathname.startsWith("/api/webhooks/stripe")
   );
+}
+
+export function isActiveStripeSubscriptionStatus(status: string | null | undefined): boolean {
+  if (!status) return false;
+  return ACTIVE_STRIPE_STATUSES.has(status);
 }

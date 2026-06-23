@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import type { PlanId } from "./plans";
-import { billingRequired, isWithinTrial } from "./plan-billing";
+import { billingRequired, isWithinTrial, isActiveStripeSubscriptionStatus } from "./plan-billing";
 import {
   WORKSPACE_COOKIE_MAX_AGE,
   type WorkspaceSnapshot,
@@ -22,6 +22,15 @@ export async function buildWorkspaceSnapshot(
   });
   if (!location || !location.active) return null;
 
+  const subscription = await prisma.paymentProviderConnection.findUnique({
+    where: { locationId_purpose: { locationId, purpose: "SUBSCRIPTION" } },
+    select: { provider: true, status: true },
+  });
+
+  const stripeSubscriptionActive =
+    subscription?.provider === "STRIPE" &&
+    isActiveStripeSubscriptionStatus(subscription.status);
+
   const plan = location.plan as PlanId;
   const required = billingRequired();
 
@@ -31,6 +40,7 @@ export async function buildWorkspaceSnapshot(
     autopayEnabled: location.autopayEnabled,
     billingRequired: required,
     trialActive: isWithinTrial(location.createdAt),
+    stripeSubscriptionActive,
     setupComplete: location.setupComplete,
     exp: Date.now() + WORKSPACE_COOKIE_MAX_AGE * 1000,
   };

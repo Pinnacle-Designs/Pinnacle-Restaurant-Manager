@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { MobileHeader } from "@/components/layout/MobileHeader";
@@ -13,10 +13,12 @@ import { LocationLocaleProvider } from "@/components/location/LocationLocaleProv
 import { GlobalSearchProvider } from "@/components/search/GlobalSearch";
 import { PageSearchStrip } from "@/components/search/PageSearchStrip";
 import { isEmbeddableEmbedParam } from "@/lib/embed-config";
+import { MOBILE_EMBED_MEDIA } from "@/hooks/useEmbedChrome";
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [narrowViewport, setNarrowViewport] = useState(false);
   const isMarketing = pathname === "/" || pathname === "/demo";
   const isLogin = pathname === "/login";
   const isSignup = pathname === "/signup";
@@ -27,14 +29,25 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const isEmbedRoute = pathname === "/embed";
   const embedParam = searchParams.get("embed");
   const isEmbed = isEmbeddableEmbedParam(embedParam);
-  const isEmbedFull = embedParam === "full" || (isEmbed && embedParam !== "mobile" && embedParam !== "1");
-  const isEmbedMobile = embedParam === "mobile" || embedParam === "1";
+
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_EMBED_MEDIA);
+    const sync = () => setNarrowViewport(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  const isEmbedMobile =
+    embedParam === "mobile" ||
+    embedParam === "1" ||
+    (isEmbed && narrowViewport);
 
   if (isLogin || isSignup || isOnboarding || isDownload || isLegal || isMarketing || isEmbedRoute || isTableside) {
     return <>{children}</>;
   }
 
-  const showSidebar = !isEmbed || isEmbedFull;
+  const showSidebar = !isEmbed || !isEmbedMobile;
   const showMobileHeader = !isEmbed || isEmbedMobile;
   const showMobileNav = !isEmbed || isEmbedMobile;
   const showDesktopTopBar = !isEmbed;

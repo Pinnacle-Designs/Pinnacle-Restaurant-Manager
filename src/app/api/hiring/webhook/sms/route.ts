@@ -2,21 +2,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { normalizePhone } from "@/lib/hiring/utils";
 import { sendSms } from "@/lib/hiring/sms";
+<<<<<<< HEAD
 import {
   twilioAuthTokenConfigured,
   validateTwilioSignature,
 } from "@/lib/twilio-webhook";
+=======
+import { validateTwilioSignature } from "@/lib/hiring/twilio-webhook";
+>>>>>>> dbb58372ac09fe50cc587fc1e930d5795f24f22d
 
 /** Twilio inbound SMS webhook — text-to-apply and replies. */
 export async function POST(request: NextRequest) {
   let from = "";
   let to = "";
   let body = "";
+<<<<<<< HEAD
   let formParams: Record<string, string> = {};
+=======
+  const params: Record<string, string> = {};
+>>>>>>> dbb58372ac09fe50cc587fc1e930d5795f24f22d
 
   const contentType = request.headers.get("content-type") || "";
   if (contentType.includes("application/x-www-form-urlencoded")) {
     const form = await request.formData();
+<<<<<<< HEAD
     formParams = Object.fromEntries(
       [...form.entries()].map(([key, value]) => [key, String(value)])
     );
@@ -25,6 +34,17 @@ export async function POST(request: NextRequest) {
     body = (formParams.Body || "").trim();
   } else {
     const json = (await request.json()) as Record<string, unknown>;
+=======
+    for (const [key, value] of form.entries()) {
+      params[key] = String(value);
+    }
+    from = params.From || "";
+    to = params.To || "";
+    body = (params.Body || "").trim();
+  } else {
+    const json = (await request.json()) as Record<string, string>;
+    Object.assign(params, json);
+>>>>>>> dbb58372ac09fe50cc587fc1e930d5795f24f22d
     from = String(json.From || json.from || "");
     to = String(json.To || json.to || "");
     body = String(json.Body || json.body || "").trim();
@@ -47,6 +67,12 @@ export async function POST(request: NextRequest) {
 
   if (!from || !body) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  }
+
+  const signature = request.headers.get("x-twilio-signature");
+  const webhookUrl = request.nextUrl.origin + request.nextUrl.pathname;
+  if (!validateTwilioSignature(webhookUrl, params, signature)) {
+    return NextResponse.json({ error: "Invalid Twilio signature" }, { status: 403 });
   }
 
   const fromPhone = normalizePhone(from);

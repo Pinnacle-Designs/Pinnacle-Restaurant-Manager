@@ -10,9 +10,15 @@ const GL_ACCOUNTS: Record<string, string> = {
 };
 
 function hasLiveCredentials(provider: AccountingProvider): boolean {
-  if (provider === "QUICKBOOKS") return Boolean(process.env.QUICKBOOKS_CLIENT_ID);
-  if (provider === "XERO") return Boolean(process.env.XERO_CLIENT_ID);
-  if (provider === "SAGE") return Boolean(process.env.SAGE_CLIENT_ID);
+  if (provider === "QUICKBOOKS") {
+    return Boolean(process.env.QUICKBOOKS_CLIENT_ID && process.env.QUICKBOOKS_CLIENT_SECRET);
+  }
+  if (provider === "XERO") {
+    return Boolean(process.env.XERO_CLIENT_ID && process.env.XERO_CLIENT_SECRET);
+  }
+  if (provider === "SAGE") {
+    return Boolean(process.env.SAGE_CLIENT_ID && process.env.SAGE_CLIENT_SECRET);
+  }
   return false;
 }
 
@@ -33,17 +39,17 @@ export async function connectAccountingProvider(
       companyName: companyName || `${label} — Demo Co.`,
       externalCompanyId: live ? undefined : `demo-${provider.toLowerCase()}`,
       autoSyncEnabled: true,
-      lastSyncStatus: live ? "pending_oauth" : "demo",
+      lastSyncStatus: live ? "demo_with_credentials" : "demo",
       lastSyncMessage: live
-        ? "OAuth credentials configured — complete authorization in provider portal."
+        ? "API credentials detected — journal entries sync locally until OAuth is completed."
         : "Connected in demo mode. Journal entries post to Pinnacle until API keys are added.",
     },
     update: {
       connected: true,
       companyName: companyName || undefined,
-      lastSyncStatus: live ? "pending_oauth" : "demo",
+      lastSyncStatus: live ? "demo_with_credentials" : "demo",
       lastSyncMessage: live
-        ? "Reconnect initiated."
+        ? "Reconnected — journal entries sync locally until OAuth is completed."
         : "Reconnected in demo mode.",
     },
   });

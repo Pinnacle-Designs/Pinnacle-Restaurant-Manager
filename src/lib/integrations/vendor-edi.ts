@@ -20,18 +20,37 @@ const EDI_ACCOUNT: Record<VendorEdiProvider, string> = {
   GORDON_FOOD_SERVICE: "GFS-339018",
 };
 
+const EDI_ENV_KEY: Record<VendorEdiProvider, string> = {
+  SYSCO: "SYSCO_EDI_API_KEY",
+  US_FOODS: "US_FOODS_EDI_API_KEY",
+  GORDON_FOOD_SERVICE: "GORDON_FOOD_SERVICE_EDI_API_KEY",
+};
+
 const EDI_WAREHOUSE: Record<VendorEdiProvider, string> = {
   SYSCO: "AUS-DC12",
   US_FOODS: "AUS-WH08",
   GORDON_FOOD_SERVICE: "AUS-GFS04",
 };
 
+function hasEdiCredentials(provider: VendorEdiProvider): boolean {
+  return Boolean(process.env[EDI_ENV_KEY[provider]]?.trim());
+}
+
+function deterministicInStock(itemId: string, lowStock: boolean): boolean {
+  if (lowStock) return false;
+  let hash = 0;
+  for (let i = 0; i < itemId.length; i++) {
+    hash = (hash * 31 + itemId.charCodeAt(i)) % 100;
+  }
+  return hash > 8;
+}
+
 export async function connectVendorEdi(
   locationId: string,
   provider: VendorEdiProvider,
   accountNumber?: string
 ) {
-  const live = Boolean(process.env[`${provider}_EDI_API_KEY`]);
+  const live = hasEdiCredentials(provider);
   return prisma.vendorEdiConnection.upsert({
     where: { locationId_provider: { locationId, provider } },
     create: {
@@ -40,12 +59,12 @@ export async function connectVendorEdi(
       connected: true,
       accountNumber: accountNumber || EDI_ACCOUNT[provider],
       warehouseCode: EDI_WAREHOUSE[provider],
-      lastSyncStatus: live ? "live" : "demo",
+      lastSyncStatus: live ? "demo_with_credentials" : "demo",
     },
     update: {
       connected: true,
       accountNumber: accountNumber || undefined,
-      lastSyncStatus: live ? "live" : "demo",
+      lastSyncStatus: live ? "demo_with_credentials" : "demo",
     },
   });
 }
@@ -76,7 +95,7 @@ export async function syncVendorCatalog(locationId: string, provider: VendorEdiP
   for (const [idx, item] of inventory.entries()) {
     const sku = `${prefix}-${String(idx + 1).padStart(5, "0")}`;
     const lowStock = item.quantity <= item.minQuantity;
-    const inStock = !lowStock && Math.random() > 0.08;
+    const inStock = deterministicInStock(item.id, lowStock);
 
     await prisma.vendorCatalogItem.upsert({
       where: { locationId_provider_sku: { locationId, provider, sku } },

@@ -10,6 +10,7 @@ import {
   squareConfigured,
   stripeConnectConfigured,
 } from "@/lib/payments/providers";
+import { billingRequired } from "@/lib/plan-billing";
 import { privateJsonResponse } from "@/lib/secure-response";
 
 export async function GET(request: NextRequest) {
@@ -49,6 +50,12 @@ export async function PATCH(request: NextRequest) {
   const mode = String(body.mode || "");
 
   if (mode === "manual") {
+    if (billingRequired()) {
+      return privateJsonResponse(
+        { error: "Manual billing is disabled in production. Use Stripe Checkout." },
+        { status: 403 }
+      );
+    }
     await prisma.paymentProviderConnection.deleteMany({
       where: { locationId: locationId!, purpose: "SUBSCRIPTION", provider: "STRIPE" },
     });
