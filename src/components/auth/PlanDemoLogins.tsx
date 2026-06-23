@@ -57,10 +57,11 @@ export function PlanDemoLogins({ onLogin, loading }: PlanDemoLoginsProps) {
   return (
     <div className="mt-6 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-        Plan demos (dev only)
+        Try each plan tier
       </p>
       <p className="mt-1 text-xs text-slate-500">
-        Private logins for testing Starter, Growth, and Pro. Not shown in production.
+        Sign in as Starter, Growth, or Pro to see what subscribers get. Sign out and pick another
+        tier to compare.
       </p>
       <div className="mt-3 space-y-2">
         {accounts.map((account) => (

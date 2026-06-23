@@ -1,7 +1,7 @@
 import {
   PLAN_DEMO_USERS,
   planDemoLoginEnabled,
-  seedPlanDemoUsers,
+  seedPlanDemoWorkspaces,
 } from "@/lib/demo-users";
 import { privateJsonResponse } from "@/lib/secure-response";
 
@@ -12,6 +12,7 @@ export async function GET() {
 
   return privateJsonResponse({
     enabled: true,
+    password: PLAN_DEMO_USERS[0]?.password ?? "demo1234",
     accounts: PLAN_DEMO_USERS.map((u) => ({
       email: u.email,
       plan: u.plan,
@@ -25,7 +26,7 @@ export async function POST() {
     return privateJsonResponse({ error: "Not found" }, { status: 404 });
   }
 
-  const accounts = await seedPlanDemoUsers();
+  const accounts = await seedPlanDemoWorkspaces();
   return privateJsonResponse({
     message: "Plan demo accounts ready",
     accounts: accounts.map(({ email, plan, locationName }) => ({

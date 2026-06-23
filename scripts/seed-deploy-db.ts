@@ -28,17 +28,35 @@ async function main() {
     throw err;
   }
 
-  const { seedDemoUsers } = await import("../src/lib/demo-users");
+  const { seedDemoUsers, seedPlanDemoWorkspaces } = await import("../src/lib/demo-users");
   const { setupDemoWorkspace } = await import("../src/lib/seed-data");
+  const { ensureOwnerDemoPostCheckout } = await import("../src/lib/demo-owner-billing");
 
   await seedDemoUsers();
   const workspace = await setupDemoWorkspace("seeded");
 
   const { prisma } = await import("../src/lib/prisma");
-  await prisma.user.update({
+  const owner = await prisma.user.update({
     where: { email: "owner@pinnacle.com" },
     data: { locationId: workspace.locationId },
   });
+  await ensureOwnerDemoPostCheckout(workspace.locationId, owner.id);
+
+  await seedPlanDemoWorkspaces();
+
+  const userCount = await prisma.user.count();
+  const planDemoCount = await prisma.user.count({
+    where: {
+      email: {
+        in: [
+          "demo-starter@pinnacle.com",
+          "demo-growth@pinnacle.com",
+          "demo-pro@pinnacle.com",
+        ],
+      },
+    },
+  });
+  console.log(`[db] Users: ${userCount} total, ${planDemoCount} plan-tier demos`);
 
   await prisma.$disconnect();
 

@@ -54,11 +54,12 @@ export const PLAN_DEMO_USERS: Array<{
   },
 ];
 
-/** True when private plan demo accounts may sign in via /login (never on public marketing). */
+/** True when private plan demo accounts may sign in via /login. */
 export function planDemoLoginEnabled(): boolean {
   return (
     process.env.NODE_ENV === "development" ||
-    process.env.PLAN_DEMO_LOGIN_ENABLED === "true"
+    process.env.PLAN_DEMO_LOGIN_ENABLED === "true" ||
+    process.env.SEED_DEMO_DATA === "true"
   );
 }
 
@@ -160,4 +161,28 @@ export async function seedPlanDemoUsers() {
   }
 
   return seeded;
+}
+
+/** Seed plan-tier workspaces with sample data and demo billing (build + /api/auth/plan-demos). */
+export async function seedPlanDemoWorkspaces() {
+  const accounts = await seedPlanDemoUsers();
+  const { seedLocationData } = await import("./seed-data");
+  const { ensurePlanDemoWorkspaceReady } = await import("./demo-owner-billing");
+
+  for (const account of accounts) {
+    const user = await prisma.user.findUnique({
+      where: { email: account.email },
+      select: { id: true, locationId: true },
+    });
+    if (!user?.locationId) continue;
+
+    await seedLocationData(user.locationId);
+    await prisma.location.update({
+      where: { id: user.locationId },
+      data: { plan: account.plan },
+    });
+    await ensurePlanDemoWorkspaceReady(user.locationId, user.id, account.plan);
+  }
+
+  return accounts;
 }
