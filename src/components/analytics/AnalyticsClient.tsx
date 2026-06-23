@@ -16,6 +16,8 @@ import {
   ANALYTICS_VIEW_OPTIONS,
   type DataViewMode,
 } from "@/components/charts";
+import { apiFetch } from "@/lib/api-fetch";
+import { useAuth } from "@/components/auth/AuthProvider";
 import {
   analyticsTabsForPlan,
   canAccessAnalyticsTab,
@@ -54,6 +56,7 @@ function formatHourLabel(hour: number) {
 }
 
 export function AnalyticsClient({ plan }: { plan: PlanId }) {
+  const { user, loading: authLoading } = useAuth();
   const allowedTabs = useMemo(() => analyticsTabsForPlan(plan), [plan]);
   const [data, setData] = useState<AnalyticsPayload | null>(null);
   const [tab, setTab] = useState<TabId>(() => allowedTabs[0] ?? "executive");
@@ -72,7 +75,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
   const loadAnalytics = useCallback(() => {
     setLoading(true);
     setError(null);
-    fetch("/api/analytics")
+    apiFetch("/api/analytics")
       .then(async (r) => {
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || `Analytics failed (${r.status})`);
@@ -85,14 +88,20 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
   }, []);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setError("Session expired. Refresh the demo or sign in again.");
+      setLoading(false);
+      return;
+    }
     loadAnalytics();
-  }, [loadAnalytics]);
+  }, [authLoading, user, loadAnalytics]);
 
   const loadSampleData = async () => {
     setSeeding(true);
     setError(null);
     try {
-      const res = await fetch("/api/seed", { method: "POST" });
+      const res = await apiFetch("/api/seed", { method: "POST" });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Failed to load sample data");
       loadAnalytics();
@@ -108,7 +117,7 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
     setWeatherSyncing(true);
     setError(null);
     try {
-      const res = await fetch("/api/external/weather/sync", { method: "POST" });
+      const res = await apiFetch("/api/external/weather/sync", { method: "POST" });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Weather sync failed");
       loadAnalytics();
@@ -119,20 +128,25 @@ export function AnalyticsClient({ plan }: { plan: PlanId }) {
     }
   };
 
-  if (loading) return <p className="text-sm text-slate-500">Loading analytics...</p>;
+  if (authLoading || loading) return <p className="text-sm text-slate-500">Loading analytics...</p>;
   if (error) {
+    const isDev = process.env.NODE_ENV === "development";
     return (
       <div className="rounded-lg border border-red-200 bg-red-50 p-4">
         <p className="font-medium text-red-800">Analytics unavailable</p>
         <p className="mt-1 text-sm text-red-700">{error}</p>
-        <p className="mt-2 text-sm text-red-600">
-          Stop all running dev servers, then run <code className="rounded bg-red-100 px-1">npm run fresh</code> and log in as Owner/Manager.
-        </p>
+        {isDev && (
+          <p className="mt-2 text-sm text-red-600">
+            Stop all running dev servers, then run <code className="rounded bg-red-100 px-1">npm run fresh</code> and log in as Owner/Manager.
+          </p>
+        )}
         <div className="mt-4 flex flex-wrap gap-2">
           <Button size="sm" onClick={loadAnalytics}>Retry</Button>
-          <Button size="sm" variant="secondary" onClick={loadSampleData} disabled={seeding}>
-            {seeding ? "Loading sample data..." : "Load sample data"}
-          </Button>
+          {isDev && (
+            <Button size="sm" variant="secondary" onClick={loadSampleData} disabled={seeding}>
+              {seeding ? "Loading sample data..." : "Load sample data"}
+            </Button>
+          )}
         </div>
       </div>
     );

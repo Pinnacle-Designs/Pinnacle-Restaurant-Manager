@@ -47,7 +47,7 @@ export async function requireActiveAccount(user: SessionUser | null) {
     return { user: null, error: unauthorizedResponse() };
   }
 
-  if ((user.sessionVersion ?? 0) !== dbUser.sessionVersion) {
+  if ((user.sessionVersion ?? 0) !== (dbUser.sessionVersion ?? 0)) {
     return { user: null, error: unauthorizedResponse() };
   }
 

@@ -1,19 +1,14 @@
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { getSessionUserFromRequest } from "./auth";
-import { isDemoAccountEmail } from "./demo-email";
+import { isDemoAccountEmail, isPlanDemoAccountEmail } from "./demo-email";
+import { findSeededDemoLocationId } from "./demo-location";
 import { isProductionRuntime } from "./env";
 import { resolveAuthorizedLocationId } from "./location-access";
 import { prisma } from "./prisma";
 import { LOCATION_COOKIE_NAME } from "./location-constants";
 
 export { LOCATION_COOKIE_NAME };
-
-const EMBED_DEMO_LOCATION_NAMES = [
-  "Smoky Oak BBQ",
-  "Demo - Sample Data",
-  "Demo — Sample Data",
-];
 
 async function locationExists(locationId: string): Promise<boolean> {
   const row = await prisma.location.findUnique({
@@ -27,17 +22,29 @@ async function resolveDemoEmbedLocationId(
   email: string,
   sessionLocationId: string | null | undefined
 ): Promise<string | null> {
-  if (sessionLocationId && (await locationExists(sessionLocationId))) {
-    return sessionLocationId;
+  if (isPlanDemoAccountEmail(email)) {
+    if (sessionLocationId && (await locationExists(sessionLocationId))) {
+      return sessionLocationId;
+    }
+    return null;
   }
-  const demoLocation = await prisma.location.findFirst({
-    where: { name: { in: EMBED_DEMO_LOCATION_NAMES } },
-    select: { id: true },
-  });
-  return demoLocation?.id ?? null;
+
+  if (isDemoAccountEmail(email)) {
+    return findSeededDemoLocationId();
+  }
+
+  return null;
 }
 
 export async function getLocationId(): Promise<string> {
+  const { getSessionUser } = await import("./auth");
+  const user = await getSessionUser();
+
+  if (user && isDemoAccountEmail(user.email)) {
+    const demoId = await resolveDemoEmbedLocationId(user.email, user.locationId);
+    if (demoId) return demoId;
+  }
+
   const cookieStore = await cookies();
   const cookieId = cookieStore.get(LOCATION_COOKIE_NAME)?.value;
 
@@ -45,16 +52,8 @@ export async function getLocationId(): Promise<string> {
     return cookieId;
   }
 
-  const { getSessionUser } = await import("./auth");
-  const user = await getSessionUser();
-
   if (user?.locationId && (await locationExists(user.locationId))) {
     return user.locationId;
-  }
-
-  if (user && isDemoAccountEmail(user.email)) {
-    const demoId = await resolveDemoEmbedLocationId(user.email, user.locationId);
-    if (demoId) return demoId;
   }
 
   if (isProductionRuntime()) {
@@ -76,8 +75,14 @@ export async function getLocationId(): Promise<string> {
 
 export async function getLocationIdFromRequest(request: Request): Promise<string> {
   const nextRequest = request as NextRequest;
-  const cookieId = nextRequest.cookies?.get(LOCATION_COOKIE_NAME)?.value;
   const user = await getSessionUserFromRequest(nextRequest);
+
+  if (user && isDemoAccountEmail(user.email)) {
+    const demoId = await resolveDemoEmbedLocationId(user.email, user.locationId);
+    if (demoId) return demoId;
+  }
+
+  const cookieId = nextRequest.cookies?.get(LOCATION_COOKIE_NAME)?.value;
 
   const resolved = await resolveAuthorizedLocationId(nextRequest, user, cookieId);
   if (resolved && (await locationExists(resolved))) {

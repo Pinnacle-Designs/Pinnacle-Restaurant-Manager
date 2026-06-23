@@ -5,6 +5,7 @@ import type { AppRole } from "@prisma/client";
 import type { PlanId } from "@/lib/plans";
 import type { Permission } from "@/lib/permissions";
 import { hasPermissionInList } from "@/lib/permissions";
+import { apiFetch } from "@/lib/api-fetch";
 import { parseJsonResponse } from "@/lib/fetch-json";
 
 export interface AuthUser {
@@ -44,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = async () => {
     try {
-      const res = await fetch("/api/auth/login");
+      const res = await apiFetch("/api/auth/login");
       const data = await parseJsonResponse<{ user: AuthUser | null }>(res);
       setUser(data.user ?? null);
     } catch {
@@ -59,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await apiFetch("/api/auth/logout", { method: "POST" });
     setUser(null);
     window.location.href = "/login";
   };

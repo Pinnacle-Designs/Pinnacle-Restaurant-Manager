@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
-const useSqlite = (process.env.DATABASE_URL ?? "").startsWith("file:");
+const dbUrl = process.env.DATABASE_URL ?? "";
+const isPostgres =
+  dbUrl.startsWith("postgresql://") || dbUrl.startsWith("postgres://");
+const useSqlite =
+  dbUrl.startsWith("file:") ||
+  process.env.SEED_DEMO_DATA === "true" ||
+  (process.env.VERCEL === "1" && !isPostgres);
 
 const nextConfig: NextConfig = {
   ...(useSqlite
