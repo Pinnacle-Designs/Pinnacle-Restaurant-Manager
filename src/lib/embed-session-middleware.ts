@@ -42,9 +42,10 @@ export async function applyEmbedSessionParam(
   const flags = embedCookieFlags(request, forEmbed);
   response.cookies.set(sessionCookieOptions(rawToken, forEmbed, flags.secure));
 
-  const existingLocation = request.cookies.get(LOCATION_COOKIE_NAME)?.value;
-  if (existingLocation) {
-    response.cookies.set(LOCATION_COOKIE_NAME, existingLocation, {
+  const locationId =
+    request.cookies.get(LOCATION_COOKIE_NAME)?.value ?? user.locationId ?? undefined;
+  if (locationId) {
+    response.cookies.set(LOCATION_COOKIE_NAME, locationId, {
       path: "/",
       maxAge: 60 * 60 * 24 * 365,
       sameSite: flags.sameSite,

@@ -95,14 +95,14 @@ export async function buildEmbedLaunchResponse(
     const locationId =
       request.cookies.get(LOCATION_COOKIE_NAME)?.value ?? existing.locationId ?? "";
 
-    // Cross-origin iframes need _st on every launch so middleware can refresh SameSite=None cookies.
-    if (forEmbed && token) {
+    // Iframes need _st on every launch so middleware can refresh SameSite=None cookies.
+    if (token) {
       redirectUrl.searchParams.set(EMBED_SESSION_PARAM, token);
     }
 
     const response = NextResponse.redirect(redirectUrl);
     if (token && locationId) {
-      applyEmbedAuthCookies(response, request, token, locationId, forEmbed);
+      applyEmbedAuthCookies(response, request, token, locationId, true);
     }
     return response;
   }
@@ -145,12 +145,10 @@ export async function buildEmbedLaunchResponse(
 
   const redirectUrl = new URL(`${path}?embed=${embedValue}`, request.url);
 
-  // Cross-origin iframes often block Set-Cookie on redirect; pass token once in URL.
-  if (forEmbed) {
-    redirectUrl.searchParams.set(EMBED_SESSION_PARAM, token);
-  }
+  // Iframes often drop Set-Cookie on redirect — pass the session once in the URL.
+  redirectUrl.searchParams.set(EMBED_SESSION_PARAM, token);
 
   const response = NextResponse.redirect(redirectUrl);
-  applyEmbedAuthCookies(response, request, token, locationId, forEmbed);
+  applyEmbedAuthCookies(response, request, token, locationId, true);
   return response;
 }

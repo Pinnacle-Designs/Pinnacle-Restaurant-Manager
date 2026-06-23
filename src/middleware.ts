@@ -229,7 +229,8 @@ export async function middleware(request: NextRequest) {
   if (
     user.role === "OWNER" &&
     user.setupComplete === false &&
-    !isOnboardingAllowedPath(pathname)
+    !isOnboardingAllowedPath(pathname) &&
+    !isEmbeddableEmbedParam(embedParam)
   ) {
     if (pathname.startsWith("/api/")) {
       return applyFramePolicy(
