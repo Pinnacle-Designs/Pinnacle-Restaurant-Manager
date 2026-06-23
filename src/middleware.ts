@@ -40,14 +40,11 @@ const PUBLIC_PATHS = [
   "/api/auth/login",
   "/api/auth/mfa/verify",
   "/api/auth/register",
-<<<<<<< HEAD
   "/api/auth/forgot-password",
   "/api/auth/reset-password",
   "/api/auth/verify-email",
   "/api/auth/seed",
   "/api/auth/plan-demos",
-=======
->>>>>>> dbb58372ac09fe50cc587fc1e930d5795f24f22d
   "/api/embed/launch",
   "/api/pitch-request",
   "/api/webhooks/stripe",

@@ -11,9 +11,10 @@ async function main() {
   );
   const { validateProductionEnv, isSqliteDatabase } = await import("../src/lib/env");
 
-  const prev = process.env.NODE_ENV;
-  process.env.NODE_ENV = "production";
-  if (isSqliteDatabase()) process.env.ALLOW_SQLITE_PRODUCTION = "true";
+  const processEnv = process.env as Record<string, string | undefined>;
+  const prev = processEnv.NODE_ENV;
+  processEnv.NODE_ENV = "production";
+  if (isSqliteDatabase()) processEnv.ALLOW_SQLITE_PRODUCTION = "true";
 
   console.log("=== Production env validation ===");
   try {
@@ -34,8 +35,9 @@ async function main() {
     console.log(`  ${icon} [${s.mode}] ${s.name}: ${s.message}`);
   }
 
-  process.env.NODE_ENV = prev;
-  delete process.env.ALLOW_SQLITE_PRODUCTION;
+  if (prev !== undefined) processEnv.NODE_ENV = prev;
+  else delete processEnv.NODE_ENV;
+  delete processEnv.ALLOW_SQLITE_PRODUCTION;
 }
 
 main();

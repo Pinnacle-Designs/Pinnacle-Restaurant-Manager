@@ -198,9 +198,11 @@ async function main() {
   }
 
   console.log("\n[4/5] Production env validation (simulated)");
-  process.env.NODE_ENV = "production";
+  const processEnv = process.env as Record<string, string | undefined>;
+  const prevNodeEnv = processEnv.NODE_ENV;
+  processEnv.NODE_ENV = "production";
   if (dbUrl.startsWith("file:")) {
-    process.env.ALLOW_SQLITE_PRODUCTION = "true";
+    processEnv.ALLOW_SQLITE_PRODUCTION = "true";
     console.log("  Note: ALLOW_SQLITE_PRODUCTION=true only for preview — use Postgres for real customers.");
   }
   try {
@@ -210,8 +212,9 @@ async function main() {
   } catch (err) {
     console.warn(`  ⚠ ${err instanceof Error ? err.message : err}`);
   } finally {
-    process.env.NODE_ENV = "development";
-    delete process.env.ALLOW_SQLITE_PRODUCTION;
+    if (prevNodeEnv !== undefined) processEnv.NODE_ENV = prevNodeEnv;
+    else delete processEnv.NODE_ENV;
+    delete processEnv.ALLOW_SQLITE_PRODUCTION;
   }
 
   console.log("\n[5/5] Manual steps remaining");

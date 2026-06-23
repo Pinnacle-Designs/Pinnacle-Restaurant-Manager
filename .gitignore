@@ -31,11 +31,8 @@ yarn-error.log*
 # env files
 .env
 .env*.local
-<<<<<<< HEAD
 .env.vercel
-=======
 .env.vercel.production
->>>>>>> dbb58372ac09fe50cc587fc1e930d5795f24f22d
 
 # typescript
 *.tsbuildinfo

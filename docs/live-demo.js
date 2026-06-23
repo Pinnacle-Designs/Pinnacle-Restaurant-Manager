@@ -390,11 +390,7 @@
       }
       heroController = mountLiveEmbed(heroSlot, appUrl, {
         path: DEFAULT_PATH,
-<<<<<<< HEAD
         chrome: "mobile",
-=======
-        chrome: preferredChrome(),
->>>>>>> dbb58372ac09fe50cc587fc1e930d5795f24f22d
         candidates: buildCandidates(appUrl),
       });
     }
