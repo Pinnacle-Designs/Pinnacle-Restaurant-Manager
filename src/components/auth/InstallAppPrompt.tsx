@@ -20,6 +20,7 @@ export function InstallAppPrompt({ plan, onContinue, embedded }: InstallAppPromp
     installing,
     isInstalled,
     isIOS,
+    isInAppBrowser,
     swReady,
     showManualInstallGuide,
   } = usePwaInstall();
@@ -84,7 +85,9 @@ export function InstallAppPrompt({ plan, onContinue, embedded }: InstallAppPromp
             </Button>
           )}
 
-          {showManualInstallGuide && <ManualInstallGuide isIOS={isIOS} swReady={swReady} />}
+          {showManualInstallGuide && (
+            <ManualInstallGuide isIOS={isIOS} swReady={swReady} isInAppBrowser={isInAppBrowser} />
+          )}
         </div>
       )}
 

@@ -90,8 +90,8 @@ export function Modal({ open, onClose, title, children, size = "md" }: ModalProp
     <div
       className={
         fullscreen
-          ? "fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-3"
-          : "fixed inset-0 z-50 flex items-center justify-center p-4"
+          ? "fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-3"
+          : "fixed inset-0 z-[100] flex items-center justify-center p-4 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] sm:pb-4"
       }
     >
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />

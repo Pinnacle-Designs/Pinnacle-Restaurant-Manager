@@ -22,6 +22,7 @@ export function InstallAppButton({ variant = "light", className }: InstallAppBut
     installing,
     isInstalled,
     isIOS,
+    isInAppBrowser,
     swReady,
     showManualInstallGuide,
   } = usePwaInstall();
@@ -46,6 +47,7 @@ export function InstallAppButton({ variant = "light", className }: InstallAppBut
         disabled={installing}
         className={cn(
           "inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 sm:px-3 sm:text-sm",
+          "min-h-[44px] min-w-[44px]",
           variant === "dark"
             ? "border border-slate-600 bg-slate-800 text-white hover:bg-slate-700"
             : "border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50",
@@ -68,7 +70,9 @@ export function InstallAppButton({ variant = "light", className }: InstallAppBut
               {installing ? "Installing…" : "Install app"}
             </Button>
           )}
-          {showManualInstallGuide && <ManualInstallGuide isIOS={isIOS} swReady={swReady} />}
+          {showManualInstallGuide && (
+            <ManualInstallGuide isIOS={isIOS} swReady={swReady} isInAppBrowser={isInAppBrowser} />
+          )}
           <p className="text-center text-xs text-slate-500">
             <Link href="/download" className="font-medium text-orange-600 hover:text-orange-500">
               Open full download page

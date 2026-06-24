@@ -10,10 +10,7 @@ interface BeforeInstallPromptEvent extends Event {
 
 function detectIOS(): boolean {
   if (typeof navigator === "undefined") return false;
-  return (
-    /iphone|ipad|ipod/i.test(navigator.userAgent) &&
-    !("MSStream" in window)
-  );
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) && !("MSStream" in window);
 }
 
 function detectInstalled(): boolean {
@@ -24,16 +21,24 @@ function detectInstalled(): boolean {
   );
 }
 
+function detectInAppBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent.toLowerCase();
+  return /(instagram|fbav|fban|facebook|line\/|twitter|snapchat|tiktok)/i.test(ua);
+}
+
 export function usePwaInstall() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
+  const [isInAppBrowser, setIsInAppBrowser] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [swReady, setSwReady] = useState(false);
 
   useEffect(() => {
     setIsIOS(detectIOS());
     setIsInstalled(detectInstalled());
+    setIsInAppBrowser(detectInAppBrowser());
 
     void registerPwaServiceWorker().then((registration) => {
       setSwReady(Boolean(registration));
@@ -75,7 +80,7 @@ export function usePwaInstall() {
     }
   }, [deferredPrompt]);
 
-  const canNativeInstall = Boolean(deferredPrompt);
+  const canNativeInstall = Boolean(deferredPrompt) && !isInAppBrowser;
 
   return {
     canNativeInstall,
@@ -83,8 +88,9 @@ export function usePwaInstall() {
     installing,
     isInstalled,
     isIOS,
+    isInAppBrowser,
     swReady,
     showIOSInstructions: isIOS && !isInstalled,
-    showManualInstallGuide: !isInstalled && !canNativeInstall,
+    showManualInstallGuide: !isInstalled && (!canNativeInstall || isInAppBrowser),
   };
 }

@@ -1,28 +1,23 @@
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open("walk-in-v1").then((cache) =>
-      cache.addAll(["/api/walk-in/catalog"]).catch(() => undefined)
-    )
-  );
-  self.skipWaiting();
-});
-
-self.addEventListener("fetch", (event) => {
-  if (event.request.url.includes("/api/walk-in/catalog")) {
-    event.respondWith(
-      fetch(event.request)
-        .then((res) => {
-          const clone = res.clone();
-          caches.open("walk-in-v1").then((cache) => cache.put(event.request, clone));
-          return res;
-        })
-        .catch(() => caches.match(event.request))
-    );
-  }
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener("fetch", (event) => {
+  if (!event.request.url.includes("/api/walk-in/catalog")) return;
+
+  event.respondWith(
+    fetch(event.request)
+      .then((res) => {
+        const clone = res.clone();
+        caches.open("walk-in-v1").then((cache) => cache.put(event.request, clone));
+        return res;
+      })
+      .catch(() => caches.match(event.request))
+  );
 });
 
 self.addEventListener("message", (event) => {
@@ -31,8 +26,8 @@ self.addEventListener("message", (event) => {
     insights.forEach((insight) => {
       self.registration.showNotification(insight.title, {
         body: insight.description,
-        icon: "/logo.png",
-        badge: "/logo.png",
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
         tag: `insight-${insight.title}`,
         data: { url: "/insights" },
       });

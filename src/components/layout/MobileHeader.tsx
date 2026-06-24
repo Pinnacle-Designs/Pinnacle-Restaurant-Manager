@@ -15,7 +15,7 @@ export function MobileHeader({ forceShow = false }: { forceShow?: boolean }) {
     >
       <Logo priority />
       <div className="flex items-center gap-2">
-      {!forceShow && <InstallAppButton variant="dark" />}
+      <InstallAppButton variant="dark" />
         <GlobalSearchTrigger variant="icon" />
       </div>
     </header>
