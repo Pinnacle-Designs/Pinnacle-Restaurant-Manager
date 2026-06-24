@@ -7,11 +7,12 @@ import { analyzeInvoice } from "@/lib/ai/analyze-invoice";
 import { getLocationIdFromRequest } from "@/lib/location";
 import { requirePermission } from "@/lib/api-auth";
 import { processDigitizedInvoice } from "@/lib/purchasing/invoice-digitization";
-
-async function fileToBase64(file: File): Promise<string> {
-  const buffer = Buffer.from(await file.arrayBuffer());
-  return buffer.toString("base64");
-}
+import {
+  base64Input,
+  filesToBase64,
+  parseScanFormData,
+  visionScanFromParsed,
+} from "@/lib/scan/parse-scan-form";
 
 export async function POST(request: NextRequest) {
   const { error } = await requirePermission(request, "manage_inventory");
@@ -19,27 +20,20 @@ export async function POST(request: NextRequest) {
 
   try {
     const formData = await request.formData();
-    const multiFiles = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
-    const singleFile = formData.get("file");
-    const file = singleFile instanceof File && singleFile.size > 0 ? singleFile : null;
-    const files = multiFiles.length > 0 ? multiFiles : file ? [file] : [];
+    const parsed = parseScanFormData(formData);
 
-    if (files.length === 0) {
+    if (parsed.files.length === 0) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    const base64Images = await Promise.all(files.map(fileToBase64));
-    const panoramic =
-      formData.get("panoramic") === "true" || formData.get("scanMode") === "panorama";
-    const invoice = await analyzeInvoice(
-      base64Images.length === 1 ? base64Images[0] : base64Images,
-      { panoramic: panoramic && base64Images.length === 1 }
-    );
+    const base64Images = await filesToBase64(parsed.files);
+    const vision = visionScanFromParsed(parsed);
+    const invoice = await analyzeInvoice(base64Input(base64Images), vision);
 
     return NextResponse.json({
       invoice,
-      pageCount: files.length,
-      panoramic: panoramic || files.length > 1,
+      pageCount: parsed.pageCount,
+      panoramic: vision.panoramic || parsed.stitchedMulti,
     });
   } catch (err) {
     console.error("Invoice scan error:", err);
@@ -54,7 +48,8 @@ export async function PUT(request: NextRequest) {
   try {
     const locationId = await getLocationIdFromRequest(request);
     const formData = await request.formData();
-    const file = formData.get("file") as File | null;
+    const parsed = parseScanFormData(formData);
+    const file = parsed.uploadFile;
     const vendor = formData.get("vendor") as string;
     const amount = parseFloat(formData.get("amount") as string);
     const invoiceDate = formData.get("invoiceDate") as string;
@@ -63,7 +58,7 @@ export async function PUT(request: NextRequest) {
     const receiptId = (formData.get("receiptId") as string) || null;
     const linesJson = formData.get("lines") as string;
     const lines = linesJson ? JSON.parse(linesJson) : [];
-    const pageCount = parseInt(String(formData.get("pageCount") || "1"), 10);
+    const pageCount = parsed.pageCount;
 
     let imageUrl: string | null = null;
     if (file) {
@@ -138,6 +133,7 @@ export async function PUT(request: NextRequest) {
       inventoryUpdated: result.inventoryUpdated,
       recipesUpdated: result.recipesUpdated,
       pushNotifications: result.pushNotifications,
+      pageCount,
     });
   } catch (err) {
     console.error("Invoice save error:", err);

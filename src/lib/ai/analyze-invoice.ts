@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { visionScanHint } from "@/lib/scan/parse-scan-form";
 
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -52,11 +53,12 @@ function parseInvoiceJson(parsed: Record<string, unknown>, today: string): Invoi
 
 export async function analyzeInvoice(
   imageBase64: string | string[],
-  options?: { panoramic?: boolean }
+  options?: { panoramic?: boolean; multiPage?: boolean; pageCount?: number }
 ): Promise<InvoiceData> {
   const images = Array.isArray(imageBase64) ? imageBase64 : [imageBase64];
-  const multiPage = images.length > 1;
+  const multiPage = options?.multiPage ?? images.length > 1;
   const panoramic = options?.panoramic ?? false;
+  const pageCount = options?.pageCount ?? images.length;
   const today = new Date().toISOString().split("T")[0]!;
   const fallback: InvoiceData = {
     vendor: "Unknown vendor",
@@ -77,11 +79,11 @@ export async function analyzeInvoice(
   }
 
   try {
-    const pageHint = multiPage
-      ? `This vendor invoice or delivery report spans ${images.length} photos in order from top to bottom (first image = top). Read all pages as one document. Merge line items across pages, skip duplicates at overlaps, and use the invoice total from the final page when present.`
-      : panoramic
-        ? "This is a single panoramic photo of a long vendor invoice or delivery report — captured in one continuous vertical sweep. Read the entire tall image from top to bottom."
-        : "Extract data from this vendor invoice image for a restaurant accounts payable record.";
+    const pageHint = `${visionScanHint("vendor invoice or delivery report", {
+      panoramic,
+      multiPage,
+      pageCount,
+    })} Extract data for a restaurant accounts payable record.`;
 
     const content: Array<
       | { type: "text"; text: string }

@@ -2,6 +2,8 @@
  * Shared marketing site navigation — single source of truth for all docs pages.
  */
 (function () {
+  var mobileNavOpen = false;
+
   var PRIMARY_LINKS = [
     { hash: "#top", label: "Live Demo" },
     { hash: "#features", label: "Features" },
@@ -142,7 +144,7 @@
       '<button type="button" class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-controls="nav-mobile" aria-label="Open menu">' +
       hamburgerIcon() +
       "</button>" +
-      "</div>" +
+      "</div></div>" +
       '<div class="nav-mobile-wrap" id="nav-mobile-wrap" hidden>' +
       '<button type="button" class="nav-mobile-backdrop" id="nav-mobile-backdrop" aria-label="Close menu"></button>' +
       '<nav class="nav-mobile" id="nav-mobile" aria-label="Mobile">' +
@@ -162,22 +164,32 @@
       '" class="btn btn-primary nav-mobile-cta">Try live demo</a>' +
       '<a href="#" class="nav-mobile-signin" data-app-link="/login" hidden>Sign in to your account</a>' +
       "</div>" +
-      "</nav></div></div>";
+      "</nav></div>";
 
+    attachMobileNavToBody();
     initMobileNav();
     initMoreMenu();
     initSectionHighlight();
   }
 
-  function setMobileOpen(open) {
+  /** backdrop-filter on .nav traps position:fixed — menu must live on body. */
+  function attachMobileNavToBody() {
+    var wrap = document.getElementById("nav-mobile-wrap");
+    if (wrap && wrap.parentElement !== document.body) {
+      document.body.appendChild(wrap);
+    }
+  }
+
+  function setMobileOpen(nextOpen) {
     var wrap = document.getElementById("nav-mobile-wrap");
     var toggle = document.getElementById("nav-toggle");
     if (!wrap || !toggle) return;
-    wrap.hidden = !open;
-    toggle.classList.toggle("is-open", open);
-    toggle.setAttribute("aria-expanded", open ? "true" : "false");
-    toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
-    document.body.classList.toggle("nav-open", open);
+    mobileNavOpen = nextOpen;
+    wrap.hidden = !mobileNavOpen;
+    toggle.classList.toggle("is-open", mobileNavOpen);
+    toggle.setAttribute("aria-expanded", mobileNavOpen ? "true" : "false");
+    toggle.setAttribute("aria-label", mobileNavOpen ? "Close menu" : "Open menu");
+    document.body.classList.toggle("nav-open", mobileNavOpen);
   }
 
   function initMobileNav() {
@@ -188,8 +200,9 @@
     var mobile = document.getElementById("nav-mobile");
     if (!toggle || !wrap) return;
 
-    toggle.addEventListener("click", function () {
-      setMobileOpen(wrap.hidden);
+    toggle.addEventListener("click", function (e) {
+      e.stopPropagation();
+      setMobileOpen(!mobileNavOpen);
     });
 
     if (backdrop) {
@@ -212,7 +225,7 @@
     }
 
     document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && !wrap.hidden) setMobileOpen(false);
+      if (e.key === "Escape" && mobileNavOpen) setMobileOpen(false);
     });
   }
 

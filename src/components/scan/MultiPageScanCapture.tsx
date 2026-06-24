@@ -17,7 +17,9 @@ import { Button, Badge } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import {
   blobToFile,
+  compressFileForUpload,
   filesToScanPages,
+  readFileAsDataUrl,
   stitchDocumentPanorama,
   type ScanPage,
 } from "@/lib/receipt/panorama-stitch";
@@ -35,6 +37,8 @@ interface MultiPageScanCaptureProps {
   pages: ScanPage[];
   onPagesChange: (pages: ScanPage[]) => void;
   onStitchedChange?: (stitched: StitchedDocument | null) => void;
+  /** Fired while the stitched upload JPEG is being built/compressed. */
+  onPreparingChange?: (preparing: boolean) => void;
   /** Called when user finishes capturing and is ready to extract */
   onSessionComplete?: () => void;
   disabled?: boolean;
@@ -49,6 +53,7 @@ export function MultiPageScanCapture({
   pages,
   onPagesChange,
   onStitchedChange,
+  onPreparingChange,
   onSessionComplete,
   disabled = false,
   accentClass = "green",
@@ -89,14 +94,23 @@ export function MultiPageScanCapture({
       if (pageList.length === 0) {
         setPanoramaPreview(null);
         onStitchedChange?.(null);
+        onPreparingChange?.(false);
         return;
       }
       if (pageList.length === 1) {
-        setPanoramaPreview(pageList[0].dataUrl);
-        onStitchedChange?.({ dataUrl: pageList[0].dataUrl, file: pageList[0].file });
+        onPreparingChange?.(true);
+        try {
+          const compressed = await compressFileForUpload(pageList[0].file);
+          const dataUrl = await readFileAsDataUrl(compressed);
+          setPanoramaPreview(dataUrl);
+          onStitchedChange?.({ dataUrl, file: compressed });
+        } finally {
+          onPreparingChange?.(false);
+        }
         return;
       }
       setBuildingPanorama(true);
+      onPreparingChange?.(true);
       try {
         const { dataUrl, blob } = await stitchDocumentPanorama(pageList.map((p) => p.dataUrl));
         setPanoramaPreview(dataUrl);
@@ -105,13 +119,21 @@ export function MultiPageScanCapture({
           file: blobToFile(blob, `${documentLabel}-panorama.jpg`),
         });
       } catch {
-        setPanoramaPreview(pageList[0].dataUrl);
-        onStitchedChange?.({ dataUrl: pageList[0].dataUrl, file: pageList[0].file });
+        try {
+          const compressed = await compressFileForUpload(pageList[0].file);
+          const dataUrl = await readFileAsDataUrl(compressed);
+          setPanoramaPreview(dataUrl);
+          onStitchedChange?.({ dataUrl, file: compressed });
+        } catch {
+          setPanoramaPreview(pageList[0].dataUrl);
+          onStitchedChange?.({ dataUrl: pageList[0].dataUrl, file: pageList[0].file });
+        }
       } finally {
         setBuildingPanorama(false);
+        onPreparingChange?.(false);
       }
     },
-    [documentLabel, onStitchedChange]
+    [documentLabel, onStitchedChange, onPreparingChange]
   );
 
   useEffect(() => {

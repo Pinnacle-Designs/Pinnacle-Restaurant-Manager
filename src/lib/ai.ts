@@ -90,11 +90,12 @@ export interface ReceiptData {
 
 export async function analyzeReceipt(
   imageBase64: string | string[],
-  options?: { panoramic?: boolean }
+  options?: { panoramic?: boolean; multiPage?: boolean; pageCount?: number }
 ): Promise<ReceiptData> {
   const images = Array.isArray(imageBase64) ? imageBase64 : [imageBase64];
-  const multiPage = images.length > 1;
+  const multiPage = options?.multiPage ?? images.length > 1;
   const panoramic = options?.panoramic ?? false;
+  const pageCount = options?.pageCount ?? images.length;
 
   const fallback: ReceiptData = {
     description: "Receipt expense",
@@ -116,11 +117,11 @@ export async function analyzeReceipt(
   }
 
   try {
-    const pageHint = multiPage
-      ? `This is a long receipt captured in ${images.length} photos, in order from top to bottom (first image = top of receipt). Read all images as one continuous receipt. Combine line items across pages, avoid duplicates at page overlaps, and use the final total from the bottom section.`
-      : panoramic
-        ? "This is a single panoramic photo of a long receipt — the camera was swept vertically from top to bottom in one continuous shot. Read the entire tall image from top to bottom as one receipt."
-        : "Extract data from this receipt image for a restaurant expense record.";
+    const pageHint = `${visionScanHint("receipt", {
+      panoramic,
+      multiPage,
+      pageCount,
+    })} Return JSON with: description (vendor + brief summary), amount (total as number), category (one of: Food & Supplies, Utilities, Maintenance, Labor, Marketing, Equipment, Insurance, Other), date (YYYY-MM-DD), vendor (store name), items (array of line item strings). Use the total amount including tax.`;
 
     const content: Array<
       | { type: "text"; text: string }
@@ -128,7 +129,7 @@ export async function analyzeReceipt(
     > = [
       {
         type: "text",
-        text: `${pageHint} Return JSON with: description (vendor + brief summary), amount (total as number), category (one of: Food & Supplies, Utilities, Maintenance, Labor, Marketing, Equipment, Insurance, Other), date (YYYY-MM-DD), vendor (store name), items (array of line item strings). Use the total amount including tax.`,
+        text: pageHint,
       },
       ...images.map((b64) => ({
         type: "image_url" as const,

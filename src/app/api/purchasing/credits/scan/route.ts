@@ -5,6 +5,7 @@ import {
   base64Input,
   filesToBase64,
   parseScanFormData,
+  visionScanFromParsed,
 } from "@/lib/scan/parse-scan-form";
 
 export async function POST(request: NextRequest) {
@@ -13,22 +14,20 @@ export async function POST(request: NextRequest) {
 
   try {
     const formData = await request.formData();
-    const { files, panoramic, pageCount } = parseScanFormData(formData);
+    const parsed = parseScanFormData(formData);
 
-    if (files.length === 0) {
+    if (parsed.files.length === 0) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    const base64Images = await filesToBase64(files);
-    const analysis = await analyzeDamagePhoto(base64Input(base64Images), {
-      panoramic: panoramic && base64Images.length === 1,
-      pageCount,
-    });
+    const base64Images = await filesToBase64(parsed.files);
+    const vision = visionScanFromParsed(parsed);
+    const analysis = await analyzeDamagePhoto(base64Input(base64Images), vision);
 
     return NextResponse.json({
       analysis,
-      pageCount,
-      panoramic: panoramic || files.length > 1,
+      pageCount: parsed.pageCount,
+      panoramic: vision.panoramic || parsed.stitchedMulti,
     });
   } catch (err) {
     console.error("Damage scan error:", err);

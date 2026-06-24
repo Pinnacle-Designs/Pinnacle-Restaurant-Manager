@@ -53,11 +53,13 @@ export function DocumentQuickScanCapture({
     setStitched,
     sessionComplete,
     setSessionComplete,
+    setUploadPreparing,
     handleSingleFile,
     clear,
     canExtract,
     fileInputRef,
     cameraInputRef,
+    uploadPreparing,
   } = scan;
 
   const canRunExtract = canExtractOverride ?? canExtract;
@@ -196,6 +198,7 @@ export function DocumentQuickScanCapture({
             pages={pages}
             onPagesChange={setPages}
             onStitchedChange={setStitched}
+            onPreparingChange={setUploadPreparing}
             sessionComplete={sessionComplete}
             onSessionCompleteChange={setSessionComplete}
             disabled={disabled}
@@ -216,9 +219,13 @@ export function DocumentQuickScanCapture({
                   `${extractLabel} (${pages.length} page${pages.length === 1 ? "" : "s"})`
                 )}
               </Button>
-              {!canRunExtract && pages.length === 1 && !sessionComplete && (
+              {!canRunExtract && pages.length > 0 && (
                 <p className="text-center text-xs text-slate-500">
-                  Scan more pages or tap &quot;Done scanning&quot; to continue.
+                  {scan.uploadPreparing
+                    ? "Preparing panoramic image for upload…"
+                    : pages.length === 1 && !sessionComplete
+                      ? 'Scan more pages or tap "Done scanning" to continue.'
+                      : "Waiting for stitched preview…"}
                 </p>
               )}
             </>

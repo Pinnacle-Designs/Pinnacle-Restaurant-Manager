@@ -5,6 +5,7 @@ import { Upload, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui";
 import { PHOTO_CATEGORIES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { submitScanForm } from "@/lib/scan/submit-scan";
 import { DocumentQuickScanCapture } from "@/components/scan/DocumentQuickScanCapture";
 import { useDocumentQuickScan } from "@/hooks/useDocumentQuickScan";
 
@@ -46,11 +47,7 @@ export function PhotoUploader({
         ...(description ? { description } : {}),
       });
 
-      const res = await fetch("/api/photos", { method: "POST", body: formData });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Upload failed");
-      }
+      await submitScanForm("/api/photos", formData);
 
       scan.clear();
       setTitle("");

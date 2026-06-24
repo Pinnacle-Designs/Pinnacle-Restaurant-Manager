@@ -13,6 +13,7 @@ import {
   base64Input,
   filesToBase64,
   parseScanFormData,
+  visionScanFromParsed,
 } from "@/lib/scan/parse-scan-form";
 
 export async function GET(request: NextRequest) {
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     const locationId = await getLocationIdFromRequest(request);
     const formData = await request.formData();
-    const { files, panoramic, pageCount } = parseScanFormData(formData);
+    const parsed = parseScanFormData(formData);
     const category = (formData.get("category") as string) || "OTHER";
 
     if (category === "RECEIPT" && !(await userCan(user, "view_receipts"))) {
@@ -57,13 +58,11 @@ export async function POST(request: NextRequest) {
     const description = formData.get("description") as string | null;
     const analyzeWithAI = formData.get("analyzeWithAI") === "true";
 
-    if (files.length === 0) {
+    if (parsed.files.length === 0) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    const explicitFile = formData.get("file");
-    const uploadFile =
-      explicitFile instanceof File && explicitFile.size > 0 ? explicitFile : files[0];
+    const uploadFile = parsed.uploadFile ?? parsed.files[0];
     const buffer = Buffer.from(await uploadFile.arrayBuffer());
     const ext = uploadFile.name.split(".").pop() || "jpg";
     const filename = `${uuidv4()}.${ext}`;
@@ -78,11 +77,9 @@ export async function POST(request: NextRequest) {
     let tags: string[] = [];
 
     if (analyzeWithAI) {
-      const base64Images = await filesToBase64(files);
-      const analysis = await analyzePhoto(base64Input(base64Images), category, {
-        panoramic: panoramic && base64Images.length === 1,
-        pageCount,
-      });
+      const base64Images = await filesToBase64(parsed.files);
+      const vision = visionScanFromParsed(parsed);
+      const analysis = await analyzePhoto(base64Input(base64Images), category, vision);
       aiAnalysis = analysis.description;
       tags = analysis.tags;
       if (!photoTitle) photoTitle = analysis.suggestedTitle;

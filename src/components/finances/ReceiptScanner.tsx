@@ -5,6 +5,7 @@ import { Loader2, Receipt, CheckCircle } from "lucide-react";
 import { Button, Badge } from "@/components/ui";
 import { Input, Select, FormField } from "@/components/ui/form";
 import { formatCurrency } from "@/lib/utils";
+import { submitScanForm } from "@/lib/scan/submit-scan";
 import { DocumentScanModeToggle } from "@/components/scan/DocumentScanModeToggle";
 import { DocumentQuickScanCapture } from "@/components/scan/DocumentQuickScanCapture";
 import { useDocumentQuickScan } from "@/hooks/useDocumentQuickScan";
@@ -65,10 +66,11 @@ export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
 
     try {
       const formData = scan.buildScanFormData();
-      const res = await fetch("/api/receipts/scan", { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Scan failed");
-
+      const data = await submitScanForm<{
+        receipt: ReceiptData;
+        pageCount?: number;
+        panoramic?: boolean;
+      }>("/api/receipts/scan", formData);
       setReceiptData(data.receipt);
       setPageCountScanned(data.pageCount ?? scan.getPageCount());
       setWasPanoramic(Boolean(data.panoramic));
@@ -94,9 +96,11 @@ export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
       });
       if (saveFile && !formData.has("file")) formData.append("file", saveFile);
 
-      const res = await fetch("/api/receipts/scan", { method: "PUT", body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Save failed");
+      const data = await submitScanForm<{ expense: Expense }>(
+        "/api/receipts/scan",
+        formData,
+        "PUT"
+      );
 
       onExpenseCreated(data.expense);
       resetAll();

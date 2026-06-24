@@ -57,6 +57,10 @@ a { color: inherit; text-decoration: none; }
 
 body.nav-open { overflow: hidden; }
 
+body.nav-open .nav {
+  z-index: 110;
+}
+
 .nav-container { position: relative; }
 
 .nav-inner {
@@ -257,11 +261,11 @@ body.nav-open { overflow: hidden; }
   transform: translateY(-7px) rotate(-45deg);
 }
 
-/* Mobile menu panel */
+/* Mobile menu panel — rendered on document.body by site-nav.js */
 .nav-mobile-wrap {
   position: fixed;
   inset: 0;
-  z-index: 51;
+  z-index: 105;
 }
 
 .nav-mobile-wrap[hidden] {

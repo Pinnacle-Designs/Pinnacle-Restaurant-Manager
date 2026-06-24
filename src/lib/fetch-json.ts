@@ -12,6 +12,11 @@ export async function parseJsonResponse<T = Record<string, unknown>>(
   try {
     return JSON.parse(text) as T;
   } catch {
+    if (res.status === 413 || /request entity too large/i.test(text)) {
+      throw new Error(
+        "Photo is too large to upload. Use multi-page mode with fewer pages, or retake at a lower zoom."
+      );
+    }
     throw new Error(
       res.ok
         ? "Invalid response from server"

@@ -5,6 +5,9 @@ import { Loader2, CheckCircle, AlertTriangle, Mail, Lock, Camera } from "lucide-
 import { Button } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
 import { formatCurrency } from "@/lib/utils";
+import { submitScanForm } from "@/lib/scan/submit-scan";
+import { clientFetch } from "@/lib/embed-api-client";
+import { parseJsonResponse } from "@/lib/fetch-json";
 import { DocumentQuickScanCapture } from "@/components/scan/DocumentQuickScanCapture";
 import { useDocumentQuickScan } from "@/hooks/useDocumentQuickScan";
 
@@ -57,12 +60,12 @@ export function CreditMemoModal({
     setScanning(true);
     setError(null);
     try {
-      const res = await fetch("/api/purchasing/credits/scan", {
-        method: "POST",
-        body: scan.buildScanFormData(),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Scan failed");
+      const data = await submitScanForm<{ analysis: {
+        vendor: string;
+        estimatedAmount: number;
+        reason: string;
+        category: string;
+      } }>("/api/purchasing/credits/scan", scan.buildScanFormData());
       const a = data.analysis;
       setForm((f) => ({
         ...f,
@@ -97,8 +100,17 @@ export function CreditMemoModal({
       if (form.repEmail) formData.append("repEmail", form.repEmail);
       if (form.invoiceId) formData.append("invoiceId", form.invoiceId);
 
-      const res = await fetch("/api/purchasing/credits/request", { method: "POST", body: formData });
-      const data = await res.json();
+      const res = await clientFetch("/api/purchasing/credits/request", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await parseJsonResponse<{
+        credit: unknown;
+        email?: { status: string; message: string };
+        accountingLocked?: boolean;
+        repEmail?: string;
+        error?: string;
+      }>(res);
       if (!res.ok) throw new Error(data.error || "Submit failed");
       onSaved(data);
       onClose();

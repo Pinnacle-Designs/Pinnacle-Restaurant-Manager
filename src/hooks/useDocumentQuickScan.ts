@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import type { DocumentScanMode } from "@/components/scan/DocumentScanModeToggle";
-import { readFileAsDataUrl } from "@/lib/receipt/panorama-stitch";
+import { readFileAsDataUrl, compressFileForUpload } from "@/lib/receipt/panorama-stitch";
 import type { ScanPage, StitchedDocument } from "@/components/scan/MultiPageScanCapture";
 
 export function useDocumentQuickScan(initialMode: DocumentScanMode = "single") {
@@ -13,6 +13,7 @@ export function useDocumentQuickScan(initialMode: DocumentScanMode = "single") {
   const [stitched, setStitched] = useState<StitchedDocument | null>(null);
   const [sessionComplete, setSessionComplete] = useState(false);
   const [wasPanoramic, setWasPanoramic] = useState(false);
+  const [uploadPreparing, setUploadPreparing] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -20,7 +21,10 @@ export function useDocumentQuickScan(initialMode: DocumentScanMode = "single") {
   const hasCapture = scanMode === "multi" ? pages.length > 0 : !!preview;
   const canExtract =
     scanMode === "multi"
-      ? pages.length > 0 && (sessionComplete || pages.length > 1)
+      ? pages.length > 0 &&
+        !uploadPreparing &&
+        (sessionComplete || pages.length > 1) &&
+        (pages.length === 1 ? !!stitched : !!stitched?.file)
       : !!file && !!preview;
 
   const clear = useCallback(() => {
@@ -30,6 +34,7 @@ export function useDocumentQuickScan(initialMode: DocumentScanMode = "single") {
     setStitched(null);
     setSessionComplete(false);
     setWasPanoramic(false);
+    setUploadPreparing(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
   }, []);
@@ -44,8 +49,9 @@ export function useDocumentQuickScan(initialMode: DocumentScanMode = "single") {
   );
 
   const handleSingleFile = useCallback(async (selectedFile: File) => {
-    setFile(selectedFile);
-    setPreview(await readFileAsDataUrl(selectedFile));
+    const compressed = await compressFileForUpload(selectedFile);
+    setFile(compressed);
+    setPreview(await readFileAsDataUrl(compressed));
   }, []);
 
   const getSaveFile = useCallback((): File | null => {
@@ -68,12 +74,12 @@ export function useDocumentQuickScan(initialMode: DocumentScanMode = "single") {
       }
 
       if (scanMode === "multi") {
-        for (const page of pages) {
-          formData.append("files", page.file);
+        const uploadFile = stitched?.file ?? pages[0]?.file;
+        if (uploadFile) {
+          formData.append("file", uploadFile);
         }
         formData.append("pageCount", String(pages.length));
-        const saveFile = stitched?.file ?? pages[0]?.file;
-        if (saveFile) formData.append("file", saveFile);
+        formData.append("panoramic", "true");
       } else if (file) {
         formData.append("file", file);
         formData.append("pageCount", "1");
@@ -104,6 +110,8 @@ export function useDocumentQuickScan(initialMode: DocumentScanMode = "single") {
     setSessionComplete,
     wasPanoramic,
     setWasPanoramic,
+    uploadPreparing,
+    setUploadPreparing,
     hasCapture,
     canExtract,
     handleSingleFile,

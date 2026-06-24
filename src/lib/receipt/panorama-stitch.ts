@@ -1,6 +1,9 @@
 /** Max width for stitched document images (keeps uploads reasonable). */
 const MAX_STITCH_WIDTH = 1200;
 
+/** Stay under Vercel's ~4.5MB request body limit (leave room for form fields). */
+export const MAX_UPLOAD_BYTES = 3_500_000;
+
 export interface ScanPage {
   id: string;
   dataUrl: string;
@@ -24,6 +27,80 @@ export async function filesToScanPages(files: File[]): Promise<ScanPage[]> {
       file,
     }))
   );
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Could not create image"))),
+      "image/jpeg",
+      quality
+    );
+  });
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Could not read image"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Shrink JPEG until it fits the upload limit (for serverless body size caps). */
+async function compressImageElement(
+  img: HTMLImageElement,
+  maxBytes: number,
+  maxWidth = MAX_STITCH_WIDTH
+): Promise<{ blob: Blob; dataUrl: string; width: number; height: number }> {
+  const naturalW = img.naturalWidth || img.width;
+  const naturalH = img.naturalHeight || img.height;
+  let width = Math.min(maxWidth, naturalW);
+  let quality = 0.88;
+
+  for (let attempt = 0; attempt < 14; attempt++) {
+    const height = Math.round((width / naturalW) * naturalH);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas not supported");
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(img, 0, 0, width, height);
+
+    const blob = await canvasToBlob(canvas, quality);
+    if (blob.size <= maxBytes) {
+      return { blob, dataUrl: await blobToDataUrl(blob), width, height };
+    }
+
+    if (quality > 0.52) {
+      quality -= 0.08;
+    } else {
+      width = Math.max(480, Math.round(width * 0.85));
+      quality = 0.82;
+    }
+  }
+
+  throw new Error(
+    "Image is too large to upload even after compression. Try fewer pages or retake with less zoom."
+  );
+}
+
+/** Compress a camera/upload file before sending to scan APIs. */
+export async function compressFileForUpload(
+  file: File,
+  maxBytes = MAX_UPLOAD_BYTES
+): Promise<File> {
+  if (file.size <= maxBytes && file.type === "image/jpeg") {
+    return file;
+  }
+  const img = await loadImage(await readFileAsDataUrl(file));
+  const { blob } = await compressImageElement(img, maxBytes);
+  const base = file.name.replace(/\.[^.]+$/, "") || "scan";
+  return blobToFile(blob, `${base}.jpg`);
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -76,16 +153,15 @@ export async function stitchDocumentPanorama(
     y += h;
   }
 
-  const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (b) => (b ? resolve(b) : reject(new Error("Could not create image"))),
-      "image/jpeg",
-      0.88
-    );
-  });
+  const tempImg = await loadImage(canvas.toDataURL("image/jpeg", 0.88));
+  const compressed = await compressImageElement(tempImg, MAX_UPLOAD_BYTES, targetWidth);
 
-  return { dataUrl, blob, width: targetWidth, height: totalHeight };
+  return {
+    dataUrl: compressed.dataUrl,
+    blob: compressed.blob,
+    width: compressed.width,
+    height: compressed.height,
+  };
 }
 
 export const stitchReceiptPanorama = stitchDocumentPanorama;

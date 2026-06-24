@@ -5,6 +5,7 @@ import { Loader2, CheckCircle, Scale } from "lucide-react";
 import { Button } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
 import { formatCurrency } from "@/lib/utils";
+import { submitScanForm } from "@/lib/scan/submit-scan";
 import { showCriticalNotifications } from "@/lib/notifications";
 import { DocumentQuickScanCapture } from "@/components/scan/DocumentQuickScanCapture";
 import { useDocumentQuickScan } from "@/hooks/useDocumentQuickScan";
@@ -60,12 +61,11 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
     setScanning(true);
     setError(null);
     try {
-      const res = await fetch("/api/purchasing/invoices/scan", {
-        method: "POST",
-        body: scan.buildScanFormData(),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Scan failed");
+      const data = await submitScanForm<{
+        invoice: InvoiceData;
+        pageCount?: number;
+        panoramic?: boolean;
+      }>("/api/purchasing/invoices/scan", scan.buildScanFormData());
       setInvoiceData(data.invoice);
       setPageCountScanned(data.pageCount ?? scan.getPageCount());
       setWasPanoramic(Boolean(data.panoramic));
@@ -99,9 +99,11 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
       });
       if (saveFile && !formData.has("file")) formData.append("file", saveFile);
 
-      const res = await fetch("/api/purchasing/invoices/scan", { method: "PUT", body: formData });
-      const data = (await res.json()) as InvoiceSaveResult;
-      if (!res.ok) throw new Error((data as { error?: string }).error || "Save failed");
+      const data = await submitScanForm<InvoiceSaveResult>(
+        "/api/purchasing/invoices/scan",
+        formData,
+        "PUT"
+      );
 
       if (data.pushNotifications?.length) {
         await showCriticalNotifications(data.pushNotifications);
