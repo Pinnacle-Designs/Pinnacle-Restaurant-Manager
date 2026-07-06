@@ -6,6 +6,7 @@
   var DEFAULT_PATH = "/dashboard";
   var PROBE_PORTS = ["3000", "3001", "3002", "3003", "3004", "3005"];
   var PROBE_TIMEOUT_MS = 1200;
+  var EMBED_READY_MESSAGE_TYPE = "pinnacle-embed-ready";
 
   function isLocalHost() {
     var host = location.hostname;
@@ -169,6 +170,28 @@
     );
   }
 
+  function iframeEmbedReady(path, search) {
+    if (!path || path === "/embed" || path === "/api/embed/launch") return false;
+    if (iframeHasEmbed(search)) return true;
+    if (path === "/dashboard" || path === "/login") return true;
+    return search.indexOf("_st=") !== -1;
+  }
+
+  function trustedEmbedOrigin(origin) {
+    if (!origin) return false;
+    if (origin === location.origin) return true;
+    var cfg = window.PINNACLE_CONFIG || {};
+    var configured = (cfg.appUrl || "").replace(/\/$/, "");
+    if (configured) {
+      try {
+        if (origin === new URL(configured).origin) return true;
+      } catch (err) {
+        /* ignore */
+      }
+    }
+    return false;
+  }
+
   function createLoadingOverlay(message, sub) {
     var el = document.createElement("div");
     el.className = "hero-app-loading";
@@ -273,6 +296,14 @@
       iframe.src = src + (iframeKey ? "&_=" + iframeKey : "");
       iframe.setAttribute("allow", "clipboard-write");
 
+      function handleReadyMessage(event) {
+        if (!event.data || event.data.type !== EMBED_READY_MESSAGE_TYPE) return;
+        if (!trustedEmbedOrigin(event.origin)) return;
+        markReady(loading);
+      }
+
+      window.addEventListener("message", handleReadyMessage);
+
       iframe.addEventListener("load", function () {
         if (ready || failed) return;
         loadCount += 1;
@@ -281,6 +312,7 @@
           var search = frameWin && frameWin.location ? frameWin.location.search : "";
           var framePath = frameWin && frameWin.location ? frameWin.location.pathname : "";
           if (framePath === "/api/embed/launch" && loadCount >= 2) {
+            window.removeEventListener("message", handleReadyMessage);
             markFailed(
               loading,
               isProductionSite()
@@ -291,21 +323,19 @@
             );
             return;
           }
-          if (
-            framePath !== "/embed" &&
-            framePath !== "/api/embed/launch" &&
-            (iframeHasEmbed(search) ||
-              framePath === "/dashboard" ||
-              framePath === "/login")
-          ) {
+          if (iframeEmbedReady(framePath, search)) {
+            window.removeEventListener("message", handleReadyMessage);
             markReady(loading);
             return;
           }
         } catch (err) {
           if (loadCount >= 1) {
             setTimeout(function () {
-              if (!ready && !failed) markReady(loading);
-            }, 1500);
+              if (!ready && !failed) {
+                window.removeEventListener("message", handleReadyMessage);
+                markReady(loading);
+              }
+            }, 1200);
           }
         }
       });
@@ -435,7 +465,17 @@
       modalController = null;
     }
 
-    connectApp();
+    connectApp().catch(function (err) {
+      console.error("Live demo failed to start:", err);
+      heroSlot.innerHTML = "";
+      heroSlot.appendChild(
+        createFallback(
+          isProductionSite()
+            ? productionErrorMessage()
+            : "Demo failed to start. Stop other <code>npm run dev</code> instances, restart on one port, then reload."
+        )
+      );
+    });
 
     if (expandBtn) {
       expandBtn.addEventListener("click", function (e) {

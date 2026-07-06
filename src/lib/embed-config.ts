@@ -88,9 +88,8 @@ export function getMarketingFrameAncestors(): string[] {
   const githubPages = process.env.GITHUB_PAGES_ORIGIN?.trim();
   if (githubPages) origins.push(githubPages);
 
-  // GitHub Pages — Pinnacle-Designs org project site + any *.github.io host
+  // GitHub Pages — explicit project site (CSP frame-ancestors does not support *.host wildcards)
   origins.push("https://pinnacle-designs.github.io");
-  origins.push("https://*.github.io");
 
   // Vercel production + preview deployments (docs at /docs on same project)
   const vercelUrl = process.env.VERCEL_URL?.trim();

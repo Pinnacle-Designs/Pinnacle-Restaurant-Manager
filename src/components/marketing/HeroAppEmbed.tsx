@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Maximize2, X } from "lucide-react";
 import { embedLaunchUrl } from "@/lib/embed-config";
+import { EMBED_READY_MESSAGE_TYPE, EMBED_SESSION_PARAM } from "@/lib/embed-constants";
 import { useEmbedChrome } from "@/hooks/useEmbedChrome";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +20,26 @@ function iframeHasEmbed(search: string): boolean {
     search.includes("embed=full") ||
     search.includes("embed=1")
   );
+}
+
+function iframeEmbedReady(path: string, search: string): boolean {
+  if (!path || path === "/embed" || path === "/api/embed/launch") return false;
+  if (iframeHasEmbed(search)) return true;
+  if (path === "/dashboard" || path === "/login") return true;
+  return search.includes(`${EMBED_SESSION_PARAM}=`);
+}
+
+function trustedEmbedOrigin(origin: string): boolean {
+  if (!origin) return false;
+  if (origin === window.location.origin) return true;
+  try {
+    const configured = (window as Window & { PINNACLE_CONFIG?: { appUrl?: string } })
+      .PINNACLE_CONFIG?.appUrl;
+    if (configured && origin === new URL(configured).origin) return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
 }
 
 export function HeroAppEmbed({
@@ -72,6 +93,23 @@ export function HeroAppEmbed({
     };
   }, [expanded, closeModal]);
 
+  const markEmbedReady = useCallback(() => {
+    if (readyRef.current) return;
+    readyRef.current = true;
+    setLoading(false);
+    setError(null);
+  }, []);
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type !== EMBED_READY_MESSAGE_TYPE) return;
+      if (!trustedEmbedOrigin(event.origin)) return;
+      markEmbedReady();
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [markEmbedReady]);
+
   useEffect(() => {
     if (!loading) return;
     const timer = window.setTimeout(() => {
@@ -95,20 +133,18 @@ export function HeroAppEmbed({
         setLoading(false);
         return;
       }
-      if (path !== "/embed" && path !== "/api/embed/launch" && iframeHasEmbed(search)) {
-        readyRef.current = true;
-        setLoading(false);
-        setError(null);
+      if (iframeEmbedReady(path, search)) {
+        markEmbedReady();
+        return;
       }
     } catch {
-      if (loadCountRef.current >= 1) {
-        window.setTimeout(() => {
-          if (!readyRef.current) {
-            readyRef.current = true;
-            setLoading(false);
-          }
-        }, 1500);
-      }
+      /* cross-origin — postMessage or fallback below */
+    }
+
+    if (loadCountRef.current >= 1) {
+      window.setTimeout(() => {
+        if (!readyRef.current) markEmbedReady();
+      }, 1200);
     }
   };
 

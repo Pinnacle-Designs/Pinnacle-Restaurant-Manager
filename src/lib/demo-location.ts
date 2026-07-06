@@ -6,6 +6,8 @@ import {
 } from "./demo-email";
 import { PLAN_DEMO_USERS } from "./demo-users";
 
+const demoWorkspaceLocks = new Map<string, Promise<void>>();
+
 export const SEEDED_DEMO_LOCATION_NAMES = [
   DEMO_LOCATION_SAMPLE,
   "Demo - Sample Data",
@@ -81,8 +83,7 @@ export async function resolveDemoAccountLocationId(
   return resolveOwnerDemoLocationId(userId, currentLocationId);
 }
 
-/** Idempotently ensure Smoky Oak has full demo data + Pro billing for embed/live demo. */
-export async function ensureFullDemoWorkspace(
+async function runEnsureFullDemoWorkspace(
   locationId: string,
   ownerUserId: string
 ): Promise<void> {
@@ -111,6 +112,26 @@ export async function ensureFullDemoWorkspace(
       console.error("[demo] seedDemoExtras failed (non-fatal):", err);
     }
   }
+}
+
+/** Idempotently ensure Smoky Oak has full demo data + Pro billing for embed/live demo. */
+export async function ensureFullDemoWorkspace(
+  locationId: string,
+  ownerUserId: string
+): Promise<void> {
+  const existing = demoWorkspaceLocks.get(locationId);
+  if (existing) {
+    await existing;
+    return;
+  }
+
+  const work = runEnsureFullDemoWorkspace(locationId, ownerUserId).finally(() => {
+    if (demoWorkspaceLocks.get(locationId) === work) {
+      demoWorkspaceLocks.delete(locationId);
+    }
+  });
+  demoWorkspaceLocks.set(locationId, work);
+  await work;
 }
 
 /** Fill in sample data when the runtime DB is empty or thin (e.g. missed build seed). */

@@ -50,6 +50,26 @@
 
       return originalFetch(input, init);
     };
+
+    function notifyEmbedParentReady() {
+      try {
+        if (window.parent === window) return;
+        var path = location.pathname;
+        if (path === "/api/embed/launch" || path === "/embed") return;
+        window.parent.postMessage(
+          { type: "pinnacle-embed-ready", path: path },
+          location.origin
+        );
+      } catch (e) {
+        /* ignore */
+      }
+    }
+
+    notifyEmbedParentReady();
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", notifyEmbedParentReady);
+    }
+    window.addEventListener("load", notifyEmbedParentReady);
   } catch (e) {
     /* ignore */
   }
