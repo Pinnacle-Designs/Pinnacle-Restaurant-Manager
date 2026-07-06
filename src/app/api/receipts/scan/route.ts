@@ -5,7 +5,7 @@ import { requirePermission } from "@/lib/api-auth";
 import { getRequestPlan } from "@/lib/plan-api";
 import { persistUploadFile, uploadErrorMessage } from "@/lib/persist-upload";
 import { resolveReceiptScan } from "@/lib/ocr/resolve-scan";
-import { isDocumentOcrAvailable } from "@/lib/ocr/capabilities";
+import { isAiOcrConfigured } from "@/lib/ocr/capabilities";
 import {
   GROWTH_OCR_MONTHLY_LIMIT,
   PLAN_BY_ID,
@@ -22,6 +22,9 @@ import {
   scanUploadTooLarge,
   visionScanFromParsed,
 } from "@/lib/scan/parse-scan-form";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   const { error } = await requirePermission(request, "view_receipts");
@@ -85,7 +88,7 @@ export async function POST(request: NextRequest) {
       receipt,
       pageCount: parsed.pageCount,
       panoramic: vision.panoramic || parsed.stitchedMulti,
-      ocrConfigured: isDocumentOcrAvailable(),
+      ocrConfigured: isAiOcrConfigured(),
       ocrSource: source,
     });
   } catch (error) {

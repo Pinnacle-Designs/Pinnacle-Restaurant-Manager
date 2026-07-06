@@ -27,6 +27,29 @@ function emptyReceipt(today = new Date().toISOString().split("T")[0]!): ReceiptD
   };
 }
 
+async function extractServerText(imageBase64: string | string[]): Promise<string | null> {
+  try {
+    const { extractTextFromBase64Images } = await import("./server-extract");
+    const text = (await extractTextFromBase64Images(imageBase64)).trim();
+    return text || null;
+  } catch (err) {
+    console.warn("Server OCR fallback failed:", err);
+    return null;
+  }
+}
+
+async function resolveFromText(
+  text: string,
+  kind: "invoice" | "receipt"
+): Promise<{ invoice?: InvoiceData; receipt?: ReceiptData; useful: boolean }> {
+  if (kind === "invoice") {
+    const invoice = parseInvoiceFromText(text);
+    return { invoice, useful: hasUsefulInvoiceData(invoice) };
+  }
+  const receipt = parseReceiptFromText(text);
+  return { receipt, useful: hasUsefulReceiptData(receipt) };
+}
+
 export async function resolveInvoiceScan(
   imageBase64: string | string[],
   options: { panoramic?: boolean; multiPage?: boolean; pageCount?: number },
@@ -39,12 +62,25 @@ export async function resolveInvoiceScan(
     }
   }
 
-  const text = ocrText?.trim();
-  if (text) {
-    const local = parseInvoiceFromText(text);
-    if (hasUsefulInvoiceData(local)) {
-      return { invoice: local, source: "local" };
+  const clientText = ocrText?.trim();
+  if (clientText) {
+    const parsed = await resolveFromText(clientText, "invoice");
+    if (parsed.useful && parsed.invoice) {
+      return { invoice: parsed.invoice, source: "local" };
     }
+  }
+
+  const serverText = await extractServerText(imageBase64);
+  if (serverText) {
+    const parsed = await resolveFromText(serverText, "invoice");
+    if (parsed.useful && parsed.invoice) {
+      return { invoice: parsed.invoice, source: "local" };
+    }
+  }
+
+  if (clientText || serverText) {
+    const best = parseInvoiceFromText(clientText || serverText || "");
+    return { invoice: best, source: "local" };
   }
 
   return { invoice: emptyInvoice(), source: "none" };
@@ -62,12 +98,25 @@ export async function resolveReceiptScan(
     }
   }
 
-  const text = ocrText?.trim();
-  if (text) {
-    const local = parseReceiptFromText(text);
-    if (hasUsefulReceiptData(local)) {
-      return { receipt: local, source: "local" };
+  const clientText = ocrText?.trim();
+  if (clientText) {
+    const parsed = await resolveFromText(clientText, "receipt");
+    if (parsed.useful && parsed.receipt) {
+      return { receipt: parsed.receipt, source: "local" };
     }
+  }
+
+  const serverText = await extractServerText(imageBase64);
+  if (serverText) {
+    const parsed = await resolveFromText(serverText, "receipt");
+    if (parsed.useful && parsed.receipt) {
+      return { receipt: parsed.receipt, source: "local" };
+    }
+  }
+
+  if (clientText || serverText) {
+    const best = parseReceiptFromText(clientText || serverText || "");
+    return { receipt: best, source: "local" };
   }
 
   return { receipt: emptyReceipt(), source: "none" };

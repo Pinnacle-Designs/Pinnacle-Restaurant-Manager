@@ -15,6 +15,9 @@ import {
   visionScanFromParsed,
 } from "@/lib/scan/parse-scan-form";
 
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   const { error } = await requirePermission(request, "manage_inventory");
   if (error) return error;

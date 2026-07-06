@@ -53,6 +53,7 @@ export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
   const [pageCountScanned, setPageCountScanned] = useState(1);
   const [wasPanoramic, setWasPanoramic] = useState(false);
   const [ocrSource, setOcrSource] = useState<OcrSource | null>(null);
+  const [ocrProgress, setOcrProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const resetAll = () => {
@@ -61,12 +62,14 @@ export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
     setPageCountScanned(1);
     setWasPanoramic(false);
     setOcrSource(null);
+    setOcrProgress(null);
     setError(null);
   };
 
   const scanReceipt = async () => {
     setScanning(true);
     setError(null);
+    setOcrProgress("Starting scan…");
 
     try {
       const formData = scan.buildScanFormData();
@@ -75,7 +78,9 @@ export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
         pageCount?: number;
         panoramic?: boolean;
         ocrSource?: OcrSource;
-      }>("/api/receipts/scan", formData);
+      }>("/api/receipts/scan", formData, "POST", {
+        onOcrProgress: setOcrProgress,
+      });
       setReceiptData(data.receipt);
       setOcrSource(data.ocrSource ?? null);
       setPageCountScanned(data.pageCount ?? scan.getPageCount());
@@ -84,6 +89,7 @@ export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
       setError(err instanceof Error ? err.message : "Scan failed");
     } finally {
       setScanning(false);
+      setOcrProgress(null);
     }
   };
 
@@ -135,24 +141,29 @@ export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
 
       <div className="mt-4">
         {!receiptData ? (
-          <DocumentQuickScanCapture
-            scan={scan}
-            documentLabel="receipt"
-            accent="green"
-            disabled={scanning || saving}
-            hideToggle
-            showExtract
-            extracting={scanning}
-            onExtract={scanReceipt}
-            extractLabel={
-              scan.scanMode === "multi"
-                ? `Extract from ${scan.pages.length} page${scan.pages.length === 1 ? "" : "s"} (panoramic stitch)`
-                : scan.scanMode === "panorama"
-                  ? "Extract panoramic receipt"
-                  : "Extract Receipt Data"
-            }
-            onCancel={scan.hasCapture ? resetAll : undefined}
-          />
+          <>
+            <DocumentQuickScanCapture
+              scan={scan}
+              documentLabel="receipt"
+              accent="green"
+              disabled={scanning || saving}
+              hideToggle
+              showExtract
+              extracting={scanning}
+              onExtract={scanReceipt}
+              extractLabel={
+                scan.scanMode === "multi"
+                  ? `Extract from ${scan.pages.length} page${scan.pages.length === 1 ? "" : "s"} (panoramic stitch)`
+                  : scan.scanMode === "panorama"
+                    ? "Extract panoramic receipt"
+                    : "Extract Receipt Data"
+              }
+              onCancel={scan.hasCapture ? resetAll : undefined}
+            />
+            {ocrProgress && scanning && (
+              <p className="mt-3 text-center text-sm text-slate-500">{ocrProgress}</p>
+            )}
+          </>
         ) : (
           <ExtractedForm
             receiptData={receiptData}

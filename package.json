@@ -28,12 +28,13 @@
     "vercel:env:push": "node scripts/push-vercel-env.mjs",
     "production:checklist": "tsx scripts/production-checklist.ts --write-env",
     "production:verify": "tsx scripts/verify-production-readiness.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate && node scripts/copy-tesseract-public.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.5.0",
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.1",
+    "@tesseract.js-data/eng": "^1.0.0",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "@zxing/browser": "^0.2.0",

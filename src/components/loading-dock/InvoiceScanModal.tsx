@@ -87,18 +87,22 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
   const [pageCountScanned, setPageCountScanned] = useState(1);
   const [wasPanoramic, setWasPanoramic] = useState(false);
   const [ocrSource, setOcrSource] = useState<OcrSource | null>(null);
+  const [ocrProgress, setOcrProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const scanInvoice = async () => {
     setScanning(true);
     setError(null);
+    setOcrProgress("Starting scan…");
     try {
       const data = await submitScanForm<{
         invoice: InvoiceData;
         pageCount?: number;
         panoramic?: boolean;
         ocrSource?: OcrSource;
-      }>("/api/purchasing/invoices/scan", scan.buildScanFormData());
+      }>("/api/purchasing/invoices/scan", scan.buildScanFormData(), "POST", {
+        onOcrProgress: setOcrProgress,
+      });
       setInvoiceData(normalizeInvoiceData(data.invoice));
       setOcrSource(data.ocrSource ?? null);
       setPageCountScanned(data.pageCount ?? scan.getPageCount());
@@ -107,6 +111,7 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
       setError(err instanceof Error ? err.message : "Scan failed");
     } finally {
       setScanning(false);
+      setOcrProgress(null);
     }
   };
 
@@ -216,6 +221,9 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
               }
               onCancel={scan.hasCapture ? scan.clear : undefined}
             />
+            {ocrProgress && scanning && (
+              <p className="mt-3 text-center text-sm text-slate-500">{ocrProgress}</p>
+            )}
           </>
         )}
 

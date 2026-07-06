@@ -16,12 +16,12 @@ export async function submitScanForm<T = Record<string, unknown>>(
   url: string,
   formData: FormData,
   method: "POST" | "PUT" = "POST",
-  options?: { runLocalOcr?: boolean }
+  options?: { runLocalOcr?: boolean; onOcrProgress?: (message: string) => void }
 ): Promise<T> {
   validateScanFormData(formData);
   if (method === "POST" && options?.runLocalOcr !== false) {
     const { appendClientOcrText } = await import("@/lib/ocr/client-extract");
-    await appendClientOcrText(formData);
+    await appendClientOcrText(formData, options?.onOcrProgress);
   }
   const res = await clientFetch(url, { method, body: formData });
   const data = await parseJsonResponse<T & { error?: string }>(res);

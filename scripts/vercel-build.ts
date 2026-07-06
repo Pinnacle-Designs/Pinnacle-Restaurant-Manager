@@ -39,6 +39,7 @@ function main() {
     run("npx prisma db push --skip-generate");
   }
 
+  run("node scripts/copy-tesseract-public.mjs");
   run("next build");
 }
 

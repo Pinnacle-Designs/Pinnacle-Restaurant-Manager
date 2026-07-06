@@ -5,10 +5,10 @@ const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
-import { isDocumentOcrAvailable } from "@/lib/ocr/capabilities";
+import { isAiOcrConfigured } from "@/lib/ocr/capabilities";
 
 export function isInvoiceOcrConfigured(): boolean {
-  return isDocumentOcrAvailable();
+  return isAiOcrConfigured();
 }
 
 export interface InvoiceLineData {
