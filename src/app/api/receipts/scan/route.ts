@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { analyzeReceipt } from "@/lib/ai";
 import { getLocationIdFromRequest } from "@/lib/location";
 import { requirePermission } from "@/lib/api-auth";
 import { getRequestPlan } from "@/lib/plan-api";
 import { persistUploadFile, uploadErrorMessage } from "@/lib/persist-upload";
+import { resolveReceiptScan } from "@/lib/ocr/resolve-scan";
+import { isDocumentOcrAvailable } from "@/lib/ocr/capabilities";
 import {
   GROWTH_OCR_MONTHLY_LIMIT,
   PLAN_BY_ID,
@@ -17,6 +18,7 @@ import {
   base64Input,
   filesToBase64,
   parseScanFormData,
+  readOcrTextFromForm,
   scanUploadTooLarge,
   visionScanFromParsed,
 } from "@/lib/scan/parse-scan-form";
@@ -72,16 +74,23 @@ export async function POST(request: NextRequest) {
 
     const base64Images = await filesToBase64(parsed.files);
     const vision = visionScanFromParsed(parsed);
-    const receipt = await analyzeReceipt(base64Input(base64Images), vision);
+    const ocrText = readOcrTextFromForm(formData);
+    const { receipt, source } = await resolveReceiptScan(
+      base64Input(base64Images),
+      vision,
+      ocrText
+    );
 
     return NextResponse.json({
       receipt,
       pageCount: parsed.pageCount,
       panoramic: vision.panoramic || parsed.stitchedMulti,
+      ocrConfigured: isDocumentOcrAvailable(),
+      ocrSource: source,
     });
   } catch (error) {
     console.error("Receipt scan error:", error);
-    return NextResponse.json({ error: "Scan failed" }, { status: 500 });
+    return NextResponse.json({ error: uploadErrorMessage(error, "Scan failed") }, { status: 500 });
   }
 }
 

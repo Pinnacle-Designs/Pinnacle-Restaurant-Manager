@@ -6,8 +6,10 @@ import { Button } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
 import { formatCurrency } from "@/lib/utils";
 import { submitScanForm } from "@/lib/scan/submit-scan";
+import type { OcrSource } from "@/lib/ocr/capabilities";
 import { showCriticalNotifications } from "@/lib/notifications";
 import { DocumentQuickScanCapture } from "@/components/scan/DocumentQuickScanCapture";
+import { ScanOcrNotice } from "@/components/scan/ScanOcrNotice";
 import { useDocumentQuickScan } from "@/hooks/useDocumentQuickScan";
 
 function normalizeInvoiceData(raw: Partial<InvoiceData> | null | undefined): InvoiceData {
@@ -84,7 +86,7 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
   const [pageCountScanned, setPageCountScanned] = useState(1);
   const [wasPanoramic, setWasPanoramic] = useState(false);
-  const [ocrConfigured, setOcrConfigured] = useState(true);
+  const [ocrSource, setOcrSource] = useState<OcrSource | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const scanInvoice = async () => {
@@ -95,10 +97,10 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
         invoice: InvoiceData;
         pageCount?: number;
         panoramic?: boolean;
-        ocrConfigured?: boolean;
+        ocrSource?: OcrSource;
       }>("/api/purchasing/invoices/scan", scan.buildScanFormData());
       setInvoiceData(normalizeInvoiceData(data.invoice));
-      setOcrConfigured(data.ocrConfigured !== false);
+      setOcrSource(data.ocrSource ?? null);
       setPageCountScanned(data.pageCount ?? scan.getPageCount());
       setWasPanoramic(Boolean(data.panoramic));
     } catch (err) {
@@ -204,7 +206,9 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
               extracting={scanning}
               onExtract={scanInvoice}
               extractLabel={
-                scan.scanMode === "multi"
+                scanning
+                  ? "Reading text from photo…"
+                  : scan.scanMode === "multi"
                   ? `Extract from ${scan.pages.length} page${scan.pages.length === 1 ? "" : "s"} (panoramic stitch)`
                   : scan.scanMode === "panorama"
                     ? "Extract panoramic invoice"
@@ -217,13 +221,7 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
 
         {invoiceData && (
           <div className="space-y-3">
-            {!ocrConfigured && (
-              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                Automatic invoice OCR is not enabled on this server. Enter vendor, total, and line
-                items manually below. To enable AI extraction, set{" "}
-                <code className="rounded bg-amber-100 px-1">OPENAI_API_KEY</code> in production env.
-              </p>
-            )}
+            <ScanOcrNotice source={ocrSource} />
             {wasPanoramic && pageCountScanned <= 1 && (
               <p className="text-xs font-medium text-orange-700">Panoramic scan</p>
             )}

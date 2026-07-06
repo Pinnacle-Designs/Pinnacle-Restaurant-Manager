@@ -99,8 +99,8 @@ export function getIntegrationHealth(): IntegrationStatus[] {
       "OpenAI",
       "AI",
       openAi,
-      "OpenAI API enabled for vision and insights.",
-      "Rule-based AI fallback active — set OPENAI_API_KEY to enhance."
+      "OpenAI API enabled for enhanced AI vision and insights.",
+      "On-device OCR active for receipts and invoices. Set OPENAI_API_KEY for enhanced AI extraction."
     ),
     {
       id: "twilio",

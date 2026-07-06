@@ -8,7 +8,9 @@ import { formatCurrency } from "@/lib/utils";
 import { submitScanForm } from "@/lib/scan/submit-scan";
 import { DocumentScanModeToggle } from "@/components/scan/DocumentScanModeToggle";
 import { DocumentQuickScanCapture } from "@/components/scan/DocumentQuickScanCapture";
+import { ScanOcrNotice } from "@/components/scan/ScanOcrNotice";
 import { useDocumentQuickScan } from "@/hooks/useDocumentQuickScan";
+import type { OcrSource } from "@/lib/ocr/capabilities";
 
 interface Expense {
   id: string;
@@ -50,6 +52,7 @@ export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [pageCountScanned, setPageCountScanned] = useState(1);
   const [wasPanoramic, setWasPanoramic] = useState(false);
+  const [ocrSource, setOcrSource] = useState<OcrSource | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const resetAll = () => {
@@ -57,6 +60,7 @@ export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
     setReceiptData(null);
     setPageCountScanned(1);
     setWasPanoramic(false);
+    setOcrSource(null);
     setError(null);
   };
 
@@ -70,8 +74,10 @@ export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
         receipt: ReceiptData;
         pageCount?: number;
         panoramic?: boolean;
+        ocrSource?: OcrSource;
       }>("/api/receipts/scan", formData);
       setReceiptData(data.receipt);
+      setOcrSource(data.ocrSource ?? null);
       setPageCountScanned(data.pageCount ?? scan.getPageCount());
       setWasPanoramic(Boolean(data.panoramic));
     } catch (err) {
@@ -152,6 +158,7 @@ export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
             receiptData={receiptData}
             pageCountScanned={pageCountScanned}
             wasPanoramic={wasPanoramic || scan.scanMode === "panorama"}
+            ocrSource={ocrSource}
             saving={saving}
             onChange={setReceiptData}
             onClear={resetAll}
@@ -169,6 +176,7 @@ function ExtractedForm({
   receiptData,
   pageCountScanned,
   wasPanoramic,
+  ocrSource,
   saving,
   onChange,
   onClear,
@@ -177,6 +185,7 @@ function ExtractedForm({
   receiptData: ReceiptData;
   pageCountScanned: number;
   wasPanoramic: boolean;
+  ocrSource: OcrSource | null;
   saving: boolean;
   onChange: (data: ReceiptData) => void;
   onClear: () => void;
@@ -186,7 +195,7 @@ function ExtractedForm({
     <div className="space-y-4 rounded-lg border border-green-200 bg-green-50 p-4">
       <div className="flex flex-wrap items-center gap-2 text-green-700">
         <CheckCircle className="h-5 w-5" />
-        <span className="font-medium">Receipt data extracted</span>
+        <span className="font-medium">Receipt ready to review</span>
         {wasPanoramic && pageCountScanned <= 1 && (
           <Badge className="bg-green-200/80 text-green-900">Panoramic scan</Badge>
         )}
@@ -196,6 +205,7 @@ function ExtractedForm({
           </Badge>
         )}
       </div>
+      <ScanOcrNotice source={ocrSource} />
       <FormField label="Description">
         <Input
           value={receiptData.description}

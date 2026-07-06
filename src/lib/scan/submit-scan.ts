@@ -15,9 +15,14 @@ function validateScanFormData(formData: FormData): void {
 export async function submitScanForm<T = Record<string, unknown>>(
   url: string,
   formData: FormData,
-  method: "POST" | "PUT" = "POST"
+  method: "POST" | "PUT" = "POST",
+  options?: { runLocalOcr?: boolean }
 ): Promise<T> {
   validateScanFormData(formData);
+  if (method === "POST" && options?.runLocalOcr !== false) {
+    const { appendClientOcrText } = await import("@/lib/ocr/client-extract");
+    await appendClientOcrText(formData);
+  }
   const res = await clientFetch(url, { method, body: formData });
   const data = await parseJsonResponse<T & { error?: string }>(res);
   if (!res.ok) {

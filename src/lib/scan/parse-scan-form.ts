@@ -79,6 +79,13 @@ export function scanUploadTooLarge(files: File[]): string | null {
   return `File too large (${(oversized.size / 1_000_000).toFixed(1)}MB). Retake with fewer pages or less zoom.`;
 }
 
+export function readOcrTextFromForm(formData: FormData): string | null {
+  const raw = formData.get("ocrText");
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  return trimmed || null;
+}
+
 export interface VisionScanOptions {
   panoramic?: boolean;
   multiPage?: boolean;

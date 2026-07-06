@@ -296,8 +296,6 @@ export function AccountClient() {
     }
   };
 
-  const usesPinLogin = data?.profile.usesPinLogin === true;
-
   const submitBilling = async (includeTerms: boolean) => {
     if (!data?.billing.canManage) return;
     setBillingSaving(true);
@@ -400,6 +398,7 @@ export function AccountClient() {
   }
 
   const avatarUrl = data.profile.avatarUrl;
+  const usesPinLogin = data.profile.usesPinLogin === true;
 
   return (
     <div>
@@ -493,7 +492,9 @@ export function AccountClient() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-slate-800">{data.profile.name}</p>
-                  <p className="text-sm text-slate-500">{data.profile.email}</p>
+                  <p className="text-sm text-slate-500">
+                    {usesPinLogin ? "Team sign-in account" : data.profile.email}
+                  </p>
                   <div className="mt-2 flex flex-wrap gap-1">
                     <Badge className={ROLE_COLORS[data.profile.role]}>
                       {ROLE_LABELS[data.profile.role]}
@@ -515,10 +516,12 @@ export function AccountClient() {
                     required
                   />
                 </FormField>
-                <FormField label="Email">
-                  <Input value={data.profile.email} disabled className="bg-slate-50" />
-                  <p className="mt-1 text-xs text-slate-400">Contact support to change your email.</p>
-                </FormField>
+                {!usesPinLogin && (
+                  <FormField label="Email">
+                    <Input value={data.profile.email} disabled className="bg-slate-50" />
+                    <p className="mt-1 text-xs text-slate-400">Contact support to change your email.</p>
+                  </FormField>
+                )}
                 {profileMessage && (
                   <p
                     className={cn(

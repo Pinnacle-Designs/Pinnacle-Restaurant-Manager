@@ -25,7 +25,7 @@ export async function analyzePhoto(
 
   if (!openai) {
     return {
-      description: "AI analysis unavailable — set OPENAI_API_KEY in .env",
+      description: `${category} photo`,
       tags: [category.toLowerCase()],
       suggestedTitle: `${category} photo`,
     };
@@ -107,13 +107,7 @@ export async function analyzeReceipt(
   };
 
   if (!openai) {
-    return {
-      ...fallback,
-      description:
-        multiPage || panoramic
-          ? "Long receipt (manual entry required — set OPENAI_API_KEY)"
-          : "Receipt (manual entry required — set OPENAI_API_KEY)",
-    };
+    return fallback;
   }
 
   try {

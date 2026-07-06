@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { analyzeInvoice, isInvoiceOcrConfigured } from "@/lib/ai/analyze-invoice";
+import { isInvoiceOcrConfigured } from "@/lib/ai/analyze-invoice";
 import { getLocationIdFromRequest } from "@/lib/location";
 import { requirePermission } from "@/lib/api-auth";
 import { processDigitizedInvoice } from "@/lib/purchasing/invoice-digitization";
 import { persistUploadFile, uploadErrorMessage } from "@/lib/persist-upload";
+import { resolveInvoiceScan } from "@/lib/ocr/resolve-scan";
 import {
   base64Input,
   filesToBase64,
   parseScanFormData,
+  readOcrTextFromForm,
   scanUploadTooLarge,
   visionScanFromParsed,
 } from "@/lib/scan/parse-scan-form";
@@ -32,13 +34,19 @@ export async function POST(request: NextRequest) {
 
     const base64Images = await filesToBase64(parsed.files);
     const vision = visionScanFromParsed(parsed);
-    const invoice = await analyzeInvoice(base64Input(base64Images), vision);
+    const ocrText = readOcrTextFromForm(formData);
+    const { invoice, source } = await resolveInvoiceScan(
+      base64Input(base64Images),
+      vision,
+      ocrText
+    );
 
     return NextResponse.json({
       invoice,
       pageCount: parsed.pageCount,
       panoramic: vision.panoramic || parsed.stitchedMulti,
       ocrConfigured: isInvoiceOcrConfigured(),
+      ocrSource: source,
     });
   } catch (err) {
     console.error("Invoice scan error:", err);
