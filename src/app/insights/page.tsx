@@ -78,7 +78,8 @@ export default function InsightsPage() {
             <li>• Automated insights above flag issues between command center sessions</li>
           </ul>
           <p className="mt-4 text-xs text-slate-400">
-            Set OPENAI_API_KEY in .env for full AI capabilities.
+            Receipt and invoice scanning works without any API key. Add OpenAI in project settings
+            for enhanced AI insights and vision extraction.
           </p>
         </PageSection>
       </PageSectionShell>

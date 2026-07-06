@@ -83,6 +83,9 @@ function writeVercelEnvTemplate(env: Record<string, string>) {
     { key: "STRIPE_PRICE_GROWTH" },
     { key: "STRIPE_PRICE_PRO" },
     { key: "INTEGRATION_WEBHOOK_SECRET" },
+    { key: "UPSTASH_REDIS_REST_URL", note: "Optional — rate limiting in production" },
+    { key: "UPSTASH_REDIS_REST_TOKEN", note: "Optional — rate limiting in production" },
+    { key: "OPENAI_API_KEY", note: "Optional — enhanced AI vision and insights" },
     { key: "PLAN_BILLING_OPTIONAL", note: "false" },
     { key: "PLAN_TRIAL_DAYS", note: "14" },
     { key: "SUPPORT_EMAIL", note: "support@yourdomain.com" },
@@ -227,7 +230,10 @@ async function main() {
       npx vercel --prod
     Or connect GitHub repo in Vercel dashboard (auto-deploy on push)
   □ Test: sign up at ${APP_URL}/signup?plan=GROWTH → Stripe checkout → dashboard
+  □ Verify health: GET ${APP_URL}/api/health (database + OCR assets)
   □ Verify: GET ${APP_URL}/api/integrations/health (while logged in)
+  □ Team login: Staff → enable app login → employee signs in at /login (Team member tab)
+  □ Scan test: upload receipt/invoice without OPENAI_API_KEY — expect ocrSource "local"
 `);
 }
 

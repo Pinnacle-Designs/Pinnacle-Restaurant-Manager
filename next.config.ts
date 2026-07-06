@@ -11,7 +11,18 @@ const useSqlite =
 const nextConfig: NextConfig = {
   ...(useSqlite
     ? { outputFileTracingIncludes: { "/*": ["./prisma/deploy.sqlite"] } }
-    : {}),
+    : {
+        outputFileTracingIncludes: {
+          "/api/purchasing/invoices/scan": [
+            "./node_modules/tesseract.js/**",
+            "./node_modules/tesseract.js-core/**",
+          ],
+          "/api/receipts/scan": [
+            "./node_modules/tesseract.js/**",
+            "./node_modules/tesseract.js-core/**",
+          ],
+        },
+      }),
   async headers() {
     return [
       {
@@ -24,6 +35,17 @@ const nextConfig: NextConfig = {
       {
         source: "/manifest.json",
         headers: [{ key: "Cache-Control", value: "no-cache" }],
+      },
+      {
+        source: "/tesseract/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+          { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+        ],
+      },
+      {
+        source: "/tesseract/:path*.wasm",
+        headers: [{ key: "Content-Type", value: "application/wasm" }],
       },
     ];
   },

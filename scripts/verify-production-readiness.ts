@@ -2,7 +2,18 @@
  * Verify production readiness without starting the server.
  * Usage: npm run production:verify
  */
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { loadEnvFile } from "./production-checklist-utils";
+
+function tesseractAssetsReady(): boolean {
+  const base = join(process.cwd(), "public", "tesseract");
+  return (
+    existsSync(join(base, "worker.min.js")) &&
+    existsSync(join(base, "tesseract-core-simd-lstm.wasm.js")) &&
+    existsSync(join(base, "lang", "eng.traineddata.gz"))
+  );
+}
 
 async function main() {
   loadEnvFile();
@@ -24,6 +35,11 @@ async function main() {
     console.error(`FAIL: ${err instanceof Error ? err.message : err}\n`);
     process.exitCode = 1;
   }
+
+  console.log("=== OCR assets ===");
+  const ocrAssets = tesseractAssetsReady();
+  console.log(ocrAssets ? "PASS — public/tesseract assets present\n" : "FAIL — run npm install or node scripts/copy-tesseract-public.mjs\n");
+  if (!ocrAssets) process.exitCode = 1;
 
   console.log("=== Integration health ===");
   const summary = summarizeIntegrationHealth(getIntegrationHealth());

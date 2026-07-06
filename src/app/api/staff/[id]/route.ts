@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePermission, stripSalaries } from "@/lib/api-auth";
-import { hashClockPin, isValidClockPin, verifyClockPin } from "@/lib/timeclock/clock-pin";
+import { hashClockPin, isValidClockPin } from "@/lib/timeclock/clock-pin";
 import {
   assertPinAvailableAtLocation,
   enrichStaffForClient,

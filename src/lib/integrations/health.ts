@@ -4,6 +4,7 @@ import {
   squareConfigured,
 } from "@/lib/payments/providers";
 import { smtpConfigured } from "@/lib/email/smtp";
+import { isAiOcrConfigured, isDocumentOcrAvailable } from "@/lib/ocr/capabilities";
 
 export type IntegrationMode = "live" | "demo" | "optional" | "not_configured";
 
@@ -94,6 +95,16 @@ export function getIntegrationHealth(): IntegrationStatus[] {
         ? "Square OAuth configured for guest payments."
         : "Add SQUARE_APPLICATION_ID and SQUARE_APPLICATION_SECRET.",
     },
+    optionalLive(
+      "document_ocr",
+      "Document OCR (receipts & invoices)",
+      "Operations",
+      isDocumentOcrAvailable(),
+      isAiOcrConfigured()
+        ? "On-device OCR plus OpenAI vision for enhanced extraction."
+        : "On-device OCR active — no API key required for scan and upload.",
+      "On-device OCR active — no API key required for scan and upload."
+    ),
     optionalLive(
       "openai",
       "OpenAI",

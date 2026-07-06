@@ -5,7 +5,7 @@ import { requirePermission } from "@/lib/api-auth";
 import { getRequestPlan } from "@/lib/plan-api";
 import { persistUploadFile, uploadErrorMessage } from "@/lib/persist-upload";
 import { resolveReceiptScan } from "@/lib/ocr/resolve-scan";
-import { isAiOcrConfigured } from "@/lib/ocr/capabilities";
+import { buildScanOcrMeta } from "@/lib/ocr/scan-response";
 import {
   GROWTH_OCR_MONTHLY_LIMIT,
   PLAN_BY_ID,
@@ -88,8 +88,7 @@ export async function POST(request: NextRequest) {
       receipt,
       pageCount: parsed.pageCount,
       panoramic: vision.panoramic || parsed.stitchedMulti,
-      ocrConfigured: isAiOcrConfigured(),
-      ocrSource: source,
+      ...buildScanOcrMeta(source),
     });
   } catch (error) {
     console.error("Receipt scan error:", error);

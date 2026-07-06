@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { isInvoiceOcrConfigured } from "@/lib/ai/analyze-invoice";
 import { getLocationIdFromRequest } from "@/lib/location";
 import { requirePermission } from "@/lib/api-auth";
 import { processDigitizedInvoice } from "@/lib/purchasing/invoice-digitization";
 import { persistUploadFile, uploadErrorMessage } from "@/lib/persist-upload";
 import { resolveInvoiceScan } from "@/lib/ocr/resolve-scan";
+import { buildScanOcrMeta } from "@/lib/ocr/scan-response";
 import {
   base64Input,
   filesToBase64,
@@ -48,8 +48,7 @@ export async function POST(request: NextRequest) {
       invoice,
       pageCount: parsed.pageCount,
       panoramic: vision.panoramic || parsed.stitchedMulti,
-      ocrConfigured: isInvoiceOcrConfigured(),
-      ocrSource: source,
+      ...buildScanOcrMeta(source),
     });
   } catch (err) {
     console.error("Invoice scan error:", err);
