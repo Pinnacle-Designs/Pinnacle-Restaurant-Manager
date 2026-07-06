@@ -244,9 +244,11 @@
     var loadCount = 0;
     var rotateTimer = null;
     var errorTimer = null;
+    var detachReadyMessage = function () {};
 
     function markReady(loading) {
       if (ready || failed) return;
+      detachReadyMessage();
       ready = true;
       if (rotateTimer) clearTimeout(rotateTimer);
       if (errorTimer) clearTimeout(errorTimer);
@@ -255,6 +257,7 @@
 
     function markFailed(loading, message) {
       if (ready || failed) return;
+      detachReadyMessage();
       failed = true;
       if (rotateTimer) clearTimeout(rotateTimer);
       if (errorTimer) clearTimeout(errorTimer);
@@ -279,6 +282,7 @@
 
     function render() {
       container.innerHTML = "";
+      detachReadyMessage();
       ready = false;
       failed = false;
       loadCount = 0;
@@ -302,6 +306,9 @@
         markReady(loading);
       }
 
+      detachReadyMessage = function () {
+        window.removeEventListener("message", handleReadyMessage);
+      };
       window.addEventListener("message", handleReadyMessage);
 
       iframe.addEventListener("load", function () {
@@ -312,7 +319,6 @@
           var search = frameWin && frameWin.location ? frameWin.location.search : "";
           var framePath = frameWin && frameWin.location ? frameWin.location.pathname : "";
           if (framePath === "/api/embed/launch" && loadCount >= 2) {
-            window.removeEventListener("message", handleReadyMessage);
             markFailed(
               loading,
               isProductionSite()
@@ -324,17 +330,13 @@
             return;
           }
           if (iframeEmbedReady(framePath, search)) {
-            window.removeEventListener("message", handleReadyMessage);
             markReady(loading);
             return;
           }
         } catch (err) {
           if (loadCount >= 1) {
             setTimeout(function () {
-              if (!ready && !failed) {
-                window.removeEventListener("message", handleReadyMessage);
-                markReady(loading);
-              }
+              if (!ready && !failed) markReady(loading);
             }, 1200);
           }
         }

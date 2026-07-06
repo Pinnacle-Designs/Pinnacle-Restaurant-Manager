@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Pinnacle Restaurant Manager sales deck — all-in-one POS, kitchen, menu engineering, payroll, analytics, and AI for independent restaurants." />
+  <title>Pinnacle Restaurant Manager — Sales Deck</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" href="/docs/assets/logo.png" type="image/png" />
+  <style>
+    :root {
+      --ink: #0f172a;
+      --ink-soft: #1e293b;
+      --accent: #ea580c;
+      --accent-soft: #fff7ed;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --bg: #ffffff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      color: var(--ink);
+      background: #f1f5f9;
+      line-height: 1.5;
+    }
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background: var(--ink);
+      color: #fff;
+      font-size: 14px;
+    }
+    .toolbar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .toolbar button,
+    .toolbar a.btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .toolbar a.btn-outline {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.35);
+    }
+    .deck { max-width: 960px; margin: 0 auto; padding: 24px; }
+    .slide {
+      background: var(--bg);
+      border-radius: 16px;
+      min-height: 540px;
+      padding: 44px 52px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+      display: flex;
+      flex-direction: column;
+      page-break-after: always;
+      position: relative;
+      scroll-margin-top: 72px;
+    }
+    .slide.dark {
+      background: linear-gradient(145deg, #0f172a 0%, #1e293b 55%, #312e81 100%);
+      color: #f8fafc;
+    }
+    .slide.dark .eyebrow { color: #fdba74; }
+    .slide.dark .lead,
+    .slide.dark p,
+    .slide.dark li,
+    .slide.dark .footer-note,
+    .slide.dark .card p { color: #cbd5e1; }
+    .slide.dark .card {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .slide.dark .card h3 { color: #fff; }
+    .slide-num {
+      position: absolute;
+      top: 20px;
+      right: 24px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .slide.dark .slide-num { color: #94a3b8; }
+    .eyebrow {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+    h1 { font-size: 40px; line-height: 1.08; margin-bottom: 14px; letter-spacing: -0.02em; }
+    h2 { font-size: 30px; line-height: 1.15; margin-bottom: 14px; letter-spacing: -0.02em; }
+    h3 { font-size: 17px; margin-bottom: 6px; }
+    p.lead { font-size: 19px; color: var(--muted); max-width: 38em; }
+    ul, ol { margin-top: 16px; padding-left: 1.2rem; font-size: 16px; }
+    li { margin: 7px 0; }
+    li strong { color: var(--ink); }
+    .slide.dark li strong { color: #fff; }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 20px;
+    }
+    .card {
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 16px 18px;
+      border: 1px solid var(--line);
+    }
+    .card p { font-size: 14px; color: var(--muted); line-height: 1.45; }
+    .price {
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--accent);
+      line-height: 1.1;
+    }
+    .price span { font-size: 15px; font-weight: 600; color: var(--muted); }
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .stat {
+      text-align: center;
+      padding: 14px 10px;
+      border-radius: 12px;
+      background: var(--accent-soft);
+      border: 1px solid #fed7aa;
+    }
+    .stat strong {
+      display: block;
+      font-size: 28px;
+      color: var(--accent);
+      line-height: 1.1;
+    }
+    .stat span { font-size: 12px; color: var(--muted); font-weight: 600; }
+    .slide.dark .stat {
+      background: rgba(234, 88, 12, 0.15);
+      border-color: rgba(253, 186, 116, 0.35);
+    }
+    .slide.dark .stat span { color: #cbd5e1; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 18px;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #f8fafc; font-weight: 700; }
+    .timeline {
+      margin-top: 20px;
+      display: grid;
+      gap: 12px;
+    }
+    .timeline-item {
+      display: grid;
+      grid-template-columns: 100px 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+    .timeline-item .phase {
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+      padding-top: 2px;
+    }
+    .cover-logo {
+      width: 220px;
+      height: auto;
+      margin-bottom: 28px;
+    }
+    .tagline {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .slide.dark .tagline {
+      background: rgba(234, 88, 12, 0.2);
+      color: #fdba74;
+    }
+    .footer-note {
+      margin-top: auto;
+      padding-top: 20px;
+      font-size: 12px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+    }
+    .slide.dark .footer-note { border-color: rgba(255,255,255,0.12); }
+    .two-col-bullets {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-top: 8px;
+    }
+    .highlight-box {
+      margin-top: 18px;
+      padding: 14px 18px;
+      border-radius: 12px;
+      background: var(--accent-soft);
+      border-left: 4px solid var(--accent);
+      font-size: 15px;
+      color: var(--ink-soft);
+    }
+    .slide.dark .highlight-box {
+      background: rgba(234, 88, 12, 0.15);
+      color: #fde68a;
+      border-left-color: #fdba74;
+    }
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .cta-row a {
+      display: inline-block;
+      padding: 12px 22px;
+      border-radius: 10px;
+      font-weight: 700;
+      text-decoration: none;
+      font-size: 15px;
+    }
+    .cta-primary { background: var(--accent); color: #fff; }
+    .cta-secondary {
+      background: #fff;
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+    .slide.dark .cta-secondary {
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      border-color: rgba(255,255,255,0.2);
+    }
+    .check { color: var(--accent); font-weight: 700; }
+    .vs-table td:first-child { font-weight: 600; width: 38%; }
+    @media print {
+      body { background: #fff; }
+      .toolbar { display: none; }
+      .deck { padding: 0; max-width: none; }
+      .slide {
+        box-shadow: none;
+        border-radius: 0;
+        margin: 0;
+        min-height: 100vh;
+      }
+    }
+    @media (max-width: 800px) {
+      .grid-2, .grid-3, .stat-row, .two-col-bullets { grid-template-columns: 1fr; }
+      .slide { padding: 32px 28px; }
+      h1 { font-size: 32px; }
+      h2 { font-size: 26px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <span>Confidential — Pinnacle Designs LLC · Not listed on the public site</span>
+    <button type="button" onclick="window.print()">Download PDF</button>
+  </div>
+
+  <div class="deck" id="deck">
+
+    <!-- 1. Cover -->
+    <section class="slide dark" id="slide-1">
+      <span class="slide-num">01</span>
+      <img class="cover-logo" src="/docs/assets/logo-nav.svg" alt="Pinnacle Restaurant Manager" width="220" height="44" />
+      <p class="eyebrow">For restaurant owners &amp; operators</p>
+      <h1>Run your restaurant.<br />Know your numbers.</h1>
+      <p class="lead">One app for the lunch rush and month-end P&amp;L — POS, kitchen, menu engineering, staff, payroll, purchasing, 12-tab analytics, and an AI manager that answers profit questions in plain English.</p>
+      <span class="tagline">All-in-one · From $79/location/mo · Live demo in 60 seconds</span>
+      <p class="footer-note">Pinnacle Designs LLC · Try now: owner@pinnacle.com / demo1234</p>
+    </section>
+
+    <!-- 2. Pain -->
+    <section class="slide" id="slide-2">
+      <span class="slide-num">02</span>
+      <p class="eyebrow">Sound familiar?</p>
+      <h2>You&apos;re running a restaurant — not a spreadsheet factory</h2>
+      <div class="two-col-bullets">
+        <ul>
+          <li><strong>POS doesn&apos;t talk to inventory</strong> — recipe costs and depletion stay manual</li>
+          <li><strong>Menu lives in six places</strong> — POS, delivery apps, website, and QR menus drift apart</li>
+          <li><strong>Scheduling &amp; punches are separate</strong> — labor % is a guess until payroll closes</li>
+        </ul>
+        <ul>
+          <li><strong>Purchasing is reactive</strong> — invoices and vendor credits reconciled after the fact</li>
+          <li><strong>Reports need exports</strong> — you can&apos;t ask &quot;what&apos;s hurting profit this week?&quot; and get an answer</li>
+          <li><strong>Every new tool adds cost</strong> — scheduling, inventory, accounting, marketing — none share one brain</li>
+        </ul>
+      </div>
+      <div class="highlight-box">
+        Most independents lose <strong>10–15+ hours a week</strong> reconciling numbers instead of running the floor — while margin leaks go unnoticed until it&apos;s too late.
+      </div>
+    </section>
+
+    <!-- 3. Solution -->
+    <section class="slide dark" id="slide-3">
+      <span class="slide-num">03</span>
+      <p class="eyebrow">The answer</p>
+      <h2>One workspace from front-of-house to back office</h2>
+      <p class="lead">Pinnacle Restaurant Manager connects every action — an order, a punch, a waste log, a receipt photo — to live analytics and AI that reads your actual data.</p>
+      <div class="grid-3">
+        <div class="card"><h3>Serve &amp; sell</h3><p>POS, split checks, table map, walk-in flow, KDS routing, guest payments</p></div>
+        <div class="card"><h3>Menu as profit lever</h3><p>Sub-recipes, rolled-up costing, engineering matrix, 6-channel sync, real-time 86</p></div>
+        <div class="card"><h3>Run the business</h3><p>Payroll, purchasing, loading dock, integrations, 12-tab analytics, AI Command Center</p></div>
+      </div>
+      <div class="stat-row">
+        <div class="stat"><strong>12</strong><span>Analytics modules</span></div>
+        <div class="stat"><strong>350+</strong><span>AI questions</span></div>
+        <div class="stat"><strong>6</strong><span>Menu channels</span></div>
+        <div class="stat"><strong>&lt;2 min</strong><span>Setup time</span></div>
+      </div>
+    </section>
+
+    <!-- 4. Live demo -->
+    <section class="slide" id="slide-4">
+      <span class="slide-num">04</span>
+      <p class="eyebrow">See it yourself</p>
+      <h2>Try the full app — not a slideshow</h2>
+      <p class="lead">One click launches a seeded restaurant with menu, staff, orders, inventory, analytics, and AI data already loaded. Explore every module like you own the place.</p>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Live demo credentials</h3>
+          <p><strong>Email:</strong> owner@pinnacle.com<br /><strong>Password:</strong> demo1234</p>
+        </div>
+        <div class="card">
+          <h3>What you&apos;ll see</h3>
+          <p>Dashboard, POS, KDS, menu engineering, time clock, purchase orders, finances with receipt OCR, Crystal Ball forecasting, and the AI Command Center.</p>
+        </div>
+      </div>
+      <div class="cta-row">
+        <a class="cta-primary" href="#" id="app-demo-link">Open live demo</a>
+        <a class="cta-secondary" href="#" id="app-signup-link">Start free trial</a>
+      </div>
+      <p class="footer-note">Works on desktop and tablet. Mobile layout available for floor staff workflows.</p>
+    </section>
+
+    <!-- 5. Front of house -->
+    <section class="slide" id="slide-5">
+      <span class="slide-num">05</span>
+      <p class="eyebrow">Front of house</p>
+      <h2>Serve guests faster — capture data automatically</h2>
+      <ul>
+        <li><strong>POS &amp; order flow</strong> — create orders, split checks, route to kitchen, track status from pending to paid</li>
+        <li><strong>Table floor plan</strong> — visual map with available, occupied, and reserved states tied to order volume</li>
+        <li><strong>Channel &amp; guest data</strong> — dine-in, takeout, delivery, and walk-in captured for downstream analytics</li>
+        <li><strong>Payments</strong> — Stripe and Square guest checkout options; every sale feeds sales and profitability tabs</li>
+      </ul>
+      <div class="highlight-box">
+        Every ticket updates labor %, menu mix, and channel performance in real time — no end-of-day export required.
+      </div>
+    </section>
+
+    <!-- 6. Kitchen -->
+    <section class="slide" id="slide-6">
+      <span class="slide-num">06</span>
+      <p class="eyebrow">Back of house</p>
+      <h2>Kitchen that keeps up with the rush</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h3>KDS &amp; routing</h3>
+          <p>Kitchen display shows fired tickets by station. Orders move from pending → in prep → ready without paper chits.</p>
+        </div>
+        <div class="card">
+          <h3>Prep &amp; production</h3>
+          <p>Kitchen and BOH modules track prep lists, production batches, and back-of-house workflows alongside the menu.</p>
+        </div>
+      </div>
+      <ul>
+        <li><strong>Fire &amp; recall</strong> — control ticket timing from the POS; kitchen sees updates instantly</li>
+        <li><strong>Recipe-linked depletion</strong> — sold items drive theoretical inventory usage for food cost accuracy</li>
+        <li><strong>Log book</strong> — shift notes and handoffs stay in the same system as orders and labor</li>
+      </ul>
+    </section>
+
+    <!-- 7. Menu & inventory -->
+    <section class="slide" id="slide-7">
+      <span class="slide-num">07</span>
+      <p class="eyebrow">Menu &amp; inventory</p>
+      <h2>Know what each dish actually costs — and what to promote</h2>
+      <ul>
+        <li><strong>Sub-recipes &amp; rolled-up costing</strong> — ingredients roll up through prep recipes to menu items automatically</li>
+        <li><strong>Menu engineering matrix</strong> — stars, puzzles, plowhorses, and dogs surfaced with margin and popularity data</li>
+        <li><strong>6-channel sync</strong> — keep POS, delivery apps, website, and tableside menus aligned from one source</li>
+        <li><strong>Inventory &amp; waste</strong> — par levels, low-stock alerts, waste logs, and theoretical vs actual food cost variance</li>
+        <li><strong>Purchase orders &amp; loading dock</strong> — vendor ordering, receiving, and credits tied to inventory (Pro plan)</li>
+      </ul>
+    </section>
+
+    <!-- 8. Staff & payroll -->
+    <section class="slide" id="slide-8">
+      <span class="slide-num">08</span>
+      <p class="eyebrow">People</p>
+      <h2>Staff, schedules, and payroll without the spreadsheet chaos</h2>
+      <div class="grid-2">
+        <ul>
+          <li><strong>Roles &amp; permissions</strong> — owner, manager, server, kitchen, and custom access for 3–25 users by plan</li>
+          <li><strong>Scheduling &amp; shift swaps</strong> — build schedules; staff request swaps in-app</li>
+          <li><strong>Time clock</strong> — punch in/out with optional photo capture for accountability</li>
+        </ul>
+        <ul>
+          <li><strong>Labor analytics</strong> — labor %, sales per labor hour, and prime cost tied to real punches</li>
+          <li><strong>Payroll runs</strong> — holiday pay rules, export tools, and payroll workflow (Pro)</li>
+          <li><strong>Hiring pipeline</strong> — applicant tracking integrated with staff onboarding</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 9. Finances -->
+    <section class="slide" id="slide-9">
+      <span class="slide-num">09</span>
+      <p class="eyebrow">Finances</p>
+      <h2>Expenses captured in seconds — not at month-end</h2>
+      <ul>
+        <li><strong>Receipt OCR</strong> — snap a photo; AI extracts vendor, amount, category, and line items</li>
+        <li><strong>Expense tracking</strong> — categorize spend alongside sales and labor for true P&amp;L visibility</li>
+        <li><strong>Back office</strong> — compliance, admin workflows, and operational records in one place (Pro)</li>
+      </ul>
+      <div class="highlight-box">
+        Growth includes 50 receipt scans/month; Pro is unlimited. Starter focuses on core ops — upgrade when you&apos;re ready for OCR.
+      </div>
+    </section>
+
+    <!-- 10. Analytics -->
+    <section class="slide dark" id="slide-10">
+      <span class="slide-num">10</span>
+      <p class="eyebrow">Analytics</p>
+      <h2>12 tabs of intelligence — not 12 spreadsheets</h2>
+      <div class="grid-3">
+        <div class="card"><h3>Revenue &amp; cost</h3><p>Executive summary, sales, food &amp; inventory, labor, profitability</p></div>
+        <div class="card"><h3>Menu &amp; guests</h3><p>Menu engineering, marketing ROI, guest experience, operations</p></div>
+        <div class="card"><h3>Forward-looking</h3><p>Purchasing, forecasting, external factors, Crystal Ball trends</p></div>
+      </div>
+      <p class="lead" style="margin-top: 20px;">Starter unlocks core tabs (executive, sales, food, labor). Growth adds menu engineering and operations. Pro opens the full 12-tab suite including marketing, forecasting, and guest insights.</p>
+    </section>
+
+    <!-- 11. AI -->
+    <section class="slide" id="slide-11">
+      <span class="slide-num">11</span>
+      <p class="eyebrow">AI Command Center</p>
+      <h2>Ask questions. Get answers from your live data.</h2>
+      <p class="lead">Not generic chatbot advice — Pinnacle cross-checks sales, labor, inventory, vendors, waste, reviews, and staff data to answer questions like:</p>
+      <div class="grid-2">
+        <ul>
+          <li>&quot;What&apos;s hurting my profit this week?&quot;</li>
+          <li>&quot;Which menu items should I promote?&quot;</li>
+          <li>&quot;Am I overstaffed on Tuesdays?&quot;</li>
+        </ul>
+        <ul>
+          <li>&quot;Where is food cost leaking?&quot;</li>
+          <li>&quot;Which vendor is costing me the most?&quot;</li>
+          <li>&quot;What should I fix before the weekend rush?&quot;</li>
+        </ul>
+      </div>
+      <div class="highlight-box">
+        <strong>350+ curated prompts</strong> across profit, labor, inventory, menu, marketing, and operations. Pro unlocks the full library and advanced profitability analysis.
+      </div>
+    </section>
+
+    <!-- 12. Integrations -->
+    <section class="slide" id="slide-12">
+      <span class="slide-num">12</span>
+      <p class="eyebrow">Integrations</p>
+      <h2>Connect the tools you already use</h2>
+      <div class="grid-3">
+        <div class="card"><h3>Payments</h3><p>Stripe billing for subscriptions; Square &amp; Stripe for guest checkout</p></div>
+        <div class="card"><h3>Delivery &amp; channels</h3><p>Omnichannel menu sync to major delivery and ordering platforms</p></div>
+        <div class="card"><h3>Vendor EDI</h3><p>Purchasing integrations for automated ordering and receiving (Pro)</p></div>
+      </div>
+      <ul>
+        <li><strong>Social &amp; marketing</strong> — connect accounts, schedule posts, measure campaign ROI against real sales</li>
+        <li><strong>Multi-location</strong> — switch between stores; owner rollups compare labor, food cost, and sales side by side</li>
+        <li><strong>Enterprise</strong> — custom API access, migration, training, and white-label available on request</li>
+      </ul>
+    </section>
+
+    <!-- 13. ROI -->
+    <section class="slide" id="slide-13">
+      <span class="slide-num">13</span>
+      <p class="eyebrow">Why switch</p>
+      <h2>Replace a stack of point solutions with one platform</h2>
+      <table class="vs-table">
+        <thead>
+          <tr><th>Typical stack</th><th>With Pinnacle</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>POS + scheduling + inventory apps</td><td>One login, one data model, one bill</td></tr>
+          <tr><td>Manual food cost &amp; menu updates</td><td>Recipe-linked costing &amp; 6-channel sync</td></tr>
+          <tr><td>End-of-week spreadsheet reports</td><td>12-tab analytics updated in real time</td></tr>
+          <tr><td>Guessing what&apos;s hurting margin</td><td>AI Command Center with specific numbers &amp; actions</td></tr>
+          <tr><td>$400–$800+/mo across tools</td><td>From <strong>$79/mo</strong> per location — Growth at <strong>$249</strong> covers most independents</td></tr>
+        </tbody>
+      </table>
+      <p class="footer-note">Even a 1% improvement in food or labor cost on $50K monthly revenue pays for Growth many times over.</p>
+    </section>
+
+    <!-- 14. How it works -->
+    <section class="slide" id="slide-14">
+      <span class="slide-num">14</span>
+      <p class="eyebrow">Getting started</p>
+      <h2>Up and running in three steps</h2>
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="phase">Step 1</div>
+          <div><h3>Launch the demo or sign up</h3><p>Explore the seeded restaurant instantly, or create your account and pick a plan in under two minutes.</p></div>
+        </div>
+        <div class="timeline-item">
+          <div class="phase">Step 2</div>
+          <div><h3>Onboard your location</h3><p>Guided setup for menu, staff, tables, and integrations. Import or build as you go — no rip-and-replace required on day one.</p></div>
+        </div>
+        <div class="timeline-item">
+          <div class="phase">Step 3</div>
+          <div><h3>Run &amp; improve</h3><p>Every order, punch, and receipt feeds analytics. Ask the Command Center what to fix next.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 15. Pricing -->
+    <section class="slide" id="slide-15">
+      <span class="slide-num">15</span>
+      <p class="eyebrow">Pricing</p>
+      <h2>Simple per-location pricing — scale when you&apos;re ready</h2>
+      <div class="grid-3">
+        <div class="card">
+          <h3>Starter</h3>
+          <p class="price">$79<span>/mo per location</span></p>
+          <p>Small shops &amp; cafes — dashboard, menu, tables, orders, basic inventory &amp; staff, limited AI (10 questions/day).</p>
+        </div>
+        <div class="card" style="border-color: #fed7aa; background: #fff7ed;">
+          <h3>Growth ★ Most popular</h3>
+          <p class="price">$249<span>/mo per location</span></p>
+          <p>Full inventory, KDS, POS flow, scheduling, menu engineering, receipt OCR, AI Command Center. Up to 10 users.</p>
+        </div>
+        <div class="card">
+          <h3>Pro</h3>
+          <p class="price">$449<span>/mo per location</span></p>
+          <p>All 12 analytics tabs, advanced AI, purchasing, forecasting, payroll tools, unlimited OCR. Up to 25 users.</p>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Plan</th><th>Price</th><th>Best for</th></tr></thead>
+        <tbody>
+          <tr><td>Group (2–10 locations)</td><td>$599/mo + $249/additional location</td><td>Pro features + multi-location rollups</td></tr>
+          <tr><td>Enterprise</td><td>From $1,500/mo</td><td>Franchises, API, migration, training, SLA</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 16. Founding offer -->
+    <section class="slide dark" id="slide-16">
+      <span class="slide-num">16</span>
+      <p class="eyebrow">Limited offer</p>
+      <h2>Founding restaurant deal — $149/month for life</h2>
+      <p class="lead">The first 10 restaurants lock in full <strong>Growth plan</strong> access at $149/mo — forever. Same features as $249/mo, including KDS, menu engineering, and AI Command Center.</p>
+      <div class="stat-row">
+        <div class="stat"><strong>10</strong><span>Spots total</span></div>
+        <div class="stat"><strong>$149</strong><span>Per month for life</span></div>
+        <div class="stat"><strong>Growth</strong><span>Full plan scope</span></div>
+        <div class="stat"><strong>100%</strong><span>Founding partner status</span></div>
+      </div>
+      <div class="cta-row">
+        <a class="cta-primary" href="#" id="app-signup-link-2">Claim your founding spot</a>
+        <a class="cta-secondary" href="mailto:sales@pinnacle-designs.com?subject=Founding%20restaurant%20deal">Email us to reserve</a>
+      </div>
+      <p class="footer-note">Founding partners help shape the product and get priority onboarding support.</p>
+    </section>
+
+    <!-- 17. Demo tour -->
+    <section class="slide" id="slide-17">
+      <span class="slide-num">17</span>
+      <p class="eyebrow">Demo tour</p>
+      <h2>20 modules to explore in the live demo</h2>
+      <div class="two-col-bullets">
+        <ul>
+          <li>Dashboard &amp; daily ops overview</li>
+          <li>Orders, POS &amp; table floor plan</li>
+          <li>Kitchen, KDS &amp; back-of-house</li>
+          <li>Menu, inventory &amp; purchase orders</li>
+          <li>Staff, time clock &amp; log book</li>
+          <li>Finances &amp; receipt OCR</li>
+        </ul>
+        <ul>
+          <li>12-tab analytics suite</li>
+          <li>AI Command Center</li>
+          <li>Crystal Ball forecasting</li>
+          <li>Social &amp; marketing</li>
+          <li>Back office &amp; loading dock</li>
+          <li>Reports &amp; photo intelligence</li>
+        </ul>
+      </div>
+      <p class="footer-note">Use the in-app demo tour or explore freely — every screen runs on real product code, not mockups.</p>
+    </section>
+
+    <!-- 18. CTA -->
+    <section class="slide dark" id="slide-18">
+      <span class="slide-num">18</span>
+      <p class="eyebrow">Next step</p>
+      <h2>Ready to run your restaurant — and know your numbers?</h2>
+      <p class="lead">Open the live demo now, or start a trial and onboard your first location in minutes. No sales call required — though we&apos;re happy to walk you through if you prefer.</p>
+      <div class="cta-row">
+        <a class="cta-primary" href="#" id="app-demo-link-2">Open live demo</a>
+        <a class="cta-secondary" href="#" id="app-signup-link-3">Start free trial</a>
+      </div>
+      <ul style="margin-top: 28px;">
+        <li><strong>Demo login:</strong> owner@pinnacle.com / demo1234</li>
+        <li><strong>Questions?</strong> sales@pinnacle-designs.com</li>
+        <li><strong>Plans:</strong> Starter $79 · Growth $249 · Pro $449 per location/month</li>
+      </ul>
+      <p class="footer-note">Pinnacle Designs LLC · pinnacle-resturant-manager.vercel.app · © 2026</p>
+    </section>
+
+  </div>
+
+  <script>
+    (function () {
+      var APP = "https://pinnacle-resturant-manager.vercel.app";
+      var links = {
+        demo: APP + "/demo",
+        signup: APP + "/signup"
+      };
+      document.querySelectorAll("#app-demo-link, #app-demo-link-2").forEach(function (el) {
+        el.href = links.demo;
+      });
+      document.querySelectorAll("#app-signup-link, #app-signup-link-2, #app-signup-link-3, .app-signup-link").forEach(function (el) {
+        el.href = links.signup;
+      });
+
+      var slides = Array.prototype.slice.call(document.querySelectorAll(".slide"));
+      var idx = 0;
+      function go(n) {
+        idx = Math.max(0, Math.min(slides.length - 1, n));
+        slides[idx].scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowRight" || e.key === "PageDown") { e.preventDefault(); go(idx + 1); }
+        if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); go(idx - 1); }
+      });
+      if ("IntersectionObserver" in window) {
+        var obs = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) idx = slides.indexOf(entry.target);
+          });
+        }, { threshold: 0.55 });
+        slides.forEach(function (s) { obs.observe(s); });
+      }
+    })();
+  </script>
+</body>
+</html>

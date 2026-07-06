@@ -38,6 +38,7 @@ const PUBLIC_PATHS = [
   "/privacy",
   "/terms",
   "/docs",
+  "/sales-deck",
   "/api/auth/login",
   "/api/auth/mfa/verify",
   "/api/auth/register",
