@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
-import { v4 as uuidv4 } from "uuid";
 import { prisma } from "@/lib/prisma";
-import { analyzeInvoice } from "@/lib/ai/analyze-invoice";
+import { analyzeInvoice, isInvoiceOcrConfigured } from "@/lib/ai/analyze-invoice";
 import { getLocationIdFromRequest } from "@/lib/location";
 import { requirePermission } from "@/lib/api-auth";
 import { processDigitizedInvoice } from "@/lib/purchasing/invoice-digitization";
+import { persistUploadFile, uploadErrorMessage } from "@/lib/persist-upload";
 import {
   base64Input,
   filesToBase64,
@@ -40,10 +38,11 @@ export async function POST(request: NextRequest) {
       invoice,
       pageCount: parsed.pageCount,
       panoramic: vision.panoramic || parsed.stitchedMulti,
+      ocrConfigured: isInvoiceOcrConfigured(),
     });
   } catch (err) {
     console.error("Invoice scan error:", err);
-    return NextResponse.json({ error: "Scan failed" }, { status: 500 });
+    return NextResponse.json({ error: uploadErrorMessage(err, "Scan failed") }, { status: 500 });
   }
 }
 
@@ -68,14 +67,8 @@ export async function PUT(request: NextRequest) {
 
     let imageUrl: string | null = null;
     if (file) {
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      const ext = file.name.split(".").pop() || "jpg";
-      const filename = `${uuidv4()}.${ext}`;
-      const uploadsDir = join(process.cwd(), "public", "uploads");
-      await mkdir(uploadsDir, { recursive: true });
-      await writeFile(join(uploadsDir, filename), buffer);
-      imageUrl = `/uploads/${filename}`;
+      const stored = await persistUploadFile(file);
+      imageUrl = stored.url;
     }
 
     const saved = await prisma.vendorInvoice.create({
@@ -143,7 +136,7 @@ export async function PUT(request: NextRequest) {
     });
   } catch (err) {
     console.error("Invoice save error:", err);
-    return NextResponse.json({ error: "Save failed" }, { status: 500 });
+    return NextResponse.json({ error: uploadErrorMessage(err, "Save failed") }, { status: 500 });
   }
 }
 

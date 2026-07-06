@@ -2,7 +2,7 @@
   "name": "Pinnacle Restaurant Manager",
   "short_name": "Pinnacle",
   "description": "AI-powered restaurant management for orders, inventory, staff, and profit",
-  "start_url": "/dashboard",
+  "start_url": "/login",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",

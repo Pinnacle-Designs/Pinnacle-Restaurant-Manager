@@ -142,13 +142,22 @@ export function PhotoGallery({ photos, categoryFilter }: PhotoGalleryProps) {
       {filtered.map((photo) => (
         <div key={photo.id} className="card overflow-hidden !p-0">
           <div className="relative aspect-video bg-slate-100">
-            <Image
-              src={photo.url}
-              alt={photo.title || "Photo"}
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, 33vw"
-            />
+            {photo.url.startsWith("data:") ? (
+              <img
+                src={photo.url}
+                alt={photo.title || "Photo"}
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            ) : (
+              <Image
+                src={photo.url}
+                alt={photo.title || "Photo"}
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 33vw"
+                unoptimized={photo.url.startsWith("/uploads/")}
+              />
+            )}
           </div>
           <div className="p-4">
             <div className="flex items-center justify-between">

@@ -1049,7 +1049,7 @@ function PoReceivingCard({
           </p>
           <p className="text-sm text-slate-500">
             {formatCurrency(po.totalAmount)} · {new Date(po.submittedAt).toLocaleDateString()}
-            {po.receipts.length > 0 && ` · ${po.receipts.length} receipt(s)`}
+            {po.receipts?.length > 0 && ` · ${po.receipts.length} receipt(s)`}
             {linkedInvoice?.invoiceNumber && ` · ${linkedInvoice.invoiceNumber}`}
           </p>
         </div>

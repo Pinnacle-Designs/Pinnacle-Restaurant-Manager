@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
-import { v4 as uuidv4 } from "uuid";
 import { prisma } from "@/lib/prisma";
 import { analyzeReceipt } from "@/lib/ai";
 import { getLocationIdFromRequest } from "@/lib/location";
 import { requirePermission } from "@/lib/api-auth";
 import { getRequestPlan } from "@/lib/plan-api";
+import { persistUploadFile, uploadErrorMessage } from "@/lib/persist-upload";
 import {
   GROWTH_OCR_MONTHLY_LIMIT,
   PLAN_BY_ID,
@@ -106,20 +104,14 @@ export async function PUT(request: NextRequest) {
     let receiptUrl: string | null = null;
 
     if (file) {
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      const ext = file.name.split(".").pop() || "jpg";
-      const filename = `${uuidv4()}.${ext}`;
-      const uploadsDir = join(process.cwd(), "public", "uploads");
-      await mkdir(uploadsDir, { recursive: true });
-      await writeFile(join(uploadsDir, filename), buffer);
-      receiptUrl = `/uploads/${filename}`;
+      const stored = await persistUploadFile(file);
+      receiptUrl = stored.url;
 
       await prisma.photo.create({
         data: {
           locationId,
-          filename,
-          url: receiptUrl,
+          filename: stored.filename,
+          url: stored.url,
           category: "RECEIPT" as PhotoCategory,
           title: description,
           description:

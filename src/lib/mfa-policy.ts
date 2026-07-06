@@ -1,5 +1,6 @@
 import type { SessionUser } from "./session";
 import { isDemoAccountEmail, isPlanDemoAccountEmail } from "./demo-email";
+import { isStaffPinLoginEmail } from "./staff-pin-email";
 
 export function isProductionSecurityEnforced(): boolean {
   return process.env.NODE_ENV === "production";
@@ -8,7 +9,11 @@ export function isProductionSecurityEnforced(): boolean {
 export function isMfaExemptUser(user: Pick<SessionUser, "email" | "isPlatformAdmin">): boolean {
   if (user.isPlatformAdmin) return true;
   const email = user.email.trim().toLowerCase();
-  return isDemoAccountEmail(email) || isPlanDemoAccountEmail(email);
+  return (
+    isDemoAccountEmail(email) ||
+    isPlanDemoAccountEmail(email) ||
+    isStaffPinLoginEmail(email)
+  );
 }
 
 export function ownerMfaRequired(user: SessionUser): boolean {
@@ -26,6 +31,8 @@ export function isMfaSetupAllowedPath(pathname: string): boolean {
     pathname.startsWith("/api/account/password") ||
     pathname.startsWith("/api/auth/logout") ||
     pathname.startsWith("/api/auth/login") ||
+    pathname.startsWith("/api/auth/pin-login") ||
+    pathname.startsWith("/api/auth/team-roster") ||
     pathname.startsWith("/api/auth/mfa") ||
     pathname.startsWith("/onboarding") ||
     pathname.startsWith("/download")

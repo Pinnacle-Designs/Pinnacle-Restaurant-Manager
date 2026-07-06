@@ -1,13 +1,11 @@
 import { NextRequest } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
-import { v4 as uuidv4 } from "uuid";
 import { prisma } from "@/lib/prisma";
 import { createSessionToken, sessionCookieOptions } from "@/lib/auth";
 import { requireSecureAuth } from "@/lib/api-auth";
 import { isRateLimited } from "@/lib/rate-limit";
 import { matchesDeclaredImageType } from "@/lib/image-validation";
 import { privateJsonResponse } from "@/lib/secure-response";
+import { persistUploadBuffer, uploadErrorMessage } from "@/lib/persist-upload";
 
 const MAX_BYTES = 2 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -50,13 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-    const filename = `avatar-${user!.id}-${uuidv4()}.${ext}`;
-
-    const uploadsDir = join(process.cwd(), "public", "uploads", "avatars");
-    await mkdir(uploadsDir, { recursive: true });
-    await writeFile(join(uploadsDir, filename), buffer);
-
-    const avatarUrl = `/uploads/avatars/${filename}`;
+    const { url: avatarUrl } = await persistUploadBuffer(buffer, ext, "avatars");
 
     const updated = await prisma.user.update({
       where: { id: user!.id },
@@ -73,6 +65,6 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (err) {
     console.error("Avatar upload error:", err);
-    return privateJsonResponse({ error: "Upload failed" }, { status: 500 });
+    return privateJsonResponse({ error: uploadErrorMessage(err) }, { status: 500 });
   }
 }

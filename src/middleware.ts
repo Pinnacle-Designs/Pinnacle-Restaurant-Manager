@@ -40,6 +40,8 @@ const PUBLIC_PATHS = [
   "/docs",
   "/sales-deck",
   "/api/auth/login",
+  "/api/auth/pin-login",
+  "/api/auth/team-roster",
   "/api/auth/mfa/verify",
   "/api/auth/register",
   "/api/auth/forgot-password",
@@ -189,6 +191,21 @@ async function runMiddleware(request: NextRequest) {
   const embedSessionRedirect = await applyEmbedSessionParam(request);
   if (embedSessionRedirect) {
     return applyFramePolicy(request, embedSessionRedirect);
+  }
+
+  // Installed app opens at /login — skip sign-in when session is still valid.
+  if (pathname === "/login") {
+    const token = getRequestSessionToken(request);
+    const sessionUser = token ? await parseSessionToken(token) : null;
+    if (sessionUser) {
+      const from = request.nextUrl.searchParams.get("from");
+      const dest =
+        from && from.startsWith("/") && !from.startsWith("//") && from !== "/login"
+          ? from
+          : "/dashboard";
+      return applyFramePolicy(request, NextResponse.redirect(new URL(dest, request.url)));
+    }
+    return applyFramePolicy(request, NextResponse.next());
   }
 
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {

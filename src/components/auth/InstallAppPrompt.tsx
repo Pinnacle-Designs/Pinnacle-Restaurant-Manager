@@ -100,7 +100,7 @@ export function InstallAppPrompt({ plan, onContinue, embedded }: InstallAppPromp
           </Button>
         )}
         <Button type="button" onClick={onContinue}>
-          {isInstalled ? "Open your workspace" : "Go to dashboard"}
+          {isInstalled ? "Open app" : "Go to dashboard"}
         </Button>
       </div>
       <p className="mt-4 text-center text-xs text-slate-500">

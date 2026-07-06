@@ -1,6 +1,4 @@
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
-import { v4 as uuidv4 } from "uuid";
+import { persistUploadBuffer } from "@/lib/persist-upload";
 
 const MAX_BYTES = 2_500_000;
 
@@ -20,10 +18,6 @@ export async function savePunchPhoto(dataUrl: string): Promise<string> {
     throw new Error("Punch photo is too small — retake the photo");
   }
 
-  const filename = `punch-${uuidv4()}.${ext}`;
-  const uploadsDir = join(process.cwd(), "public", "uploads", "punches");
-  await mkdir(uploadsDir, { recursive: true });
-  await writeFile(join(uploadsDir, filename), buffer);
-
-  return `/uploads/punches/${filename}`;
+  const { url } = await persistUploadBuffer(buffer, ext, "punches");
+  return url;
 }

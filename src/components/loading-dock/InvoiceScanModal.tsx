@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, CheckCircle, Scale } from "lucide-react";
+import { Loader2, CheckCircle, Scale, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
 import { formatCurrency } from "@/lib/utils";
@@ -9,6 +9,35 @@ import { submitScanForm } from "@/lib/scan/submit-scan";
 import { showCriticalNotifications } from "@/lib/notifications";
 import { DocumentQuickScanCapture } from "@/components/scan/DocumentQuickScanCapture";
 import { useDocumentQuickScan } from "@/hooks/useDocumentQuickScan";
+
+function normalizeInvoiceData(raw: Partial<InvoiceData> | null | undefined): InvoiceData {
+  const today = new Date().toISOString().split("T")[0]!;
+  const lines = Array.isArray(raw?.lines)
+    ? raw.lines.map((line, i) => ({
+        description: String(line?.description ?? `Line item ${i + 1}`),
+        qty: Number(line?.qty) || 0,
+        unit: String(line?.unit ?? "each"),
+        unitPrice: Number(line?.unitPrice) || 0,
+        lineTotal: Number(line?.lineTotal) || 0,
+        sku: line?.sku,
+        inventoryItemId: line?.inventoryItemId,
+        catchWeightBilled: line?.catchWeightBilled,
+        catchWeightUnit: line?.catchWeightUnit,
+      }))
+    : [];
+  const amount = Number(raw?.amount) || lines.reduce((sum, l) => sum + l.lineTotal, 0);
+  return {
+    vendor: String(raw?.vendor ?? ""),
+    invoiceNumber: String(raw?.invoiceNumber ?? ""),
+    amount,
+    invoiceDate: String(raw?.invoiceDate ?? today),
+    lines,
+  };
+}
+
+function emptyLine(): InvoiceLineData {
+  return { description: "", qty: 1, unit: "case", unitPrice: 0, lineTotal: 0 };
+}
 
 export interface InvoiceLineData {
   description: string;
@@ -55,6 +84,7 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
   const [pageCountScanned, setPageCountScanned] = useState(1);
   const [wasPanoramic, setWasPanoramic] = useState(false);
+  const [ocrConfigured, setOcrConfigured] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const scanInvoice = async () => {
@@ -65,8 +95,10 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
         invoice: InvoiceData;
         pageCount?: number;
         panoramic?: boolean;
+        ocrConfigured?: boolean;
       }>("/api/purchasing/invoices/scan", scan.buildScanFormData());
-      setInvoiceData(data.invoice);
+      setInvoiceData(normalizeInvoiceData(data.invoice));
+      setOcrConfigured(data.ocrConfigured !== false);
       setPageCountScanned(data.pageCount ?? scan.getPageCount());
       setWasPanoramic(Boolean(data.panoramic));
     } catch (err) {
@@ -78,12 +110,40 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
 
   const updateLine = (index: number, patch: Partial<InvoiceLineData>) => {
     if (!invoiceData) return;
-    const lines = invoiceData.lines.map((l, i) => (i === index ? { ...l, ...patch } : l));
-    setInvoiceData({ ...invoiceData, lines });
+    const lines = invoiceData.lines.map((l, i) => {
+      if (i !== index) return l;
+      const next = { ...l, ...patch };
+      if ("qty" in patch || "unitPrice" in patch) {
+        next.lineTotal = (Number(next.qty) || 0) * (Number(next.unitPrice) || 0);
+      }
+      return next;
+    });
+    const amount = lines.reduce((sum, l) => sum + (Number(l.lineTotal) || 0), 0);
+    setInvoiceData({ ...invoiceData, lines, amount });
+  };
+
+  const addLine = () => {
+    if (!invoiceData) return;
+    setInvoiceData({ ...invoiceData, lines: [...invoiceData.lines, emptyLine()] });
+  };
+
+  const removeLine = (index: number) => {
+    if (!invoiceData) return;
+    const lines = invoiceData.lines.filter((_, i) => i !== index);
+    const amount = lines.reduce((sum, l) => sum + (Number(l.lineTotal) || 0), 0);
+    setInvoiceData({ ...invoiceData, lines, amount });
   };
 
   const saveInvoice = async () => {
     if (!invoiceData) return;
+    if (!invoiceData.vendor.trim()) {
+      setError("Enter a vendor name before saving.");
+      return;
+    }
+    if (invoiceData.lines.length === 0) {
+      setError("Add at least one line item.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -157,6 +217,13 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
 
         {invoiceData && (
           <div className="space-y-3">
+            {!ocrConfigured && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                Automatic invoice OCR is not enabled on this server. Enter vendor, total, and line
+                items manually below. To enable AI extraction, set{" "}
+                <code className="rounded bg-amber-100 px-1">OPENAI_API_KEY</code> in production env.
+              </p>
+            )}
             {wasPanoramic && pageCountScanned <= 1 && (
               <p className="text-xs font-medium text-orange-700">Panoramic scan</p>
             )}
@@ -190,15 +257,67 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
               </FormField>
             </div>
             <div className="rounded-lg border border-slate-200 p-3">
-              <p className="mb-2 text-xs font-medium uppercase text-slate-500">Line items</p>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-xs font-medium uppercase text-slate-500">Line items</p>
+                <Button type="button" variant="ghost" size="sm" onClick={addLine}>
+                  <Plus className="mr-1 h-3.5 w-3.5" />
+                  Add line
+                </Button>
+              </div>
+              {invoiceData.lines.length === 0 && (
+                <p className="py-2 text-sm text-slate-500">
+                  No line items yet. Tap Add line to enter each product from the invoice.
+                </p>
+              )}
               {invoiceData.lines.map((line, i) => (
                 <div key={i} className="border-b border-slate-100 py-2 text-sm last:border-0">
-                  <p className="font-medium">{line.description}</p>
-                  <p className="text-slate-500">
-                    {line.qty} {line.unit} × {formatCurrency(line.unitPrice)} ={" "}
-                    {formatCurrency(line.lineTotal)}
-                  </p>
-                  {(line.catchWeightBilled != null || /case|brisket|fish|lb/i.test(line.description)) && (
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <Input
+                        value={line.description}
+                        placeholder="Description"
+                        onChange={(e) => updateLine(i, { description: e.target.value })}
+                      />
+                      <div className="grid grid-cols-3 gap-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={line.qty}
+                          placeholder="Qty"
+                          onChange={(e) =>
+                            updateLine(i, { qty: parseFloat(e.target.value) || 0 })
+                          }
+                        />
+                        <Input
+                          value={line.unit}
+                          placeholder="Unit"
+                          onChange={(e) => updateLine(i, { unit: e.target.value })}
+                        />
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={line.unitPrice}
+                          placeholder="Unit $"
+                          onChange={(e) =>
+                            updateLine(i, { unitPrice: parseFloat(e.target.value) || 0 })
+                          }
+                        />
+                      </div>
+                      <p className="text-slate-500">
+                        Line total: {formatCurrency(line.lineTotal || 0)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeLine(i)}
+                      className="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-red-600"
+                      aria-label="Remove line"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {(line.catchWeightBilled != null ||
+                    /case|brisket|fish|lb/i.test(line.description ?? "")) && (
                     <div className="mt-2 flex items-center gap-2">
                       <Scale className="h-3.5 w-3.5 text-orange-500" />
                       <label className="text-xs text-slate-600">

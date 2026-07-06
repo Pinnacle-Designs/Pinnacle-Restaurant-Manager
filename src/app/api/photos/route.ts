@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
-import { v4 as uuidv4 } from "uuid";
 import { prisma } from "@/lib/prisma";
 import { analyzePhoto } from "@/lib/ai";
 import { getLocationIdFromRequest } from "@/lib/location";
@@ -9,6 +6,7 @@ import { getSessionUserFromRequest } from "@/lib/auth";
 import { userCan } from "@/lib/permission-resolve";
 import { forbiddenResponse, unauthorizedResponse } from "@/lib/api-auth";
 import type { PhotoCategory } from "@prisma/client";
+import { persistUploadFile, uploadErrorMessage } from "@/lib/persist-upload";
 import {
   base64Input,
   filesToBase64,
@@ -69,15 +67,11 @@ export async function POST(request: NextRequest) {
     }
 
     const uploadFile = parsed.uploadFile ?? parsed.files[0];
-    const buffer = Buffer.from(await uploadFile.arrayBuffer());
-    const ext = uploadFile.name.split(".").pop() || "jpg";
-    const filename = `${uuidv4()}.${ext}`;
+    if (!uploadFile) {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
 
-    const uploadsDir = join(process.cwd(), "public", "uploads");
-    await mkdir(uploadsDir, { recursive: true });
-    await writeFile(join(uploadsDir, filename), buffer);
-
-    const url = `/uploads/${filename}`;
+    const { url, filename } = await persistUploadFile(uploadFile);
     let aiAnalysis: string | null = null;
     let photoTitle = title;
     let tags: string[] = [];
@@ -117,6 +111,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(photo);
   } catch (error) {
     console.error("Photo upload error:", error);
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    return NextResponse.json({ error: uploadErrorMessage(error) }, { status: 500 });
   }
 }

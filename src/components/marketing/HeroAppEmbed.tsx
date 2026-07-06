@@ -52,6 +52,7 @@ export function HeroAppEmbed({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [iframeKey, setIframeKey] = useState(0);
+  const [mounted, setMounted] = useState(false);
   const readyRef = useRef(false);
   const loadCountRef = useRef(0);
   const lastChromeRef = useRef(embedChrome);
@@ -60,6 +61,11 @@ export function HeroAppEmbed({
   const fullSrc = embedLaunchUrl(undefined, "full");
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
     if (lastChromeRef.current === embedChrome) return;
     lastChromeRef.current = embedChrome;
     if (expanded) return;
@@ -68,7 +74,7 @@ export function HeroAppEmbed({
     setError(null);
     setLoading(true);
     setIframeKey((k) => k + 1);
-  }, [embedChrome, expanded]);
+  }, [embedChrome, expanded, mounted]);
 
   const retryEmbed = useCallback(() => {
     readyRef.current = false;
@@ -218,7 +224,9 @@ export function HeroAppEmbed({
               </button>
             </div>
           )}
-          {frame(false)}
+          {mounted ? frame(false) : (
+            <div className="rounded-b-2xl bg-slate-950" style={{ height }} aria-hidden />
+          )}
         </div>
       </div>
 

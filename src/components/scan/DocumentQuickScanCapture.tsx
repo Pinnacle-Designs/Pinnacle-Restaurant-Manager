@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { Camera, Upload, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui";
 import {
@@ -116,13 +115,11 @@ export function DocumentQuickScanCapture({
     ) : (
       <div className="space-y-4">
         <div className="relative mx-auto max-w-xs">
-          <Image
+          {/* Native img — next/image can crash on large camera data URLs (iOS Safari). */}
+          <img
             src={preview}
             alt={documentLabel}
-            width={300}
-            height={400}
-            className="rounded-lg object-contain"
-            unoptimized
+            className="mx-auto max-h-[70vh] w-full rounded-lg object-contain"
           />
         </div>
         {showExtract && onExtract && (

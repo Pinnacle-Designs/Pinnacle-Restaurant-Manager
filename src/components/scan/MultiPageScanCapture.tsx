@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import {
   Camera,
   Upload,
@@ -334,13 +333,10 @@ export function MultiPageScanCapture({
                   {index === 0 && " · top"}
                   {index === pages.length - 1 && pages.length > 1 && " · bottom"}
                 </div>
-                <Image
+                <img
                   src={page.dataUrl}
                   alt={`${documentLabel} page ${index + 1}`}
-                  width={200}
-                  height={280}
                   className="h-36 w-full object-cover object-top"
-                  unoptimized
                 />
                 <div className="flex items-center justify-between border-t border-slate-200 bg-white px-2 py-1">
                   <div className="flex gap-1">
@@ -384,13 +380,10 @@ export function MultiPageScanCapture({
                 Panoramic preview
               </div>
               <div className="mx-auto max-h-[420px] max-w-md overflow-y-auto rounded-lg bg-white">
-                <Image
+                <img
                   src={panoramaPreview}
                   alt={`Panoramic ${documentLabel}`}
-                  width={360}
-                  height={800}
                   className="w-full object-contain"
-                  unoptimized
                 />
               </div>
             </div>

@@ -399,6 +399,8 @@ model Location {
   /// Alert managers this many minutes before meal break is due
   mealBreakAlertMinutes     Int     @default(15)
   active        Boolean  @default(true)
+  /// 4–6 digit code employees enter on the team sign-in screen (unique across locations).
+  teamLoginCode String?  @unique
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

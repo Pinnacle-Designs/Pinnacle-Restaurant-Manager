@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
-import { v4 as uuidv4 } from "uuid";
 import { prisma } from "@/lib/prisma";
 import { getLocationIdFromRequest } from "@/lib/location";
 import { requirePermission } from "@/lib/api-auth";
 import { analyzeDamagePhoto } from "@/lib/ai/analyze-damage";
 import { submitCreditMemoRequest } from "@/lib/purchasing/credit-memo";
+import { persistUploadFile, uploadErrorMessage } from "@/lib/persist-upload";
 
 export async function POST(request: NextRequest) {
   const { user, error } = await requirePermission(request, "manage_inventory");
@@ -33,16 +31,10 @@ export async function POST(request: NextRequest) {
       let scanCategory = category;
 
       if (file) {
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
-        const ext = file.name.split(".").pop() || "jpg";
-        const filename = `${uuidv4()}.${ext}`;
-        const uploadsDir = join(process.cwd(), "public", "uploads");
-        await mkdir(uploadsDir, { recursive: true });
-        await writeFile(join(uploadsDir, filename), buffer);
-        photoUrl = `/uploads/${filename}`;
+        const stored = await persistUploadFile(file);
+        photoUrl = stored.url;
 
-        const base64 = buffer.toString("base64");
+        const base64 = Buffer.from(await file.arrayBuffer()).toString("base64");
         const analysis = await analyzeDamagePhoto(base64);
         if (!scanVendor && analysis.vendor) scanVendor = analysis.vendor;
         if (!scanReason) scanReason = analysis.reason;

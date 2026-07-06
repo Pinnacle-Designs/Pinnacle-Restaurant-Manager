@@ -5,6 +5,10 @@ const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
+export function isInvoiceOcrConfigured(): boolean {
+  return Boolean(openai);
+}
+
 export interface InvoiceLineData {
   description: string;
   qty: number;
@@ -71,10 +75,8 @@ export async function analyzeInvoice(
   if (!openai) {
     return {
       ...fallback,
-      vendor: multiPage
-        ? "Vendor (manual entry — set OPENAI_API_KEY)"
-        : "Vendor (manual entry — set OPENAI_API_KEY)",
-      lines: [{ description: "Line item 1", qty: 1, unit: "case", unitPrice: 0, lineTotal: 0 }],
+      vendor: "",
+      lines: [],
     };
   }
 

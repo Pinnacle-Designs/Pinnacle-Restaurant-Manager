@@ -4,7 +4,7 @@ import type { Permission } from "./permissions";
 import { getAuthSecret } from "./env";
 
 export const AUTH_COOKIE_NAME = "pinnacle_session";
-export const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+export const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days — stay signed in on installed mobile app
 
 export interface SessionUser {
   id: string;

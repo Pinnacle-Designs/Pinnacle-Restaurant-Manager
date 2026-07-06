@@ -56,6 +56,7 @@ interface AccountData {
     name: string;
     role: AppRole;
     avatarUrl: string | null;
+    usesPinLogin?: boolean;
   };
   location: { id: string; name: string };
   billing: {
@@ -110,6 +111,11 @@ export function AccountClient() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
+  const [currentPin, setCurrentPin] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [pinSaving, setPinSaving] = useState(false);
+  const [pinMessage, setPinMessage] = useState<string | null>(null);
 
   const [billingEmail, setBillingEmail] = useState("");
   const [autopayEnabled, setAutopayEnabled] = useState(false);
@@ -258,6 +264,39 @@ export function AccountClient() {
       setPasswordSaving(false);
     }
   };
+
+  const savePin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinMessage(null);
+    if (newPin !== confirmPin) {
+      setPinMessage("New PINs do not match");
+      return;
+    }
+    if (newPin.length < 4) {
+      setPinMessage("PIN must be 4–6 digits");
+      return;
+    }
+    setPinSaving(true);
+    try {
+      const res = await fetch("/api/account/pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPin, newPin }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Could not update PIN");
+      setCurrentPin("");
+      setNewPin("");
+      setConfirmPin("");
+      setPinMessage("PIN updated successfully");
+    } catch (err) {
+      setPinMessage(err instanceof Error ? err.message : "Could not update PIN");
+    } finally {
+      setPinSaving(false);
+    }
+  };
+
+  const usesPinLogin = data?.profile.usesPinLogin === true;
 
   const submitBilling = async (includeTerms: boolean) => {
     if (!data?.billing.canManage) return;
@@ -517,57 +556,115 @@ export function AccountClient() {
             <PageSectionShell pageId="account-security">
               <PageSection
                 id="account-security-password"
-                title="Password"
-                description="Update your password to keep your account secure."
+                title={usesPinLogin ? "Sign-in PIN" : "Password"}
+                description={
+                  usesPinLogin
+                    ? "Change the PIN you use to sign in and clock in. PINs must be unique on your team."
+                    : "Update your password to keep your account secure."
+                }
                 defaultOpen
               >
-              <form className="max-w-md space-y-4" onSubmit={savePassword}>
-                <FormField label="Current password">
-                  <Input
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    autoComplete="current-password"
-                    required
-                  />
-                </FormField>
-                <FormField label="New password">
-                  <Input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    minLength={8}
-                    autoComplete="new-password"
-                    required
-                  />
-                </FormField>
-                <FormField label="Confirm new password">
-                  <Input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    minLength={8}
-                    autoComplete="new-password"
-                    required
-                  />
-                </FormField>
-                {passwordMessage && (
-                  <p
-                    className={cn(
-                      "text-sm",
-                      passwordMessage.includes("success") ? "text-green-700" : "text-red-600"
-                    )}
-                  >
-                    {passwordMessage}
-                  </p>
-                )}
-                <Button type="submit" disabled={passwordSaving}>
-                  <Shield className="h-4 w-4" />
-                  {passwordSaving ? "Updating…" : "Update password"}
-                </Button>
-              </form>
+              {usesPinLogin ? (
+                <form className="max-w-md space-y-4" onSubmit={savePin}>
+                  <FormField label="Current PIN">
+                    <Input
+                      type="password"
+                      value={currentPin}
+                      onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      autoComplete="off"
+                      required
+                    />
+                  </FormField>
+                  <FormField label="New PIN">
+                    <Input
+                      type="password"
+                      value={newPin}
+                      onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      autoComplete="off"
+                      required
+                    />
+                  </FormField>
+                  <FormField label="Confirm new PIN">
+                    <Input
+                      type="password"
+                      value={confirmPin}
+                      onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      autoComplete="off"
+                      required
+                    />
+                  </FormField>
+                  {pinMessage && (
+                    <p
+                      className={cn(
+                        "text-sm",
+                        pinMessage.includes("success") ? "text-green-700" : "text-red-600"
+                      )}
+                    >
+                      {pinMessage}
+                    </p>
+                  )}
+                  <Button type="submit" disabled={pinSaving}>
+                    <Shield className="h-4 w-4" />
+                    {pinSaving ? "Updating…" : "Update PIN"}
+                  </Button>
+                </form>
+              ) : (
+                <form className="max-w-md space-y-4" onSubmit={savePassword}>
+                  <FormField label="Current password">
+                    <Input
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      autoComplete="current-password"
+                      required
+                    />
+                  </FormField>
+                  <FormField label="New password">
+                    <Input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      minLength={8}
+                      autoComplete="new-password"
+                      required
+                    />
+                  </FormField>
+                  <FormField label="Confirm new password">
+                    <Input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      minLength={8}
+                      autoComplete="new-password"
+                      required
+                    />
+                  </FormField>
+                  {passwordMessage && (
+                    <p
+                      className={cn(
+                        "text-sm",
+                        passwordMessage.includes("success") ? "text-green-700" : "text-red-600"
+                      )}
+                    >
+                      {passwordMessage}
+                    </p>
+                  )}
+                  <Button type="submit" disabled={passwordSaving}>
+                    <Shield className="h-4 w-4" />
+                    {passwordSaving ? "Updating…" : "Update password"}
+                  </Button>
+                </form>
+              )}
               </PageSection>
-              <MfaSecurityPanel />
+              {!usesPinLogin && <MfaSecurityPanel />}
             </PageSectionShell>
           )}
 

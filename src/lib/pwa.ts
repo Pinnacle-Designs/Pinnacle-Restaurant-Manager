@@ -6,6 +6,16 @@ let updatePending = false;
 let reloading = false;
 let bootstrapped = false;
 
+/** True when the app is opened from home screen / installed PWA. */
+export function isStandalonePwa(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    ("standalone" in navigator &&
+      (navigator as Navigator & { standalone?: boolean }).standalone === true)
+  );
+}
+
 async function fetchAppVersion(): Promise<string | null> {
   try {
     const res = await fetch("/api/app-version", { cache: "no-store" });

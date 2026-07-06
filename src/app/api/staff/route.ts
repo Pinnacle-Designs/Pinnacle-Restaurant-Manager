@@ -6,6 +6,11 @@ import { requirePermission, stripSalaries, unauthorizedResponse } from "@/lib/ap
 import { hashClockPin, isValidClockPin } from "@/lib/timeclock/clock-pin";
 import { getRequestPlan } from "@/lib/plan-api";
 import { assertCanAddStaffMember } from "@/lib/plan-enforcement";
+import {
+  assertPinAvailableAtLocation,
+  enrichStaffForClient,
+  syncStaffAppLoginUser,
+} from "@/lib/staff-app-login";
 
 export async function GET(request: NextRequest) {
   const user = await getSessionUserFromRequest(request);
@@ -16,7 +21,8 @@ export async function GET(request: NextRequest) {
     where: { locationId },
     orderBy: { name: "asc" },
   });
-  return NextResponse.json(stripSalaries(user.role, staff));
+  const safe = stripSalaries(user.role, staff).map(enrichStaffForClient);
+  return NextResponse.json(safe);
 }
 
 export async function POST(request: NextRequest) {
@@ -32,12 +38,40 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: seatCheck.message, limit: seatCheck.limit }, { status: 403 });
   }
 
+  const appLoginEnabled = Boolean(body.appLoginEnabled);
+  const pinInput = body.clockPin != null && body.clockPin !== "" ? String(body.clockPin) : "";
   let clockPinHash: string | null = null;
-  const pin = body.clockPin ? String(body.clockPin) : "1234";
-  if (!isValidClockPin(pin)) {
-    return NextResponse.json({ error: "Clock PIN must be 4–6 digits" }, { status: 400 });
+
+  if (appLoginEnabled) {
+    if (pinInput) {
+      if (!isValidClockPin(pinInput)) {
+        return NextResponse.json({ error: "PIN must be 4–6 digits" }, { status: 400 });
+      }
+      try {
+        await assertPinAvailableAtLocation(locationId, pinInput);
+      } catch (err) {
+        return NextResponse.json(
+          { error: err instanceof Error ? err.message : "PIN unavailable" },
+          { status: 400 }
+        );
+      }
+      clockPinHash = hashClockPin(pinInput);
+    }
+  } else {
+    const pin = pinInput || "1234";
+    if (!isValidClockPin(pin)) {
+      return NextResponse.json({ error: "Clock PIN must be 4–6 digits" }, { status: 400 });
+    }
+    try {
+      await assertPinAvailableAtLocation(locationId, pin);
+    } catch (err) {
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : "PIN unavailable" },
+        { status: 400 }
+      );
+    }
+    clockPinHash = hashClockPin(pin);
   }
-  clockPinHash = hashClockPin(pin);
 
   const member = await prisma.staffMember.create({
     data: {
@@ -57,15 +91,40 @@ export async function POST(request: NextRequest) {
     },
   });
 
+  if (appLoginEnabled) {
+    try {
+      await syncStaffAppLoginUser({
+        staffMemberId: member.id,
+        locationId,
+        name: member.name,
+        jobRole: member.role,
+        appLoginEnabled: true,
+        pin: pinInput || null,
+        active: member.active,
+        existingClockPinHash: clockPinHash,
+      });
+    } catch (err) {
+      await prisma.staffMember.delete({ where: { id: member.id } });
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : "Could not create app login" },
+        { status: 500 }
+      );
+    }
+  }
+
+  const refreshed = await prisma.staffMember.findUniqueOrThrow({ where: { id: member.id } });
+
   await prisma.activityLog.create({
     data: {
       locationId,
       action: "CREATE",
       entity: "staff",
       entityId: member.id,
-      details: `Added staff: ${member.name}`,
+      details: `Added staff: ${member.name}${appLoginEnabled ? " (app login)" : ""}`,
     },
   });
 
-  return NextResponse.json(stripSalaries(user!.role, [member])[0]);
+  return NextResponse.json(
+    enrichStaffForClient(stripSalaries(user!.role, [refreshed])[0])
+  );
 }

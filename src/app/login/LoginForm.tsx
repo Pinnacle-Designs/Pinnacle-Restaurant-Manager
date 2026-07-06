@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Logo } from "@/components/layout/Logo";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
 import { SignupPlanModal } from "@/components/auth/SignupPlanModal";
 import { PlanDemoLogins } from "@/components/auth/PlanDemoLogins";
+import { TeamPinLogin } from "@/components/auth/TeamPinLogin";
 
 export default function LoginForm() {
   const searchParams = useSearchParams();
@@ -18,6 +19,25 @@ export default function LoginForm() {
   const [signupOpen, setSignupOpen] = useState(false);
   const [mfaPendingToken, setMfaPendingToken] = useState<string | null>(null);
   const [mfaCode, setMfaCode] = useState("");
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [signInMode, setSignInMode] = useState<"owner" | "team">("owner");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/login")
+      .then((res) => (res.ok ? res.json() : { user: null }))
+      .then((data: { user?: { email: string } | null }) => {
+        if (cancelled || !data.user) return;
+        redirectAfterLogin({});
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setCheckingSession(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const redirectAfterLogin = (data: { redirectTo?: string }) => {
     const from = searchParams.get("from") || "/dashboard";
@@ -88,6 +108,15 @@ export default function LoginForm() {
     }
   };
 
+  if (checkingSession) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-900 px-4 py-8 text-white">
+        <Logo className="h-14" />
+        <p className="mt-8 text-sm text-slate-400">Checking your session…</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-slate-900 px-4 py-8">
       <div className="mb-8">
@@ -97,67 +126,118 @@ export default function LoginForm() {
       <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-xl">
         {!mfaPendingToken ? (
           <>
-            <h1 className="text-xl font-bold text-slate-900">Sign in</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Sign in to your restaurant workspace.
-            </p>
-
-            <form className="mt-6 space-y-4" onSubmit={handleLogin}>
-              <FormField label="Email">
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@restaurant.com"
-                  required
-                />
-              </FormField>
-              <FormField label="Password">
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </FormField>
-              <p className="text-right text-sm">
-                <Link href="/forgot-password" className="text-orange-600 hover:text-orange-500">
-                  Forgot password?
-                </Link>
-              </p>
-              {error && <p className="text-sm text-red-600">{error}</p>}
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Signing in…" : "Sign in"}
-              </Button>
-            </form>
-
-            <div className="mt-6">
-              <Button
+            <div className="flex rounded-lg border border-slate-200 p-1">
+              <button
                 type="button"
-                variant="secondary"
-                className="w-full"
-                onClick={() => setSignupOpen(true)}
+                className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
+                  signInMode === "owner"
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                onClick={() => {
+                  setSignInMode("owner");
+                  setError(null);
+                }}
               >
-                Create account
-              </Button>
+                Owner / manager
+              </button>
+              <button
+                type="button"
+                className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
+                  signInMode === "team"
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                onClick={() => {
+                  setSignInMode("team");
+                  setError(null);
+                }}
+              >
+                Team member
+              </button>
             </div>
 
-            <SignupPlanModal open={signupOpen} onClose={() => setSignupOpen(false)} />
+            {signInMode === "owner" ? (
+              <>
+                <h1 className="mt-4 text-xl font-bold text-slate-900">Sign in</h1>
+                <p className="mt-1 text-sm text-slate-500">
+                  Sign in to your restaurant workspace. You&apos;ll stay signed in on this device.
+                </p>
 
-            <PlanDemoLogins
-              loading={loading}
-              onLogin={async (loginEmail, loginPassword) => {
-                setLoading(true);
-                setError(null);
-                try {
-                  await completeLogin(loginEmail, loginPassword);
-                } catch (err) {
-                  setError(err instanceof Error ? err.message : "Login failed");
-                } finally {
-                  setLoading(false);
-                }
-              }}
-            />
+                <form className="mt-6 space-y-4" onSubmit={handleLogin}>
+                  <FormField label="Email">
+                    <Input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@restaurant.com"
+                      required
+                    />
+                  </FormField>
+                  <FormField label="Password">
+                    <Input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </FormField>
+                  <p className="text-right text-sm">
+                    <Link href="/forgot-password" className="text-orange-600 hover:text-orange-500">
+                      Forgot password?
+                    </Link>
+                  </p>
+                  {error && <p className="text-sm text-red-600">{error}</p>}
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? "Signing in…" : "Sign in"}
+                  </Button>
+                </form>
+
+                <div className="mt-6">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => setSignupOpen(true)}
+                  >
+                    Create account
+                  </Button>
+                </div>
+
+                <SignupPlanModal open={signupOpen} onClose={() => setSignupOpen(false)} />
+
+                <PlanDemoLogins
+                  loading={loading}
+                  onLogin={async (loginEmail, loginPassword) => {
+                    setLoading(true);
+                    setError(null);
+                    try {
+                      await completeLogin(loginEmail, loginPassword);
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "Login failed");
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                />
+              </>
+            ) : (
+              <div className="mt-4">
+                <h1 className="text-xl font-bold text-slate-900">Team sign in</h1>
+                <p className="mt-1 text-sm text-slate-500">
+                  Use the restaurant code from your manager, then your name and PIN.
+                </p>
+                {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+                <div className="mt-6">
+                  <TeamPinLogin
+                    loading={loading}
+                    setLoading={setLoading}
+                    onError={setError}
+                    onSuccess={redirectAfterLogin}
+                  />
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <>

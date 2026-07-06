@@ -3,11 +3,13 @@
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { InstallAppPrompt } from "@/components/auth/InstallAppPrompt";
+import { usePwaInstall } from "@/hooks/usePwaInstall";
 import type { PlanId } from "@/lib/plans";
 
 export function DownloadClient() {
   const searchParams = useSearchParams();
   const from = searchParams.get("from");
+  const { isInstalled } = usePwaInstall();
   const [plan, setPlan] = useState<PlanId | undefined>();
 
   useEffect(() => {
@@ -21,7 +23,8 @@ export function DownloadClient() {
       .catch(() => undefined);
   }, []);
 
-  const continueHref = from === "onboarding" ? "/onboarding" : "/dashboard";
+  const continueHref =
+    from === "onboarding" ? "/onboarding" : isInstalled || from === "checkout" ? "/login" : "/dashboard";
 
   return (
     <div className="min-h-screen bg-slate-50">

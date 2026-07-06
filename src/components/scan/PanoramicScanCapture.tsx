@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef } from "react";
-import Image from "next/image";
 import { Camera, Upload, ScanLine, FileImage } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -118,13 +117,10 @@ export function PanoramicScanCapture({
           </Button>
         </div>
         <div className="mx-auto max-h-[480px] max-w-md overflow-y-auto rounded-lg bg-white shadow-inner">
-          <Image
+          <img
             src={preview}
             alt={`Panoramic ${documentLabel}`}
-            width={400}
-            height={1200}
             className="w-full object-contain"
-            unoptimized
           />
         </div>
         <p className="mt-2 text-center text-xs text-slate-500">

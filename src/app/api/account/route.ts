@@ -5,6 +5,7 @@ import { userManagesBilling } from "@/lib/billing-auth";
 import { PLAN_BY_ID, type PlanId } from "@/lib/plans";
 import { planMonthlyAmount } from "@/lib/billing";
 import { privateJsonResponse } from "@/lib/secure-response";
+import { isStaffPinLoginEmail } from "@/lib/staff-pin-email";
 import {
   getProviderConnections,
   safeConnectionView,
@@ -56,6 +57,7 @@ export async function GET(request: NextRequest) {
       name: user!.name,
       role: user!.role,
       avatarUrl: user!.avatarUrl ?? null,
+      usesPinLogin: isStaffPinLoginEmail(user!.email),
     },
     location: {
       id: locationId,

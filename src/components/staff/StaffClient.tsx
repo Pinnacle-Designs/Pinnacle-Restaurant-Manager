@@ -20,9 +20,11 @@ interface StaffMember {
   tipPoints?: number;
   active: boolean;
   dateOfBirth?: string | null;
+  hasAppLogin?: boolean;
 }
 
 import { JOB_ROLES, TIPPED_JOB_ROLES } from "@/lib/payroll/job-roles";
+import { TeamLoginCodeBanner } from "@/components/staff/TeamLoginCodeBanner";
 
 const ROLES = JOB_ROLES;
 
@@ -60,6 +62,7 @@ export function StaffClient({
     active: true,
     dateOfBirth: "",
     clockPin: "",
+    appLoginEnabled: false,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +74,7 @@ export function StaffClient({
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: "", role: "Server", email: "", phone: "", hourlyRate: "", isTippedEmployee: true, tipPoints: "1", active: true, dateOfBirth: "", clockPin: "" });
+    setForm({ name: "", role: "Server", email: "", phone: "", hourlyRate: "", isTippedEmployee: true, tipPoints: "1", active: true, dateOfBirth: "", clockPin: "", appLoginEnabled: false });
     setError(null);
     setModalOpen(true);
   };
@@ -91,6 +94,7 @@ export function StaffClient({
         ? String(member.dateOfBirth).slice(0, 10)
         : "",
       clockPin: "",
+      appLoginEnabled: member.hasAppLogin ?? false,
     });
     setError(null);
     setModalOpen(true);
@@ -113,7 +117,14 @@ export function StaffClient({
         tipPoints: parseFloat(form.tipPoints) || 1,
         active: form.active,
         dateOfBirth: form.dateOfBirth || null,
-        ...(form.clockPin ? { clockPin: form.clockPin } : editing ? {} : { clockPin: "1234" }),
+        appLoginEnabled: form.appLoginEnabled,
+        ...(form.clockPin
+          ? { clockPin: form.clockPin }
+          : editing
+            ? {}
+            : form.appLoginEnabled
+              ? {}
+              : { clockPin: "1234" }),
       };
       if (editing) {
         const updated = await apiPatch<StaffMember>(`/api/staff/${editing.id}`, payload);
@@ -138,6 +149,8 @@ export function StaffClient({
 
   return (
     <>
+      {canEdit && <TeamLoginCodeBanner />}
+
       {canEdit && (
         <div className="mb-6 flex justify-end">
           <Button onClick={openCreate}>
@@ -172,9 +185,14 @@ export function StaffClient({
                 title={member.name}
                 description={member.role}
                 badge={
-                  <Badge className={member.active ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"}>
-                    {member.active ? "Active" : "Inactive"}
-                  </Badge>
+                  <div className="flex flex-wrap gap-1">
+                    {member.hasAppLogin && (
+                      <Badge className="bg-orange-100 text-orange-700">App login</Badge>
+                    )}
+                    <Badge className={member.active ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"}>
+                      {member.active ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
                 }
                 variant="card"
               >
@@ -239,13 +257,36 @@ export function StaffClient({
               onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })}
             />
           </FormField>
-          <FormField label="Time clock PIN (4–6 digits)">
+          <FormField label="App login (PIN sign-in)">
+            <Select
+              value={form.appLoginEnabled ? "true" : "false"}
+              onChange={(e) =>
+                setForm({ ...form, appLoginEnabled: e.target.value === "true" })
+              }
+            >
+              <option value="false">Time clock only</option>
+              <option value="true">Full app access with PIN</option>
+            </Select>
+          </FormField>
+          <FormField
+            label={
+              form.appLoginEnabled
+                ? "PIN (4–6 digits, optional — employee can choose on first sign-in)"
+                : "Time clock PIN (4–6 digits)"
+            }
+          >
             <Input
               type="password"
               inputMode="numeric"
               pattern="[0-9]*"
               maxLength={6}
-              placeholder={editing ? "Leave blank to keep current PIN" : "Default 1234 if empty"}
+              placeholder={
+                editing
+                  ? "Leave blank to keep current PIN"
+                  : form.appLoginEnabled
+                    ? "Employee chooses on first sign-in"
+                    : "Default 1234 if empty"
+              }
               value={form.clockPin}
               onChange={(e) => setForm({ ...form, clockPin: e.target.value.replace(/\D/g, "").slice(0, 6) })}
             />

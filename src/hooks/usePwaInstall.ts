@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { registerPwaServiceWorker } from "@/lib/pwa";
+import { registerPwaServiceWorker, isStandalonePwa } from "@/lib/pwa";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -14,11 +14,7 @@ function detectIOS(): boolean {
 }
 
 function detectInstalled(): boolean {
-  if (typeof window === "undefined") return false;
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    ("standalone" in navigator && (navigator as Navigator & { standalone?: boolean }).standalone === true)
-  );
+  return isStandalonePwa();
 }
 
 function detectInAppBrowser(): boolean {

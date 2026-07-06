@@ -2,7 +2,7 @@ import type { PlanId } from "./plans";
 import { getAuthSecret } from "./env";
 
 export const WORKSPACE_COOKIE_NAME = "pinnacle_workspace";
-export const WORKSPACE_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
+export const WORKSPACE_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
 
 export interface WorkspaceSnapshot {
   locationId: string;

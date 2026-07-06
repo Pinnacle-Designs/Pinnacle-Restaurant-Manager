@@ -4,6 +4,7 @@ import { getLocationId } from "@/lib/location";
 import { getEnrichedSessionUser } from "@/lib/location-plan";
 import { hasPermissionInList } from "@/lib/permissions";
 import { stripSalaries } from "@/lib/api-auth";
+import { enrichStaffForClient } from "@/lib/staff-app-login";
 import { PageHeader } from "@/components/ui";
 import { StaffPageClient } from "@/components/staff/StaffPageClient";
 
@@ -15,7 +16,9 @@ export default async function StaffPage() {
     orderBy: { name: "asc" },
   });
 
-  const safeStaff = user ? stripSalaries(user.role, staff, user.permissions) : staff;
+  const safeStaff = user
+    ? stripSalaries(user.role, staff, user.permissions).map(enrichStaffForClient)
+    : staff.map(enrichStaffForClient);
 
   return (
     <div>
