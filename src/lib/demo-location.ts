@@ -41,15 +41,17 @@ export async function resolveOwnerDemoLocationId(
     return seededId;
   }
 
-  const { setupDemoWorkspace } = await import("./seed-data");
-  const workspace = await setupDemoWorkspace("seeded");
-  await prisma.user
-    .update({
-      where: { id: userId },
-      data: { locationId: workspace.locationId },
-    })
-    .catch(() => {});
-  return workspace.locationId;
+  const { getOrCreateDemoLocation } = await import("./seed-data");
+  const location = await getOrCreateDemoLocation("seeded");
+  if (currentLocationId !== location.id) {
+    await prisma.user
+      .update({
+        where: { id: userId },
+        data: { locationId: location.id },
+      })
+      .catch(() => {});
+  }
+  return location.id;
 }
 
 export async function resolveDemoAccountLocationId(

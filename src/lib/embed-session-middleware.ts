@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { parseSessionToken } from "@/lib/session";
-import { applyEmbedAuthCookies } from "@/lib/embed-cookies";
+import { applyEmbedAuthCookies, isCrossOriginEmbedRequest } from "@/lib/embed-cookies";
 import { LOCATION_COOKIE_NAME } from "@/lib/location-constants";
 import {
   EMBED_LOCATION_HEADER,
@@ -9,7 +9,6 @@ import {
   EMBED_SESSION_PARAM,
 } from "@/lib/embed-constants";
 import { isEmbeddableEmbedParam } from "@/lib/embed-config";
-
 export { EMBED_SESSION_PARAM } from "@/lib/embed-constants";
 
 /** Forward embed session to server components (cookies are often blocked in iframes). */
@@ -58,6 +57,6 @@ export async function applyEmbedSessionParam(
   const response = NextResponse.next({
     request: { headers: injectEmbedSessionHeaders(request, rawToken, locationId) },
   });
-  applyEmbedAuthCookies(response, request, rawToken, locationId, true);
+  applyEmbedAuthCookies(response, request, rawToken, locationId, isCrossOriginEmbedRequest(request));
   return response;
 }

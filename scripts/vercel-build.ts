@@ -32,6 +32,7 @@ function main() {
 
   if (isPostgres) {
     run("npx prisma db push --skip-generate");
+    run("npx tsx scripts/seed-embed-demo.ts");
   } else if (seedDemo) {
     run("npm run db:deploy-seed");
   } else {

@@ -4,7 +4,7 @@
  */
 (function () {
   var DEFAULT_PATH = "/dashboard";
-  var PROBE_PORTS = ["3000", "3001", "3002", "3003", "3004", "3005"];
+  var PROBE_PORTS = ["3000", "3001", "3002", "3003", "3004", "3005", "3006"];
   var PROBE_TIMEOUT_MS = 1200;
   var EMBED_READY_MESSAGE_TYPE = "pinnacle-embed-ready";
 
@@ -123,6 +123,14 @@
     }
 
     if (isLocalHost()) {
+      if (configured) {
+        return probeEmbedUrl(configured).then(function (ok) {
+          if (ok) return configured;
+          return probeLocalAppUrl().then(function (found) {
+            return found || configured || defaultLocalAppUrl();
+          });
+        });
+      }
       return probeLocalAppUrl().then(function (found) {
         return found || defaultLocalAppUrl();
       });
@@ -139,9 +147,9 @@
 
   function devTimeoutMessage(activeUrl) {
     return (
-      "Timed out connecting to <code>" +
+      "Connection failed — no app responded at <code>" +
       activeUrl +
-      "</code>. Run <code>npm run dev</code>, then open <code>http://localhost:PORT/docs</code>."
+      "</code>. Run <code>npm run dev</code>, note the port in the terminal (e.g. 3001), then open <code>http://localhost:PORT</code> or <code>/docs</code> on that same port."
     );
   }
 
@@ -437,7 +445,7 @@
           heroSlot.innerHTML = "";
           heroSlot.appendChild(
             createFallback(
-              "No dev server found. Run <code>npm run dev</code> in the project root, then open <code>http://localhost:PORT/docs</code>."
+              "Connection failed — run <code>npm run dev</code>, then open this page on the same port shown in the terminal (e.g. <code>http://localhost:3001</code> or <code>/docs</code>)."
             )
           );
           return "";
@@ -523,6 +531,19 @@
       var retry = e.target.closest(".hero-app-retry");
       if (retry) connectApp();
     });
+
+    var tryDemoBtn = document.getElementById("hero-try-demo-btn");
+    if (tryDemoBtn) {
+      tryDemoBtn.addEventListener("click", function () {
+        var wrap = document.getElementById("hero-app-embed-wrap");
+        if (wrap) wrap.scrollIntoView({ behavior: "smooth", block: "center" });
+        if (!appUrl) {
+          connectApp();
+          return;
+        }
+        if (heroController && heroController.reload) heroController.reload();
+      });
+    }
   }
 
   function wireOptionalAppLinks(base) {

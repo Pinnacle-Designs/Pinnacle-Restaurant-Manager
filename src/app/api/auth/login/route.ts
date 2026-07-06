@@ -101,12 +101,27 @@ export async function POST(request: NextRequest) {
 
   if (useDemoWorkspace) {
     try {
-      const workspace = await setupDemoWorkspace(demoMode);
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { locationId: workspace.locationId },
-      });
-      user.locationId = workspace.locationId;
+      if (demoMode === "seeded" && isDemoAccountEmail(email)) {
+        const { resolveOwnerDemoLocationId, ensureFullDemoWorkspace } = await import(
+          "@/lib/demo-location"
+        );
+        const locationId = await resolveOwnerDemoLocationId(user.id, user.locationId);
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { locationId },
+        });
+        user.locationId = locationId;
+        void ensureFullDemoWorkspace(locationId, user.id).catch((err) => {
+          console.error("Demo background seed failed:", err);
+        });
+      } else {
+        const workspace = await setupDemoWorkspace(demoMode);
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { locationId: workspace.locationId },
+        });
+        user.locationId = workspace.locationId;
+      }
     } catch (err) {
       console.error("Demo workspace setup failed:", err);
       return privateJsonResponse(

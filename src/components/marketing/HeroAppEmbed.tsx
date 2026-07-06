@@ -66,6 +66,44 @@ export function HeroAppEmbed({
 
   useEffect(() => {
     if (!mounted) return;
+
+    let cancelled = false;
+    const controller = new AbortController();
+
+    void (async () => {
+      try {
+        const res = await fetch(mobileSrc, {
+          redirect: "manual",
+          credentials: "include",
+          signal: controller.signal,
+        });
+        if (cancelled) return;
+        if (res.status >= 500) {
+          const data = await res.json().catch(() => ({}));
+          setError(
+            typeof data.error === "string"
+              ? data.error
+              : "Demo server error — redeploy or run npm run dev locally."
+          );
+          setLoading(false);
+        }
+      } catch {
+        if (cancelled) return;
+        setError(
+          `Connection failed — open ${window.location.origin} on the same port as npm run dev, then click Retry.`
+        );
+        setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [mounted, mobileSrc, iframeKey]);
+
+  useEffect(() => {
+    if (!mounted) return;
     if (lastChromeRef.current === embedChrome) return;
     lastChromeRef.current = embedChrome;
     if (expanded) return;
@@ -120,10 +158,12 @@ export function HeroAppEmbed({
     if (!loading) return;
     const timer = window.setTimeout(() => {
       if (!readyRef.current) {
-        setError("Demo timed out starting. Try refreshing — if this persists, the server database may need a redeploy.");
+        setError(
+          "Demo is still loading. This can take a minute on first visit — click Retry, or open the full demo tour below."
+        );
         setLoading(false);
       }
-    }, 20000);
+    }, 45000);
     return () => window.clearTimeout(timer);
   }, [loading, mobileSrc, fullSrc, expanded]);
 

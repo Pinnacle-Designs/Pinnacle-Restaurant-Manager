@@ -28,6 +28,8 @@
     "vercel:env:push": "node scripts/push-vercel-env.mjs",
     "production:checklist": "tsx scripts/production-checklist.ts --write-env",
     "production:verify": "tsx scripts/verify-production-readiness.ts",
+    "create:pro-account": "tsx scripts/create-pro-account.ts",
+    "seed:embed-demo": "tsx scripts/seed-embed-demo.ts",
     "postinstall": "prisma generate && node scripts/copy-tesseract-public.mjs"
   },
   "dependencies": {

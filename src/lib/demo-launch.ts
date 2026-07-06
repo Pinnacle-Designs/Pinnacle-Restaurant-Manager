@@ -2,6 +2,10 @@ export type DemoMode = "seeded" | "fresh";
 
 export async function ensureDemoUsers() {
   const res = await fetch("/api/auth/seed", { method: "POST" });
+  if (res.status === 404) {
+    // Production — demo users are seeded at deploy via scripts/seed-embed-demo.ts
+    return;
+  }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || "Could not initialize demo accounts");

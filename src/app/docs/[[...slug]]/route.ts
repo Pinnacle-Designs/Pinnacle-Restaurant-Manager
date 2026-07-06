@@ -24,7 +24,7 @@ function resolveDocsPath(segments: string[] | undefined): string | null {
   return full;
 }
 
-function prepareDocsHtml(html: string): string {
+function prepareDocsHtml(html: string, appOrigin: string): string {
   let out = html.replace(/<base\s+href="[^"]*"\s*\/?>\s*/gi, "");
   out = out.replace('href="styles.css"', 'href="/docs/styles.css"');
   out = out.replace(/href="\.\/assets\//g, 'href="/docs/assets/');
@@ -37,11 +37,13 @@ function prepareDocsHtml(html: string): string {
     /var base = \(window\.PINNACLE_DOCS_BASE \|\| "\.\/"\)\.replace\(/g,
     'var base = (window.PINNACLE_DOCS_BASE || (location.pathname.indexOf("/docs") === 0 ? "/docs/" : "./")).replace('
   );
+  const runtimeConfig = `<script>window.PINNACLE_CONFIG=window.PINNACLE_CONFIG||{};window.PINNACLE_CONFIG.appUrl=${JSON.stringify(appOrigin)};</script>`;
+  out = out.replace("</head>", `${runtimeConfig}</head>`);
   return out;
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ slug?: string[] }> }
 ) {
   const { slug } = await context.params;
@@ -56,7 +58,7 @@ export async function GET(
     let body: BodyInit = new Uint8Array(raw);
 
     if (ext === ".html") {
-      body = prepareDocsHtml(raw.toString("utf-8"));
+      body = prepareDocsHtml(raw.toString("utf-8"), request.nextUrl.origin);
     }
 
     return new NextResponse(body, {

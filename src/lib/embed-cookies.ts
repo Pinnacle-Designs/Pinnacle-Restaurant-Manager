@@ -11,6 +11,32 @@ export function requestIsHttps(request: NextRequest): boolean {
   return request.headers.get("x-forwarded-proto") === "https";
 }
 
+/** True when the iframe parent is on a different origin (needs SameSite=None cookies). */
+export function isCrossOriginEmbedRequest(request: NextRequest): boolean {
+  const secFetchSite = request.headers.get("sec-fetch-site");
+  if (secFetchSite === "cross-site") return true;
+
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      if (new URL(origin).origin !== request.nextUrl.origin) return true;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try {
+      if (new URL(referer).origin !== request.nextUrl.origin) return true;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return false;
+}
+
 export function embedCookieFlags(request: NextRequest, forEmbed: boolean) {
   const https = requestIsHttps(request);
   // SameSite=None requires Secure; modern browsers allow Secure on http://localhost.

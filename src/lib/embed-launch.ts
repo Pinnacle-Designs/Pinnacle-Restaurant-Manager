@@ -14,40 +14,15 @@ import {
 } from "@/lib/demo-location";
 import { seedDemoUsers } from "@/lib/demo-users";
 import { resolveEmbedPath, resolveEmbedChrome, embedQueryValue } from "@/lib/embed-config";
-import { applyEmbedAuthCookies } from "@/lib/embed-cookies";
+import { applyEmbedAuthCookies, requestIsHttps, isCrossOriginEmbedRequest } from "@/lib/embed-cookies";
 import { EMBED_SESSION_PARAM } from "@/lib/embed-constants";
 import type { SessionUser } from "@/lib/session";
 
 export { EMBED_SESSION_PARAM } from "@/lib/embed-constants";
+export { isCrossOriginEmbedRequest } from "@/lib/embed-cookies";
 
 const DEMO_EMAIL = "owner@pinnacle.com";
 const DEMO_PASSWORD = "demo1234";
-
-/** True when the iframe parent is on a different origin (needs SameSite=None cookies). */
-export function isCrossOriginEmbedRequest(request: NextRequest): boolean {
-  const secFetchSite = request.headers.get("sec-fetch-site");
-  if (secFetchSite === "cross-site") return true;
-
-  const origin = request.headers.get("origin");
-  if (origin) {
-    try {
-      if (new URL(origin).origin !== request.nextUrl.origin) return true;
-    } catch {
-      /* ignore */
-    }
-  }
-
-  const referer = request.headers.get("referer");
-  if (referer) {
-    try {
-      if (new URL(referer).origin !== request.nextUrl.origin) return true;
-    } catch {
-      /* ignore */
-    }
-  }
-
-  return false;
-}
 
 async function buildEmbedRedirect(
   request: NextRequest,
@@ -56,16 +31,22 @@ async function buildEmbedRedirect(
   user: SessionUser,
   locationId: string
 ): Promise<NextResponse> {
-  await ensureFullDemoWorkspace(locationId, user.id);
+  // Seed in background — hero iframe must redirect immediately.
+  void ensureFullDemoWorkspace(locationId, user.id).catch((err) => {
+    console.error("Embed background seed failed:", err);
+  });
 
   const prepared = await prepareAuthSession({ ...user, locationId });
   const embedToken = await createCompactSessionToken(prepared.sessionUser);
   const redirectUrl = new URL(`${path}?embed=${embedValue}`, request.url);
   redirectUrl.searchParams.set(EMBED_SESSION_PARAM, embedToken);
 
+  const forEmbed = isCrossOriginEmbedRequest(request);
+  const secure = forEmbed || requestIsHttps(request);
+
   const response = NextResponse.redirect(redirectUrl);
-  applyEmbedAuthCookies(response, request, embedToken, locationId, true);
-  attachAuthCookies(response, prepared, { forEmbed: true, secure: true });
+  applyEmbedAuthCookies(response, request, embedToken, locationId, forEmbed);
+  attachAuthCookies(response, prepared, { forEmbed, secure });
   return response;
 }
 
