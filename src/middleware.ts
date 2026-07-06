@@ -51,6 +51,7 @@ const PUBLIC_PATHS = [
   "/api/embed/launch",
   "/api/app-version",
   "/api/health",
+  "/api/setup/pro-account",
   "/api/pitch-request",
   "/api/webhooks/stripe",
   "/api/account/billing/square/callback",

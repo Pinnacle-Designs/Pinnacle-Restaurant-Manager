@@ -45,6 +45,10 @@ async function main() {
 
   await seedPlanDemoWorkspaces();
 
+  const { ensureProCleanAccount } = await import("../src/lib/pro-clean-account");
+  const proClean = await ensureProCleanAccount({ resetPassword: true });
+  console.log(`[db] Pro clean account: ${proClean.email} (created=${proClean.created})`);
+
   const [userCount, menuCount, orderCount, location] = await Promise.all([
     prisma.user.count(),
     prisma.menuItem.count({ where: { locationId: workspace.locationId } }),

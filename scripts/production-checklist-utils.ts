@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 
-export function loadEnvFile(filePath = path.join(process.cwd(), ".env")): Record<string, string> {
+export function loadEnvFile(
+  filePath = path.join(process.cwd(), ".env"),
+  options?: { override?: boolean }
+): Record<string, string> {
   const env: Record<string, string> = {};
   if (!fs.existsSync(filePath)) return env;
   let text = fs.readFileSync(filePath, "utf8");
@@ -20,7 +23,7 @@ export function loadEnvFile(filePath = path.join(process.cwd(), ".env")): Record
       value = value.slice(1, -1);
     }
     env[key] = value;
-    if (!process.env[key]) process.env[key] = value;
+    if (options?.override || !process.env[key]) process.env[key] = value;
   }
   return env;
 }

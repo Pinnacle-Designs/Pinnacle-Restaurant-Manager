@@ -3,6 +3,7 @@ import { join } from "path";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isAiOcrConfigured, isDocumentOcrAvailable } from "@/lib/ocr/capabilities";
+import { PRO_CLEAN_DEFAULT_EMAIL } from "@/lib/pro-clean-account";
 
 export const runtime = "nodejs";
 
@@ -24,9 +25,15 @@ export async function GET() {
     "development";
 
   let database = false;
+  let proCleanAccount = false;
   try {
     await prisma.$queryRaw`SELECT 1`;
     database = true;
+    const proClean = await prisma.user.findUnique({
+      where: { email: PRO_CLEAN_DEFAULT_EMAIL },
+      select: { active: true, role: true },
+    });
+    proCleanAccount = Boolean(proClean?.active && proClean.role === "OWNER");
   } catch {
     database = false;
   }
@@ -40,6 +47,7 @@ export async function GET() {
       version,
       checks: {
         database,
+        proCleanAccount,
         documentOcr: isDocumentOcrAvailable(),
         ocrAssets,
         aiOcr: isAiOcrConfigured(),

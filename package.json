@@ -29,6 +29,9 @@
     "production:checklist": "tsx scripts/production-checklist.ts --write-env",
     "production:verify": "tsx scripts/verify-production-readiness.ts",
     "create:pro-account": "tsx scripts/create-pro-account.ts",
+    "create:pro-account:production": "npx vercel env pull .env.production.local --environment=production --yes && tsx scripts/create-pro-account.ts --reset --env-file .env.production.local",
+    "ensure:pro-clean": "tsx scripts/ensure-pro-clean-account.ts",
+    "ensure:pro-clean:production": "npx vercel env run --environment=production -- npx tsx scripts/ensure-pro-clean-account.ts --reset",
     "seed:embed-demo": "tsx scripts/seed-embed-demo.ts",
     "postinstall": "prisma generate && node scripts/copy-tesseract-public.mjs"
   },

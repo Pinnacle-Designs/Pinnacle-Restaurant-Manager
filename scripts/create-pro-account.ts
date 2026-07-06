@@ -4,17 +4,12 @@
  * Usage:
  *   npm run create:pro-account
  *   npm run create:pro-account -- --reset
- *   npm run create:pro-account -- --email you@example.com --password "YourPass123"
- *
- * Production (Vercel Postgres):
- *   DATABASE_URL="postgresql://..." npm run create:pro-account -- --reset
+ *   npm run create:pro-account:production
  */
 import { addDays } from "date-fns";
+import path from "path";
 import { loadEnvFile } from "./production-checklist-utils";
-import { prisma } from "../src/lib/prisma";
-import { hashPassword, verifyPassword } from "../src/lib/auth";
 import { validatePassword } from "../src/lib/password-policy";
-import { ensureDefaultStorageZones } from "../src/lib/walk-in/storage-zones";
 import { SUBSCRIPTION_CONTRACT_VERSION } from "../src/lib/subscription-contracts";
 
 function arg(name: string): string | undefined {
@@ -27,7 +22,28 @@ function hasFlag(name: string): boolean {
   return process.argv.includes(`--${name}`);
 }
 
-async function ensureBilling(locationId: string, userId: string) {
+function loadEnv() {
+  const envFile = arg("env-file");
+  if (envFile) {
+    loadEnvFile(path.isAbsolute(envFile) ? envFile : path.join(process.cwd(), envFile), {
+      override: true,
+    });
+  } else {
+    loadEnvFile();
+  }
+
+  const dbUrl = process.env.DATABASE_URL?.trim();
+  if (!dbUrl) {
+    console.error("DATABASE_URL is not set. For production run: npm run create:pro-account:production");
+    process.exit(1);
+  }
+}
+
+async function ensureBilling(
+  prisma: Awaited<ReturnType<typeof getPrisma>>,
+  locationId: string,
+  userId: string
+) {
   await prisma.paymentProviderConnection.upsert({
     where: { locationId_purpose: { locationId, purpose: "SUBSCRIPTION" } },
     create: {
@@ -65,8 +81,17 @@ async function ensureBilling(locationId: string, userId: string) {
   });
 }
 
+async function getPrisma() {
+  const { prisma } = await import("../src/lib/prisma");
+  return prisma;
+}
+
 async function main() {
-  loadEnvFile();
+  loadEnv();
+
+  const { hashPassword, verifyPassword } = await import("../src/lib/auth");
+  const { ensureDefaultStorageZones } = await import("../src/lib/walk-in/storage-zones");
+  const prisma = await getPrisma();
 
   const reset = hasFlag("reset");
   const email = (arg("email") ?? "pro-clean@pinnacle.app").trim().toLowerCase();
@@ -86,6 +111,8 @@ async function main() {
     : process.env.DATABASE_URL?.includes("postgres")
       ? "PostgreSQL"
       : "database";
+
+  console.log(`[create-pro-account] Target: ${dbHint}`);
 
   const existing = await prisma.user.findUnique({
     where: { email },
@@ -113,7 +140,7 @@ async function main() {
     });
 
     if (existing.locationId) {
-      await ensureBilling(existing.locationId, existing.id);
+      await ensureBilling(prisma, existing.locationId, existing.id);
     } else {
       const location = await prisma.location.create({
         data: {
@@ -128,7 +155,7 @@ async function main() {
         where: { id: existing.id },
         data: { locationId: location.id },
       });
-      await ensureBilling(location.id, existing.id);
+      await ensureBilling(prisma, location.id, existing.id);
     }
 
     const ok = verifyPassword(password, passwordHash);
@@ -174,7 +201,7 @@ async function main() {
     },
   });
 
-  await ensureBilling(location.id, user.id);
+  await ensureBilling(prisma, location.id, user.id);
 
   console.log(`\n✓ Pro account created in ${dbHint} (no seed data)\n`);
   console.log(`  Email:      ${email}`);
@@ -182,7 +209,7 @@ async function main() {
   console.log(`  Plan:       PRO`);
   console.log(`  Restaurant: ${restaurantName}`);
   console.log(`  Location:   ${location.id}`);
-  console.log("\n  Sign in at /login on the same environment as this database.\n");
+  console.log("\n  Sign in at https://pinnacle-resturant-manager.vercel.app/login\n");
 }
 
 main()
@@ -191,5 +218,10 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    try {
+      const prisma = await getPrisma();
+      await prisma.$disconnect();
+    } catch {
+      /* ignore */
+    }
   });
