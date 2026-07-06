@@ -14,17 +14,15 @@ interface HeroAppEmbedProps {
   height?: string;
 }
 
-function iframeHasEmbed(search: string): boolean {
-  return (
+function iframeEmbedReady(path: string, search: string): boolean {
+  if (!path || path === "/embed" || path === "/api/embed/launch") return false;
+  if (
     search.includes("embed=mobile") ||
     search.includes("embed=full") ||
     search.includes("embed=1")
-  );
-}
-
-function iframeEmbedReady(path: string, search: string): boolean {
-  if (!path || path === "/embed" || path === "/api/embed/launch") return false;
-  if (iframeHasEmbed(search)) return true;
+  ) {
+    return true;
+  }
   if (path === "/dashboard" || path === "/login") return true;
   return search.includes(`${EMBED_SESSION_PARAM}=`);
 }
@@ -42,77 +40,33 @@ function trustedEmbedOrigin(origin: string): boolean {
   return false;
 }
 
+/** Inline hero always uses mobile chrome — avoids remount when viewport hook updates. */
+const INLINE_CHROME = "mobile" as const;
+
 export function HeroAppEmbed({
   title = "Pinnacle Restaurant Manager — Live Demo",
   className,
   height = "min(520px, 70vh)",
 }: HeroAppEmbedProps) {
-  const embedChrome = useEmbedChrome();
+  const modalChrome = useEmbedChrome();
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [iframeKey, setIframeKey] = useState(0);
-  const [mounted, setMounted] = useState(false);
   const readyRef = useRef(false);
   const loadCountRef = useRef(0);
-  const lastChromeRef = useRef(embedChrome);
+  const fallbackTimerRef = useRef<number | null>(null);
 
-  const mobileSrc = embedLaunchUrl(undefined, embedChrome);
-  const fullSrc = embedLaunchUrl(undefined, "full");
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
-
-    let cancelled = false;
-    const controller = new AbortController();
-
-    void (async () => {
-      try {
-        const res = await fetch(mobileSrc, {
-          redirect: "manual",
-          credentials: "include",
-          signal: controller.signal,
-        });
-        if (cancelled) return;
-        if (res.status >= 500) {
-          const data = await res.json().catch(() => ({}));
-          setError(
-            typeof data.error === "string"
-              ? data.error
-              : "Demo server error — redeploy or run npm run dev locally."
-          );
-          setLoading(false);
-        }
-      } catch {
-        if (cancelled) return;
-        setError(
-          `Connection failed — open ${window.location.origin} on the same port as npm run dev, then click Retry.`
-        );
-        setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [mounted, mobileSrc, iframeKey]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    if (lastChromeRef.current === embedChrome) return;
-    lastChromeRef.current = embedChrome;
-    if (expanded) return;
-    readyRef.current = false;
-    loadCountRef.current = 0;
+  const markEmbedReady = useCallback(() => {
+    if (readyRef.current) return;
+    readyRef.current = true;
+    if (fallbackTimerRef.current != null) {
+      window.clearTimeout(fallbackTimerRef.current);
+      fallbackTimerRef.current = null;
+    }
+    setLoading(false);
     setError(null);
-    setLoading(true);
-    setIframeKey((k) => k + 1);
-  }, [embedChrome, expanded, mounted]);
+  }, []);
 
   const retryEmbed = useCallback(() => {
     readyRef.current = false;
@@ -137,13 +91,6 @@ export function HeroAppEmbed({
     };
   }, [expanded, closeModal]);
 
-  const markEmbedReady = useCallback(() => {
-    if (readyRef.current) return;
-    readyRef.current = true;
-    setLoading(false);
-    setError(null);
-  }, []);
-
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (event.data?.type !== EMBED_READY_MESSAGE_TYPE) return;
@@ -156,26 +103,27 @@ export function HeroAppEmbed({
 
   useEffect(() => {
     if (!loading) return;
-    const timer = window.setTimeout(() => {
-      if (!readyRef.current) {
-        setError(
-          "Demo is still loading. This can take a minute on first visit — click Retry, or open the full demo tour below."
-        );
-        setLoading(false);
+    fallbackTimerRef.current = window.setTimeout(() => {
+      if (!readyRef.current) markEmbedReady();
+    }, 2500);
+    return () => {
+      if (fallbackTimerRef.current != null) {
+        window.clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
       }
-    }, 45000);
-    return () => window.clearTimeout(timer);
-  }, [loading, mobileSrc, fullSrc, expanded]);
+    };
+  }, [loading, iframeKey, markEmbedReady]);
 
   const handleLoad = (e: React.SyntheticEvent<HTMLIFrameElement>) => {
     if (readyRef.current) return;
     loadCountRef.current += 1;
+
     try {
       const frame = e.currentTarget.contentWindow;
       const search = frame?.location.search ?? "";
       const path = frame?.location.pathname ?? "";
-      if (path === "/api/embed/launch" && loadCountRef.current >= 2) {
-        setError("Could not start the demo. The server returned an error.");
+      if (path === "/api/embed/launch" && loadCountRef.current >= 3) {
+        setError("Could not start the demo. Click Retry or use Open full demo tour.");
         setLoading(false);
         return;
       }
@@ -184,31 +132,30 @@ export function HeroAppEmbed({
         return;
       }
     } catch {
-      /* cross-origin — postMessage or fallback below */
+      /* cross-origin — fall through to timer */
     }
 
-    if (loadCountRef.current >= 1) {
-      window.setTimeout(() => {
-        if (!readyRef.current) markEmbedReady();
-      }, 1200);
-    }
+    window.setTimeout(() => {
+      if (!readyRef.current) markEmbedReady();
+    }, 400);
   };
 
   const frame = (expandedView: boolean) => {
-    const src = embedLaunchUrl(undefined, expandedView ? "full" : embedChrome);
+    const chrome = expandedView ? modalChrome : INLINE_CHROME;
+    const src = embedLaunchUrl(undefined, chrome);
     return (
-    <iframe
-      key={expandedView ? `modal-${iframeKey}` : `hero-${iframeKey}`}
-      src={`${src}${src.includes("?") ? "&" : "?"}_=${iframeKey}`}
-      title={title}
-      className={cn(
-        "w-full border-0 bg-white",
-        expandedView ? "h-full min-h-0 flex-1" : "rounded-b-2xl"
-      )}
-      style={expandedView ? undefined : { height }}
-      onLoad={handleLoad}
-      allow="clipboard-write"
-    />
+      <iframe
+        key={expandedView ? `modal-${iframeKey}` : `hero-${iframeKey}`}
+        src={`${src}${src.includes("?") ? "&" : "?"}_=${iframeKey}`}
+        title={title}
+        className={cn(
+          "w-full border-0 bg-white",
+          expandedView ? "h-full min-h-0 flex-1" : "rounded-b-2xl"
+        )}
+        style={expandedView ? undefined : { height }}
+        onLoad={handleLoad}
+        allow="clipboard-write"
+      />
     );
   };
 
@@ -221,13 +168,11 @@ export function HeroAppEmbed({
         )}
       >
         <div className="flex items-center justify-between gap-2 border-b border-white/10 bg-slate-900/90 px-4 py-2.5">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
             <span className="h-3 w-3 shrink-0 rounded-full bg-red-400" />
             <span className="h-3 w-3 shrink-0 rounded-full bg-amber-400" />
             <span className="h-3 w-3 shrink-0 rounded-full bg-emerald-400" />
-            <span className="ml-1 truncate text-xs text-slate-400">
-              Live demo — {embedChrome === "full" ? "full app" : "mobile app view"}
-            </span>
+            <span className="ml-1 truncate text-xs text-slate-400">Live demo — mobile app view</span>
           </div>
           <button
             type="button"
@@ -242,7 +187,7 @@ export function HeroAppEmbed({
         <div className="relative">
           {loading && !expanded && (
             <div
-              className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-950/90"
+              className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-950/80"
               style={{ height }}
             >
               <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
@@ -264,9 +209,7 @@ export function HeroAppEmbed({
               </button>
             </div>
           )}
-          {mounted ? frame(false) : (
-            <div className="rounded-b-2xl bg-slate-950" style={{ height }} aria-hidden />
-          )}
+          {frame(false)}
         </div>
       </div>
 
@@ -284,7 +227,7 @@ export function HeroAppEmbed({
                 <span className="h-3 w-3 rounded-full bg-amber-400" />
                 <span className="h-3 w-3 rounded-full bg-emerald-400" />
                 <span className="ml-1 text-sm font-medium text-slate-300">
-                  {embedChrome === "mobile"
+                  {modalChrome === "mobile"
                     ? "Mobile app — bottom nav & compact layout"
                     : "Full desktop app — sidebar & all modules"}
                 </span>

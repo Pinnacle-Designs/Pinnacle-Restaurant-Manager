@@ -41,8 +41,10 @@ export function EmbedSessionBootstrap() {
     };
 
     notify();
-    const timer = window.setTimeout(notify, 400);
-    return () => window.clearTimeout(timer);
+    const timers = [400, 1200, 2500].map((ms) => window.setTimeout(notify, ms));
+    return () => {
+      timers.forEach((id) => window.clearTimeout(id));
+    };
   }, [embed, st, refresh]);
 
   return null;

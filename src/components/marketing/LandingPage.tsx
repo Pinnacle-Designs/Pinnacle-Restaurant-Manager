@@ -108,9 +108,6 @@ export function LandingPage() {
                   <ArrowRight className="h-5 w-5" />
                 </Link>
               </div>
-              <p className="mt-4 text-sm text-slate-400">
-                Try the full app in the window → owner@pinnacle.com / demo1234
-              </p>
             </div>
 
             <HeroAppEmbed />
