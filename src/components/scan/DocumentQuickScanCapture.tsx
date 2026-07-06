@@ -60,6 +60,7 @@ export function DocumentQuickScanCapture({
     fileInputRef,
     cameraInputRef,
     uploadPreparing,
+    captureError,
   } = scan;
 
   const canRunExtract = canExtractOverride ?? canExtract;
@@ -150,6 +151,11 @@ export function DocumentQuickScanCapture({
 
   return (
     <div className="space-y-4">
+      {captureError && (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {captureError}
+        </p>
+      )}
       {!hideToggle && (
         <DocumentScanModeToggle mode={scanMode} onChange={switchMode} accent={accent} />
       )}

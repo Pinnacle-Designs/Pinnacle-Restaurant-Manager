@@ -64,6 +64,7 @@ export function MultiPageScanCapture({
   const [sessionCompleteInternal, setSessionCompleteInternal] = useState(false);
   const [panoramaPreview, setPanoramaPreview] = useState<string | null>(null);
   const [buildingPanorama, setBuildingPanorama] = useState(false);
+  const [prepareError, setPrepareError] = useState<string | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
 
@@ -93,10 +94,12 @@ export function MultiPageScanCapture({
     async (pageList: ScanPage[]) => {
       if (pageList.length === 0) {
         setPanoramaPreview(null);
+        setPrepareError(null);
         onStitchedChange?.(null);
         onPreparingChange?.(false);
         return;
       }
+      setPrepareError(null);
       if (pageList.length === 1) {
         onPreparingChange?.(true);
         try {
@@ -104,6 +107,11 @@ export function MultiPageScanCapture({
           const dataUrl = await readFileAsDataUrl(compressed);
           setPanoramaPreview(dataUrl);
           onStitchedChange?.({ dataUrl, file: compressed });
+        } catch (err) {
+          const message =
+            err instanceof Error ? err.message : "Could not prepare image for upload";
+          setPrepareError(message);
+          onStitchedChange?.(null);
         } finally {
           onPreparingChange?.(false);
         }
@@ -118,15 +126,20 @@ export function MultiPageScanCapture({
           dataUrl,
           file: blobToFile(blob, `${documentLabel}-panorama.jpg`),
         });
-      } catch {
+      } catch (err) {
         try {
           const compressed = await compressFileForUpload(pageList[0].file);
           const dataUrl = await readFileAsDataUrl(compressed);
           setPanoramaPreview(dataUrl);
           onStitchedChange?.({ dataUrl, file: compressed });
+          setPrepareError(
+            "Could not stitch all pages — only page 1 will be scanned. Try fewer pages or retake with less zoom."
+          );
         } catch {
-          setPanoramaPreview(pageList[0].dataUrl);
-          onStitchedChange?.({ dataUrl: pageList[0].dataUrl, file: pageList[0].file });
+          const message =
+            err instanceof Error ? err.message : "Could not prepare images for upload";
+          setPrepareError(message);
+          onStitchedChange?.(null);
         }
       } finally {
         setBuildingPanorama(false);
@@ -281,6 +294,9 @@ export function MultiPageScanCapture({
             </Badge>
             {buildingPanorama && (
               <span className="text-xs text-slate-500">Building panorama…</span>
+            )}
+            {prepareError && (
+              <span className="text-xs text-amber-700">{prepareError}</span>
             )}
             {!waitingForNextScan && !sessionComplete && pages.length > 0 && (
               <div className="flex flex-wrap gap-2">

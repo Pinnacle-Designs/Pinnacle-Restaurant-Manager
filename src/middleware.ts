@@ -46,6 +46,7 @@ const PUBLIC_PATHS = [
   "/api/auth/verify-email",
   "/api/auth/seed",
   "/api/embed/launch",
+  "/api/app-version",
   "/api/pitch-request",
   "/api/webhooks/stripe",
   "/api/account/billing/square/callback",

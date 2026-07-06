@@ -4,15 +4,10 @@ import { useEffect } from "react";
 import { showCriticalNotifications, type CriticalInsight } from "@/lib/notifications";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { parseJsonResponse } from "@/lib/fetch-json";
-import { registerPwaServiceWorker } from "@/lib/pwa";
 import { clientFetch } from "@/lib/embed-api-client";
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const { user, loading, can } = useAuth();
-
-  useEffect(() => {
-    void registerPwaServiceWorker();
-  }, []);
 
   useEffect(() => {
     if (loading || !user || !can("view_insights")) return;

@@ -13,6 +13,7 @@ import {
   base64Input,
   filesToBase64,
   parseScanFormData,
+  scanUploadTooLarge,
   visionScanFromParsed,
 } from "@/lib/scan/parse-scan-form";
 
@@ -60,6 +61,11 @@ export async function POST(request: NextRequest) {
 
     if (parsed.files.length === 0) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    const tooLarge = scanUploadTooLarge(parsed.files);
+    if (tooLarge) {
+      return NextResponse.json({ error: tooLarge }, { status: 413 });
     }
 
     const uploadFile = parsed.uploadFile ?? parsed.files[0];

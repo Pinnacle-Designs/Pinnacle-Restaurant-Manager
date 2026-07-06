@@ -12,6 +12,21 @@ const nextConfig: NextConfig = {
   ...(useSqlite
     ? { outputFileTracingIncludes: { "/*": ["./prisma/deploy.sqlite"] } }
     : {}),
+  async headers() {
+    return [
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+      {
+        source: "/manifest.json",
+        headers: [{ key: "Cache-Control", value: "no-cache" }],
+      },
+    ];
+  },
   images: {
     remotePatterns: [],
     unoptimized: false,

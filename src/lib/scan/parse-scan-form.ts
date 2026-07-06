@@ -71,6 +71,14 @@ export function base64Input(images: string[]): string | string[] {
   return images.length === 1 ? images[0] : images;
 }
 
+export const MAX_SCAN_SERVER_BYTES = 4_000_000;
+
+export function scanUploadTooLarge(files: File[]): string | null {
+  const oversized = files.find((f) => f.size > MAX_SCAN_SERVER_BYTES);
+  if (!oversized) return null;
+  return `File too large (${(oversized.size / 1_000_000).toFixed(1)}MB). Retake with fewer pages or less zoom.`;
+}
+
 export interface VisionScanOptions {
   panoramic?: boolean;
   multiPage?: boolean;

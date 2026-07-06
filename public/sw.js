@@ -21,6 +21,11 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+    return;
+  }
+
   if (event.data?.type === "SHOW_NOTIFICATIONS") {
     const insights = event.data.insights || [];
     insights.forEach((insight) => {
