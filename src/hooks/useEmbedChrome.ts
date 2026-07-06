@@ -7,9 +7,14 @@ const MOBILE_EMBED_QUERY = "(max-width: 1023px)";
 
 export { MOBILE_EMBED_QUERY as MOBILE_EMBED_MEDIA };
 
+function readEmbedChrome(): EmbedChrome {
+  if (typeof window === "undefined") return "full";
+  return window.matchMedia(MOBILE_EMBED_QUERY).matches ? "mobile" : "full";
+}
+
 /** Pick mobile vs desktop chrome for demo iframes based on viewport width. */
 export function useEmbedChrome(): EmbedChrome {
-  const [chrome, setChrome] = useState<EmbedChrome>("full");
+  const [chrome, setChrome] = useState<EmbedChrome>(readEmbedChrome);
 
   useEffect(() => {
     const mq = window.matchMedia(MOBILE_EMBED_QUERY);

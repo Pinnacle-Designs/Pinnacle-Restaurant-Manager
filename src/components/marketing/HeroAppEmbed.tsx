@@ -33,9 +33,21 @@ export function HeroAppEmbed({
   const [iframeKey, setIframeKey] = useState(0);
   const readyRef = useRef(false);
   const loadCountRef = useRef(0);
+  const lastChromeRef = useRef(embedChrome);
 
   const mobileSrc = embedLaunchUrl(undefined, embedChrome);
   const fullSrc = embedLaunchUrl(undefined, "full");
+
+  useEffect(() => {
+    if (lastChromeRef.current === embedChrome) return;
+    lastChromeRef.current = embedChrome;
+    if (expanded) return;
+    readyRef.current = false;
+    loadCountRef.current = 0;
+    setError(null);
+    setLoading(true);
+    setIframeKey((k) => k + 1);
+  }, [embedChrome, expanded]);
 
   const retryEmbed = useCallback(() => {
     readyRef.current = false;

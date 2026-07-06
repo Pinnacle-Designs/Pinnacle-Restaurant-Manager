@@ -86,19 +86,30 @@ export async function ensureFullDemoWorkspace(
   locationId: string,
   ownerUserId: string
 ): Promise<void> {
-  const { seedLocationData } = await import("./seed-data");
-  await seedLocationData(locationId);
+  try {
+    await ensureSeededDemoData(locationId);
+  } catch (err) {
+    console.error("[demo] ensureSeededDemoData failed (non-fatal):", err);
+  }
 
-  const { ensurePlanDemoWorkspaceReady } = await import("./demo-owner-billing");
-  await ensurePlanDemoWorkspaceReady(locationId, ownerUserId, "PRO");
+  try {
+    const { ensurePlanDemoWorkspaceReady } = await import("./demo-owner-billing");
+    await ensurePlanDemoWorkspaceReady(locationId, ownerUserId, "PRO");
+  } catch (err) {
+    console.error("[demo] billing setup failed (non-fatal):", err);
+  }
 
   const location = await prisma.location.findUnique({
     where: { id: locationId },
     select: { plan: true, setupComplete: true },
   });
   if (location?.plan !== "PRO" || !location.setupComplete) {
-    const { seedDemoExtras } = await import("./seed-extras");
-    await seedDemoExtras(locationId);
+    try {
+      const { seedDemoExtras } = await import("./seed-extras");
+      await seedDemoExtras(locationId);
+    } catch (err) {
+      console.error("[demo] seedDemoExtras failed (non-fatal):", err);
+    }
   }
 }
 

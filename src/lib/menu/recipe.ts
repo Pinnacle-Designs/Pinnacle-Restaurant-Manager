@@ -360,32 +360,40 @@ export async function saveMenuRecipe(
 
   await validateRecipeComponents(locationId, menuItemId, components);
 
-  await prisma.$transaction([
-    prisma.menuRecipeLine.deleteMany({ where: { menuItemId } }),
-    prisma.menuRecipeComponent.deleteMany({ where: { parentMenuItemId: menuItemId } }),
-  ]);
-
-  if (lines.length) {
-    await prisma.menuRecipeLine.createMany({
-      data: lines.map((line, idx) => ({
-        menuItemId,
-        inventoryItemId: line.inventoryItemId,
-        quantity: Math.max(0, line.quantity),
-        sortOrder: idx,
-      })),
-    });
+  const uniqueLines: RecipeLineInput[] = [];
+  const seenInventory = new Set<string>();
+  for (const line of lines) {
+    if (seenInventory.has(line.inventoryItemId)) continue;
+    seenInventory.add(line.inventoryItemId);
+    uniqueLines.push(line);
   }
 
-  if (components.length) {
-    await prisma.menuRecipeComponent.createMany({
-      data: components.map((comp, idx) => ({
-        parentMenuItemId: menuItemId,
-        componentMenuItemId: comp.componentMenuItemId,
-        quantity: Math.max(0, comp.quantity),
-        sortOrder: idx,
-      })),
-    });
-  }
+  await prisma.$transaction(async (tx) => {
+    await tx.menuRecipeLine.deleteMany({ where: { menuItemId } });
+    await tx.menuRecipeComponent.deleteMany({ where: { parentMenuItemId: menuItemId } });
+
+    if (uniqueLines.length) {
+      await tx.menuRecipeLine.createMany({
+        data: uniqueLines.map((line, idx) => ({
+          menuItemId,
+          inventoryItemId: line.inventoryItemId,
+          quantity: Math.max(0, line.quantity),
+          sortOrder: idx,
+        })),
+      });
+    }
+
+    if (components.length) {
+      await tx.menuRecipeComponent.createMany({
+        data: components.map((comp, idx) => ({
+          parentMenuItemId: menuItemId,
+          componentMenuItemId: comp.componentMenuItemId,
+          quantity: Math.max(0, comp.quantity),
+          sortOrder: idx,
+        })),
+      });
+    }
+  });
 
   const updated = await syncMenuItemRecipeCost(menuItemId);
   await bumpMenuRevision(locationId);

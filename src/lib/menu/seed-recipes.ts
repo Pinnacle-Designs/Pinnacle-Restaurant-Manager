@@ -63,6 +63,10 @@ export async function seedMenuRecipes(locationId: string) {
       .filter((line): line is { inventoryItemId: string; quantity: number } => line !== null);
 
     if (lines.length === 0) continue;
-    await saveMenuRecipe(locationId, item.id, lines);
+    try {
+      await saveMenuRecipe(locationId, item.id, lines);
+    } catch (err) {
+      console.warn(`[seed-recipes] Skipped "${item.name}":`, err);
+    }
   }
 }

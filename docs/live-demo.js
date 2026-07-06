@@ -42,8 +42,7 @@
     var url =
       base.replace(/\/$/, "") +
       "/api/embed/launch?path=" +
-      encodeURIComponent(DEFAULT_PATH) +
-      "&chrome=full";
+      encodeURIComponent(DEFAULT_PATH);
     var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
     var timer = controller
       ? setTimeout(function () {
@@ -61,6 +60,9 @@
         if (timer) clearTimeout(timer);
         if (res.status === 307 || res.status === 302 || res.status === 303) {
           return base.replace(/\/$/, "");
+        }
+        if (res.status >= 500) {
+          return "";
         }
         return "";
       })
@@ -205,7 +207,7 @@
     if (!container || !appUrl) return null;
 
     var path = (options && options.path) || DEFAULT_PATH;
-    var chrome = (options && options.chrome) || "full";
+    var chrome = (options && options.chrome) || "mobile";
     var candidates = (options && options.candidates) || [appUrl];
     var candidateIndex = Math.max(
       0,
@@ -374,11 +376,11 @@
       return list;
     }
 
-  function preferredChrome() {
-    return window.matchMedia("(max-width: 1023px)").matches ? "mobile" : "full";
-  }
+    function preferredChrome() {
+      return window.matchMedia("(max-width: 1023px)").matches ? "mobile" : "full";
+    }
 
-  function mountHero() {
+    function mountHero() {
       if (!appUrl) {
         heroSlot.innerHTML = "";
         heroSlot.appendChild(
