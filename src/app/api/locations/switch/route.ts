@@ -5,16 +5,25 @@ import { requireSecureAuth } from "@/lib/api-auth";
 import { applyAuthCookies } from "@/lib/auth-cookies";
 import { isProductionRuntime } from "@/lib/dev-routes";
 import { privateJsonResponse } from "@/lib/secure-response";
+import { isProCleanAccountEmail } from "@/lib/pro-clean-account";
 
 export async function POST(request: NextRequest) {
   const { user, error } = await requireSecureAuth(request);
   if (error) return error;
+
+  if (isProCleanAccountEmail(user!.email)) {
+    return privateJsonResponse({ error: "Forbidden" }, { status: 403 });
+  }
 
   const body = await request.json().catch(() => ({}));
   const locationId = String(body.locationId || "").trim();
 
   if (!locationId) {
     return privateJsonResponse({ error: "Location is required" }, { status: 400 });
+  }
+
+  if (isProCleanAccountEmail(user!.email) && locationId !== user!.locationId) {
+    return privateJsonResponse({ error: "Forbidden" }, { status: 403 });
   }
 
   if (isProductionRuntime()) {

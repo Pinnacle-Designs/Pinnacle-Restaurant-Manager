@@ -14,11 +14,8 @@ import { privateJsonResponse } from "@/lib/secure-response";
 import { createMfaPendingToken } from "@/lib/mfa-pending";
 import { requireActiveAccount } from "@/lib/api-auth";
 import { isCrossOriginEmbedRequest } from "@/lib/embed-launch";
-import {
-  ensureProCleanAccount,
-  isProCleanAccountEmail,
-} from "@/lib/pro-clean-account";
-import { LOCATION_COOKIE_NAME } from "@/lib/location";
+import { isProCleanAccountEmail } from "@/lib/pro-clean-account";
+import { proCleanLoginRequiredResponse } from "@/lib/pro-clean-login";
 
 const LOGIN_FAILURE_DELAY_MS = 250;
 
@@ -37,34 +34,14 @@ export async function GET(request: NextRequest) {
     return privateJsonResponse({ user: null });
   }
 
-  let sessionUser = activeUser;
   if (isProCleanAccountEmail(activeUser.email)) {
-    const ensured = await ensureProCleanAccount({ resetPassword: false });
-    if (ensured.locationId) {
-      sessionUser = { ...activeUser, locationId: ensured.locationId };
-    }
+    return privateJsonResponse({ user: null });
   }
 
-  const prepared = await prepareAuthSession(sessionUser);
+  const prepared = await prepareAuthSession(activeUser);
   const response = privateJsonResponse({ user: prepared.sessionUser });
   const forEmbed = isCrossOriginEmbedRequest(request);
   attachAuthCookies(response, prepared, forEmbed ? { forEmbed: true, secure: true } : undefined);
-  if (!forEmbed && prepared.sessionUser.locationId) {
-    response.cookies.set(LOCATION_COOKIE_NAME, "", {
-      path: "/",
-      maxAge: 0,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-    });
-    response.cookies.set(LOCATION_COOKIE_NAME, prepared.sessionUser.locationId, {
-      path: "/",
-      maxAge: 60 * 60 * 24 * 365,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-    });
-  }
   return response;
 }
 
@@ -79,6 +56,10 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const email = String(body.email || "").trim().toLowerCase();
+
+  if (isProCleanAccountEmail(email)) {
+    return proCleanLoginRequiredResponse();
+  }
 
   if (email && (await isRateLimited(`login:email:${email}`, 10, 60_000))) {
     return privateJsonResponse(

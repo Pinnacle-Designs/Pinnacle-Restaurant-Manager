@@ -25,6 +25,8 @@ import {
   isMfaSetupAllowedPath,
   ownerMfaRequired,
 } from "@/lib/mfa-policy";
+import { isProCleanAccountEmail } from "@/lib/pro-clean-account";
+import { PRO_CLEAN_LOGIN_PATH } from "@/lib/pro-clean-login";
 
 const PUBLIC_PATHS = [
   "/",
@@ -40,6 +42,7 @@ const PUBLIC_PATHS = [
   "/docs",
   "/sales-deck",
   "/api/auth/login",
+  "/api/auth/pro-login",
   "/api/auth/pin-login",
   "/api/auth/team-roster",
   "/api/auth/mfa/verify",
@@ -196,9 +199,27 @@ async function runMiddleware(request: NextRequest) {
   }
 
   // Installed app opens at /login — skip sign-in when session is still valid.
+  if (pathname === PRO_CLEAN_LOGIN_PATH) {
+    const token = getRequestSessionToken(request);
+    const sessionUser = token ? await parseSessionToken(token) : null;
+    if (sessionUser?.email && isProCleanAccountEmail(sessionUser.email)) {
+      return applyFramePolicy(request, NextResponse.redirect(new URL("/dashboard", request.url)));
+    }
+    if (sessionUser && !isProCleanAccountEmail(sessionUser.email)) {
+      return applyFramePolicy(request, NextResponse.redirect(new URL("/login", request.url)));
+    }
+    return applyFramePolicy(request, NextResponse.next());
+  }
+
   if (pathname === "/login") {
     const token = getRequestSessionToken(request);
     const sessionUser = token ? await parseSessionToken(token) : null;
+    if (sessionUser?.email && isProCleanAccountEmail(sessionUser.email)) {
+      return applyFramePolicy(
+        request,
+        NextResponse.redirect(new URL(PRO_CLEAN_LOGIN_PATH, request.url))
+      );
+    }
     if (sessionUser) {
       const from = request.nextUrl.searchParams.get("from");
       const dest =

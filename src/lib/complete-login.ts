@@ -15,10 +15,6 @@ import { devDemoLoginEnabled, isDemoAccountEmail, OWNER_DEMO_EMAIL } from "@/lib
 import type { SessionUser } from "@/lib/session";
 import { privateJsonResponse } from "@/lib/secure-response";
 import { clearWorkspaceCookieOptions } from "@/lib/workspace-cookie";
-import {
-  ensureProCleanAccount,
-  isProCleanAccountEmail,
-} from "@/lib/pro-clean-account";
 
 interface CompleteLoginOptions {
   request: NextRequest;
@@ -38,13 +34,7 @@ export async function completeUserLogin({
   let redirectTo: string | undefined;
 
   try {
-    if (isProCleanAccountEmail(email)) {
-      const ensured = await ensureProCleanAccount({ resetPassword: false });
-      if (ensured.locationId) {
-        user.locationId = ensured.locationId;
-      }
-      workspace = await resolveUserWorkspace(user);
-    } else if (devDemoLoginEnabled() && isDemoAccountEmail(email)) {
+    if (devDemoLoginEnabled() && isDemoAccountEmail(email)) {
       workspace = await setupDemoWorkspace("seeded");
       await prisma.user.update({
         where: { id: user.id },
