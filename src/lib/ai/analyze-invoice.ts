@@ -18,6 +18,7 @@ export interface InvoiceLineData {
   unitPrice: number;
   lineTotal: number;
   sku?: string;
+  inventoryItemId?: string;
   /** Catch-weight: pounds billed when sold by case (brisket, fish, etc.) */
   catchWeightBilled?: number;
   catchWeightUnit?: string;

@@ -12,7 +12,7 @@ const PAGE_SEARCH: Record<string, PageSearchConfig> = {
   "/boh": { placeholder: "Search BOH menu items…" },
   "/kds": { placeholder: "Search tickets by item or table…" },
   "/inventory": { placeholder: "Search items, barcodes, suppliers, zones…" },
-  "/purchase-orders": { placeholder: "Search POs, vendors, invoices…" },
+  "/purchase-orders": { placeholder: "Search POs, vendors, invoices, dates…" },
   "/staff": { placeholder: "Search staff, roles, schedules…" },
   "/timeclock": { placeholder: "Search employees by name or role…" },
   "/orders": { placeholder: "Search checks, tables, servers…" },

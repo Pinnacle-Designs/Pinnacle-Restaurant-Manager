@@ -273,18 +273,25 @@ export function applyVendorMemoryToInvoice(invoice: InvoiceData, ctx: VendorOcrC
 
   const lines = invoice.lines.map((line) => applyLineMemory(line, ctx));
 
+  let invoiceDate = invoice.invoiceDate;
+  const dateAlias = ctx.aliases.find(
+    (a) => a.field === "invoice_date" && a.ocrValue === normalizeAliasKey(invoice.invoiceDate)
+  );
+  if (dateAlias) invoiceDate = dateAlias.correctedValue;
+
   const amount =
     invoice.amount > 0
       ? invoice.amount
       : lines.reduce((sum, l) => sum + (l.lineTotal || 0), 0);
 
-  return { ...invoice, vendor, lines, amount };
+  return { ...invoice, vendor, lines, amount, invoiceDate };
 }
 
 function countInvoiceCorrections(original: InvoiceData, corrected: InvoiceData): number {
   let count = 0;
   if (normalizeAliasKey(original.vendor) !== normalizeAliasKey(corrected.vendor)) count += 1;
   if (original.invoiceNumber !== corrected.invoiceNumber) count += 1;
+  if (original.invoiceDate !== corrected.invoiceDate) count += 1;
   if (Math.abs(original.amount - corrected.amount) > 0.02) count += 1;
 
   const maxLines = Math.max(original.lines.length, corrected.lines.length);
@@ -332,6 +339,15 @@ export async function recordInvoiceScanLearning(
       "invoice_number",
       params.original.invoiceNumber,
       params.corrected.invoiceNumber
+    );
+  }
+
+  if (params.original.invoiceDate && params.original.invoiceDate !== params.corrected.invoiceDate) {
+    await upsertAlias(
+      profile.id,
+      "invoice_date",
+      params.original.invoiceDate,
+      params.corrected.invoiceDate
     );
   }
 

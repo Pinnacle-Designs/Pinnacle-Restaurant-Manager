@@ -13,9 +13,11 @@ import {
 } from "lucide-react";
 import { Button, Badge } from "@/components/ui";
 import { Select, FormField } from "@/components/ui/form";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { clientFetch } from "@/lib/embed-api-client";
 import { parseJsonResponse } from "@/lib/fetch-json";
+import { filterBySearchQuery } from "@/lib/search/text-match";
+import { usePageSearch } from "@/hooks/usePageSearch";
 import { ScannedImageViewer } from "@/components/scan/ScannedImageViewer";
 import { InvoiceScanModal, type InvoiceSaveResult } from "./InvoiceScanModal";
 
@@ -110,6 +112,21 @@ const MATCH_COLORS: Record<string, string> = {
   PENDING: "bg-amber-100 text-amber-800",
 };
 
+function invoiceSearchFields(inv: VendorInvoice): string[] {
+  const iso = inv.invoiceDate.split("T")[0] ?? inv.invoiceDate;
+  const parsed = new Date(inv.invoiceDate);
+  const localized = Number.isNaN(parsed.getTime()) ? iso : formatDate(parsed);
+  return [
+    inv.vendor,
+    inv.invoiceNumber ?? "",
+    iso,
+    localized,
+    String(parsed.getFullYear()),
+    formatCurrency(inv.amount),
+    inv.matchStatus,
+  ];
+}
+
 export function ThreeWayMatchPanel({
   invoices,
   orders,
@@ -119,6 +136,8 @@ export function ThreeWayMatchPanel({
   orders: LinkablePo[];
   onRefresh: () => void;
 }) {
+  const { query, hasQuery } = usePageSearch();
+  const visibleInvoices = filterBySearchQuery(invoices, query, invoiceSearchFields);
   const [scanOpen, setScanOpen] = useState(false);
   const [scanContext, setScanContext] = useState<{ poId?: string; receiptId?: string }>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -265,10 +284,19 @@ export function ThreeWayMatchPanel({
         <div className="card py-8 text-center text-slate-500">
           Receive a PO, then scan the vendor invoice to run automatic three-way matching.
         </div>
+      ) : visibleInvoices.length === 0 ? (
+        <div className="card py-8 text-center text-slate-500">
+          No invoices match &ldquo;{query.trim()}&rdquo;. Try a vendor name, invoice #, or date.
+        </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="space-y-3">
-            {invoices.map((inv) => {
+            {hasQuery && (
+              <p className="text-xs text-slate-500">
+                Showing {visibleInvoices.length} of {invoices.length} invoice(s)
+              </p>
+            )}
+            {visibleInvoices.map((inv) => {
               let exposure = 0;
               try {
                 if (inv.matchNotes) {
@@ -291,7 +319,8 @@ export function ThreeWayMatchPanel({
                     <div>
                       <p className="font-semibold">{inv.vendor}</p>
                       <p className="text-sm text-slate-500">
-                        {inv.invoiceNumber ?? "No #"} · {formatCurrency(inv.amount)}
+                        {inv.invoiceNumber ?? "No #"} · {formatDate(inv.invoiceDate)} ·{" "}
+                        {formatCurrency(inv.amount)}
                         {inv.poId ? "" : " · No PO linked"}
                       </p>
                     </div>
@@ -436,6 +465,7 @@ export function ThreeWayMatchPanel({
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="border-b bg-slate-50 text-left text-slate-500">
+                            <th className="p-2">SKU</th>
                             <th className="p-2">Item</th>
                             <th className="p-2">Qty</th>
                             <th className="p-2">Unit $</th>
@@ -445,7 +475,10 @@ export function ThreeWayMatchPanel({
                         <tbody>
                           {detail.invoice.lines.map((line, i) => (
                             <tr key={i} className="border-b border-slate-100">
-                              <td className="p-2 font-medium">{line.description}</td>
+                              <td className="p-2 font-mono text-[11px] uppercase text-slate-500">
+                                {line.sku ?? "—"}
+                              </td>
+                              <td className="p-2 font-medium">{line.description || "—"}</td>
                               <td className="p-2">
                                 {line.qty} {line.unit}
                               </td>

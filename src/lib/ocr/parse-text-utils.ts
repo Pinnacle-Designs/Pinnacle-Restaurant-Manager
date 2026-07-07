@@ -90,26 +90,145 @@ export function extractTotalAmount(text: string, opts?: { totalLabel?: string; l
   return 0;
 }
 
-export function extractDocumentDate(text: string): string {
-  const labeled = text.match(
-    /(?:invoice\s+date|order\s+date|date)[:\s]+(\d{1,2})[/-](\d{1,2})[/-]((?:20)?\d{2})/i
-  );
-  if (labeled) {
-    let year = labeled[3]!;
-    if (year.length === 2) year = `20${year}`;
-    return `${year}-${labeled[1]!.padStart(2, "0")}-${labeled[2]!.padStart(2, "0")}`;
+const MONTH_TOKEN: Record<string, string> = {
+  jan: "01",
+  january: "01",
+  feb: "02",
+  february: "02",
+  mar: "03",
+  march: "03",
+  apr: "04",
+  april: "04",
+  may: "05",
+  jun: "06",
+  june: "06",
+  jul: "07",
+  july: "07",
+  aug: "08",
+  august: "08",
+  sep: "09",
+  sept: "09",
+  september: "09",
+  oct: "10",
+  october: "10",
+  nov: "11",
+  november: "11",
+  dec: "12",
+  december: "12",
+};
+
+function normalizeYear(year: string): string {
+  if (year.length === 2) return `20${year}`;
+  return year;
+}
+
+/** Build YYYY-MM-DD from numeric month/day with slash-date ambiguity handling. */
+function composeIsoDate(monthRaw: string, dayRaw: string, yearRaw: string, preferDayFirst = false): string {
+  let month = parseInt(monthRaw, 10);
+  let day = parseInt(dayRaw, 10);
+  const year = normalizeYear(yearRaw);
+
+  if (month > 12 && day <= 12) {
+    [month, day] = [day, month];
+  } else if (day > 12 && month <= 12) {
+    // month-first already
+  } else if (month <= 12 && day <= 12 && preferDayFirst) {
+    [month, day] = [day, month];
   }
 
-  const iso = text.match(/\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return "";
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function parseMonthNameDate(dayRaw: string, monthToken: string, yearRaw: string): string {
+  const month = MONTH_TOKEN[monthToken.toLowerCase()];
+  if (!month) return "";
+  const day = parseInt(dayRaw, 10);
+  const year = normalizeYear(yearRaw);
+  if (day < 1 || day > 31) return "";
+  return `${year}-${month}-${String(day).padStart(2, "0")}`;
+}
+
+function inferPreferDayFirst(text: string, vendor?: string): boolean {
+  const probe = `${vendor ?? ""}\n${text.slice(0, 600)}`;
+  return /canada|\.C\.|\bBC\b|\bAB\b|\bON\b|\bQC\b|victoria|toronto|calgary|montreal|manufacturers?\s+ltd/i.test(
+    probe
+  );
+}
+
+/** Remove date fragments that OCR sometimes merges into product descriptions. */
+export function stripEmbeddedDates(text: string): string {
+  return text
+    .replace(
+      /\b(?:invoice|order)\s+date[:\s]*\d{1,2}[\/\-.]\d{1,2}[\/\-.](?:20)?\d{2,4}\b/gi,
+      " "
+    )
+    .replace(
+      /\b\d{1,2}[\/\-.]\d{1,2}[\/\-.](?:20)?\d{2,4}\b/g,
+      " "
+    )
+    .replace(
+      /\b\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+(?:20)?\d{2,4}\b/gi,
+      " "
+    )
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+export function extractDocumentDate(text: string, opts?: { vendor?: string }): string {
+  const headerLines = text.split(/\r?\n/).slice(0, 30);
+  const header = headerLines.join("\n");
+  const preferDayFirst = inferPreferDayFirst(text, opts?.vendor);
+
+  const invoiceSlash = header.match(
+    /invoice\s+date[:\s]+(\d{1,2})[\/\-.](\d{1,2})[\/\-.]((?:20)?\d{2,4})/i
+  );
+  if (invoiceSlash) {
+    const iso = composeIsoDate(invoiceSlash[1]!, invoiceSlash[2]!, invoiceSlash[3]!, preferDayFirst);
+    if (iso) return iso;
+  }
+
+  const invoiceNamed = header.match(
+    /invoice\s+date[:\s]+(\d{1,2})[\s\-\/]([A-Za-z]{3,9})[\s\-\/]((?:20)?\d{2,4})/i
+  );
+  if (invoiceNamed) {
+    const iso = parseMonthNameDate(invoiceNamed[1]!, invoiceNamed[2]!, invoiceNamed[3]!);
+    if (iso) return iso;
+  }
+
+  const labeled = header.match(
+    /(?:^|\b)(?:date)[:\s]+(\d{1,2})[\/\-.](\d{1,2})[\/\-.]((?:20)?\d{2,4})/im
+  );
+  if (labeled) {
+    const iso = composeIsoDate(labeled[1]!, labeled[2]!, labeled[3]!, preferDayFirst);
+    if (iso) return iso;
+  }
+
+  const orderSlash = header.match(
+    /order\s+date[:\s]+(\d{1,2})[\/\-.](\d{1,2})[\/\-.]((?:20)?\d{2,4})/i
+  );
+  if (orderSlash) {
+    const iso = composeIsoDate(orderSlash[1]!, orderSlash[2]!, orderSlash[3]!, preferDayFirst);
+    if (iso) return iso;
+  }
+
+  const iso = header.match(/\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/);
   if (iso) {
     return `${iso[1]}-${iso[2]!.padStart(2, "0")}-${iso[3]!.padStart(2, "0")}`;
   }
 
-  const us = text.match(/\b(\d{1,2})[/-](\d{1,2})[/-]((?:20)?\d{2})\b/);
+  const named = header.match(
+    /\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?,?\s+((?:20)?\d{2,4})\b/i
+  );
+  if (named) {
+    const parsed = parseMonthNameDate(named[1]!, named[2]!, named[3]!);
+    if (parsed) return parsed;
+  }
+
+  const us = header.match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.]((?:20)?\d{2,4})\b/);
   if (us) {
-    let year = us[3]!;
-    if (year.length === 2) year = `20${year}`;
-    return `${year}-${us[1]!.padStart(2, "0")}-${us[2]!.padStart(2, "0")}`;
+    const parsed = composeIsoDate(us[1]!, us[2]!, us[3]!, preferDayFirst);
+    if (parsed) return parsed;
   }
 
   return new Date().toISOString().split("T")[0]!;

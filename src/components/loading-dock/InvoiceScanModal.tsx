@@ -11,22 +11,13 @@ import { showCriticalNotifications } from "@/lib/notifications";
 import { DocumentQuickScanCapture } from "@/components/scan/DocumentQuickScanCapture";
 import { ScanOcrNotice } from "@/components/scan/ScanOcrNotice";
 import { ScannedImageViewer } from "@/components/scan/ScannedImageViewer";
+import { normalizeInvoiceLine } from "@/lib/ocr/parse-invoice-text";
 import { useDocumentQuickScan } from "@/hooks/useDocumentQuickScan";
 
 function normalizeInvoiceData(raw: Partial<InvoiceData> | null | undefined): InvoiceData {
   const today = new Date().toISOString().split("T")[0]!;
   const lines = Array.isArray(raw?.lines)
-    ? raw.lines.map((line, i) => ({
-        description: String(line?.description ?? `Line item ${i + 1}`),
-        qty: Number(line?.qty) || 0,
-        unit: String(line?.unit ?? "each"),
-        unitPrice: Number(line?.unitPrice) || 0,
-        lineTotal: Number(line?.lineTotal) || 0,
-        sku: line?.sku,
-        inventoryItemId: line?.inventoryItemId,
-        catchWeightBilled: line?.catchWeightBilled,
-        catchWeightUnit: line?.catchWeightUnit,
-      }))
+    ? raw.lines.map((line, i) => normalizeInvoiceLine(line, i))
     : [];
   const amount = Number(raw?.amount) || lines.reduce((sum, l) => sum + l.lineTotal, 0);
   return {
@@ -39,7 +30,7 @@ function normalizeInvoiceData(raw: Partial<InvoiceData> | null | undefined): Inv
 }
 
 function emptyLine(): InvoiceLineData {
-  return { description: "", qty: 1, unit: "case", unitPrice: 0, lineTotal: 0 };
+  return { description: "", qty: 1, unit: "case", unitPrice: 0, lineTotal: 0, sku: undefined };
 }
 
 export interface InvoiceLineData {
@@ -274,17 +265,24 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
                   onChange={(e) => setInvoiceData({ ...invoiceData, invoiceNumber: e.target.value })}
                 />
               </FormField>
-              <FormField label="Total">
+              <FormField label="Invoice date">
                 <Input
-                  type="number"
-                  step="0.01"
-                  value={invoiceData.amount}
-                  onChange={(e) =>
-                    setInvoiceData({ ...invoiceData, amount: parseFloat(e.target.value) || 0 })
-                  }
+                  type="date"
+                  value={invoiceData.invoiceDate}
+                  onChange={(e) => setInvoiceData({ ...invoiceData, invoiceDate: e.target.value })}
                 />
               </FormField>
             </div>
+            <FormField label="Total">
+              <Input
+                type="number"
+                step="0.01"
+                value={invoiceData.amount}
+                onChange={(e) =>
+                  setInvoiceData({ ...invoiceData, amount: parseFloat(e.target.value) || 0 })
+                }
+              />
+            </FormField>
             <div className="rounded-lg border border-slate-200 p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <p className="text-xs font-medium uppercase text-slate-500">Line items</p>
@@ -302,11 +300,22 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
                 <div key={i} className="border-b border-slate-100 py-2 text-sm last:border-0">
                   <div className="flex items-start gap-2">
                     <div className="min-w-0 flex-1 space-y-2">
-                      <Input
-                        value={line.description}
-                        placeholder="Description"
-                        onChange={(e) => updateLine(i, { description: e.target.value })}
-                      />
+                      <div className="grid grid-cols-3 gap-2">
+                        <Input
+                          value={line.sku ?? ""}
+                          placeholder="SKU / item #"
+                          className="font-mono text-xs uppercase"
+                          onChange={(e) =>
+                            updateLine(i, { sku: e.target.value.trim().toUpperCase() || undefined })
+                          }
+                        />
+                        <Input
+                          value={line.description}
+                          placeholder="Product name / description"
+                          className="col-span-2"
+                          onChange={(e) => updateLine(i, { description: e.target.value })}
+                        />
+                      </div>
                       <div className="grid grid-cols-3 gap-2">
                         <Input
                           type="number"

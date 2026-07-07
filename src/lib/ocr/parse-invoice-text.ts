@@ -7,6 +7,7 @@ import {
   extractVendorName,
   normalizeOcrText,
   parseMoney,
+  stripEmbeddedDates,
 } from "./parse-text-utils";
 
 export interface InvoiceParseContext {
@@ -58,7 +59,16 @@ function joinWrappedLineRows(rows: string[], itemCode: RegExp): string[] {
     const rowHasMoney = /[\d,]+\.\d{2}/.test(row);
     const bufferHasSku = itemCode.test(buffer) || ALT_ITEM_CODE.test(buffer);
 
-    // Only stitch SKU/description line to its price line — never merge headers.
+    const bufferSkuOnly = looksLikeSku(buffer.trim());
+    const rowHasName = /[A-Za-z]{3,}/.test(row) && !looksLikeSku(row.trim());
+
+    // SKU-only line followed by product name (no prices yet).
+    if (bufferSkuOnly && !bufferHasMoney && !rowHasMoney && rowHasName) {
+      buffer = `${buffer} ${row}`;
+      continue;
+    }
+
+    // SKU + name line followed by qty/prices.
     if (bufferHasSku && !bufferHasMoney && rowHasMoney) {
       buffer = `${buffer} ${row}`;
       continue;
@@ -137,19 +147,157 @@ function parseUnitFromLine(line: string): string {
   return "each";
 }
 
+function looksLikeSku(value: string): boolean {
+  const trimmed = value.trim();
+  return DEFAULT_ITEM_CODE.test(trimmed) || ALT_ITEM_CODE.test(trimmed);
+}
+
+function isSkuOnlyDescription(description: string, sku?: string): boolean {
+  const desc = description.trim();
+  if (!desc) return true;
+  if (sku && desc.toUpperCase() === sku.toUpperCase()) return true;
+  return looksLikeSku(desc);
+}
+
+/** Pull SKU from the front of a line segment and return the product name. */
+function extractSkuAndDescription(
+  segment: string,
+  itemCode: RegExp
+): { sku?: string; description: string } {
+  let rest = segment.trim();
+  let sku: string | undefined;
+
+  const atStart = rest.match(/^([A-Z]{2,6}\d{2,4})\b/i);
+  if (atStart?.[1]) {
+    sku = atStart[1].toUpperCase();
+    rest = rest.slice(atStart[0].length).trim();
+  } else {
+    const altStart = rest.match(/^([A-Z]{2,5}[-\s]?\d{3,5})\b/i);
+    if (altStart?.[1]) {
+      sku = altStart[1].replace(/\s+/g, "").toUpperCase();
+      rest = rest.slice(altStart[0].length).trim();
+    } else {
+      const embedded = rest.match(itemCode) ?? rest.match(ALT_ITEM_CODE);
+      if (embedded?.[1] && (embedded.index ?? 99) <= 2) {
+        sku = embedded[1].replace(/\s+/g, "").toUpperCase();
+        rest = rest.slice(0, embedded.index!) + rest.slice(embedded.index! + embedded[0].length);
+        rest = rest.trim();
+      }
+    }
+  }
+
+  rest = rest
+    .replace(
+      /(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(?:EACH|EA|CASE|CAS|CS|LB|LBS|BAG|PK|BOX|\d+(?:\s*\/\s*\d+)?\s*#(?:\/\w+)?)/gi,
+      " "
+    )
+    .replace(PACKAGE_PATTERN, " ")
+    .replace(/\b\d+\s*CT\b/gi, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  if (isSkuOnlyDescription(rest, sku)) {
+    rest = "";
+  }
+
+  rest = stripEmbeddedDates(rest);
+
+  return { sku, description: rest };
+}
+
 function applySkuHint(line: InvoiceLineData, hints?: SkuLineHint[]): InvoiceLineData {
   if (!line.sku || !hints?.length) return line;
   const hint = hints.find((h) => h.sku.toUpperCase() === line.sku!.toUpperCase());
   if (!hint) return line;
+  const needsDescription =
+    !line.description || line.description.length < 3 || isSkuOnlyDescription(line.description, line.sku);
   return {
     ...line,
-    description:
-      !line.description || line.description.length < 3 || line.description === line.sku
-        ? hint.description
-        : line.description,
+    description: needsDescription ? hint.description : line.description,
     unit: line.unit === "each" && hint.unit ? hint.unit : line.unit,
     unitPrice: line.unitPrice <= 0 && hint.unitPrice != null ? hint.unitPrice : line.unitPrice,
   };
+}
+
+function finalizeLineItem(line: InvoiceLineData, hints?: SkuLineHint[]): InvoiceLineData | null {
+  let next = { ...line };
+
+  if (!next.sku && looksLikeSku(next.description)) {
+    next.sku = next.description.trim().toUpperCase();
+    next.description = "";
+  }
+
+  if (next.sku && isSkuOnlyDescription(next.description, next.sku)) {
+    next.description = "";
+  }
+
+  next = applySkuHint(next, hints);
+
+  if (!next.sku && !next.description.trim()) return null;
+  if (!next.lineTotal && !next.unitPrice) return null;
+
+  return next;
+}
+
+function parseTabColumns(
+  tabParts: string[],
+  itemCode: RegExp,
+  line: string,
+  hints?: SkuLineHint[]
+): InvoiceLineData | null {
+  const moneyParts = tabParts.filter((p) => /^[\d,]+\.\d{2}$/.test(p));
+  if (!moneyParts.length) return null;
+
+  const lineTotal = parseMoney(moneyParts[moneyParts.length - 1]!);
+  const unitPrice = moneyParts.length >= 2 ? parseMoney(moneyParts[moneyParts.length - 2]!) : lineTotal;
+
+  let sku: string | undefined;
+  let description = "";
+
+  const skuIdx = tabParts.findIndex((p) => itemCode.test(p) || ALT_ITEM_CODE.test(p));
+  if (skuIdx >= 0) {
+    const skuCell = tabParts[skuIdx]!;
+    const extracted = extractSkuAndDescription(skuCell, itemCode);
+    sku = extracted.sku;
+    description = extracted.description;
+
+    const firstMoneyIdx = tabParts.findIndex((p) => /^[\d,]+\.\d{2}$/.test(p));
+    for (let i = skuIdx + 1; i < (firstMoneyIdx >= 0 ? firstMoneyIdx : tabParts.length); i += 1) {
+      const part = tabParts[i]!;
+      if (/[A-Za-z]{2,}/.test(part) && !looksLikeSku(part) && !/^[\d,]+\.\d{2}$/.test(part)) {
+        description = description ? `${description} ${part}` : part;
+        break;
+      }
+    }
+  } else {
+    const textPart = tabParts.find(
+      (p) => /[A-Za-z]{2,}/.test(p) && !/^[\d,]+\.\d{2}$/.test(p)
+    );
+    if (textPart) {
+      const extracted = extractSkuAndDescription(textPart, itemCode);
+      sku = extracted.sku;
+      description = extracted.description;
+    }
+  }
+
+  const qtySource = tabParts.filter((p) => !/^[\d,]+\.\d{2}$/.test(p)).join(" ");
+  const qty = parseQtyFromLine(qtySource, description, sku);
+  const catchWeight = parseCatchWeight(line);
+
+  return finalizeLineItem(
+    {
+      description,
+      qty: qty || 1,
+      unit: parseUnitFromLine(line),
+      unitPrice: unitPrice || lineTotal,
+      lineTotal,
+      sku,
+      ...(catchWeight.billed
+        ? { catchWeightBilled: catchWeight.billed, catchWeightUnit: catchWeight.unit ?? "lbs" }
+        : {}),
+    },
+    hints
+  );
 }
 
 function parseLineFromMoneyColumns(
@@ -162,30 +310,8 @@ function parseLineFromMoneyColumns(
 
   const tabParts = line.split(/\t+/).map((p) => p.trim()).filter(Boolean);
   if (tabParts.length >= 3) {
-    const moneyParts = tabParts.filter((p) => /^[\d,]+\.\d{2}$/.test(p));
-    if (moneyParts.length >= 1) {
-      const lineTotal = parseMoney(moneyParts[moneyParts.length - 1]!);
-      const unitPrice = moneyParts.length >= 2 ? parseMoney(moneyParts[moneyParts.length - 2]!) : lineTotal;
-      const descPart = tabParts.find((p) => /[A-Za-z]{3,}/.test(p) && !/^[\d,]+\.\d{2}$/.test(p)) ?? tabParts[0]!;
-      const skuMatch = descPart.match(itemCode) ?? descPart.match(ALT_ITEM_CODE);
-      const sku = skuMatch?.[1];
-      let description = descPart.replace(itemCode, "").trim();
-      if (description.length < 2) description = descPart;
-      const qty = parseQtyFromLine(descPart, description, sku);
-      const catchWeight = parseCatchWeight(line);
-      const item: InvoiceLineData = {
-        description,
-        qty: qty || 1,
-        unit: parseUnitFromLine(line),
-        unitPrice: unitPrice || lineTotal,
-        lineTotal,
-        sku,
-        ...(catchWeight.billed
-          ? { catchWeightBilled: catchWeight.billed, catchWeightUnit: catchWeight.unit ?? "lbs" }
-          : {}),
-      };
-      return applySkuHint(item, hints);
-    }
+    const tabItem = parseTabColumns(tabParts, itemCode, line, hints);
+    if (tabItem) return tabItem;
   }
 
   const moneyMatches = [...line.matchAll(/([\d,]+\.\d{2})/g)];
@@ -206,25 +332,10 @@ function parseLineFromMoneyColumns(
 
   const priceStart = priceMatches[0]!.index ?? line.length;
   const beforePrices = line.slice(0, priceStart).trim();
-  const skuMatch = beforePrices.match(itemCode) ?? beforePrices.match(ALT_ITEM_CODE);
-  const sku = skuMatch?.[1];
-  const qty = parseQtyFromLine(beforePrices, "", sku);
+  const { sku, description } = extractSkuAndDescription(beforePrices, itemCode);
+  const qty = parseQtyFromLine(beforePrices, description, sku);
 
-  let description = beforePrices;
-  if (sku) {
-    description = description.replace(itemCode, "").replace(ALT_ITEM_CODE, "").trim();
-  }
-  description = description
-    .replace(
-      /(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(?:EACH|EA|CASE|CAS|CS|LB|LBS|BAG|PK|BOX|\d+(?:\s*\/\s*\d+)?\s*#(?:\/\w+)?)/gi,
-      " "
-    )
-    .replace(PACKAGE_PATTERN, " ")
-    .replace(/\b\d+\s*CT\b/gi, " ")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-
-  if (description.length < 2) return null;
+  if (!description && !sku) return null;
 
   const unit = parseUnitFromLine(line);
   const catchWeight = parseCatchWeight(line);
@@ -236,18 +347,20 @@ function parseLineFromMoneyColumns(
     }
   }
 
-  const item: InvoiceLineData = {
-    description,
-    qty: qty || 1,
-    unit,
-    unitPrice,
-    lineTotal,
-    sku,
-    ...(catchWeight.billed
-      ? { catchWeightBilled: catchWeight.billed, catchWeightUnit: catchWeight.unit ?? "lbs" }
-      : {}),
-  };
-  return applySkuHint(item, hints);
+  return finalizeLineItem(
+    {
+      description,
+      qty: qty || 1,
+      unit,
+      unitPrice,
+      lineTotal,
+      sku,
+      ...(catchWeight.billed
+        ? { catchWeightBilled: catchWeight.billed, catchWeightUnit: catchWeight.unit ?? "lbs" }
+        : {}),
+    },
+    hints
+  );
 }
 
 function parseLineItems(text: string, ctx?: InvoiceParseContext): InvoiceLineData[] {
@@ -303,7 +416,13 @@ export function mergeInvoiceData(...sources: InvoiceData[]): InvoiceData {
       lines: [],
     };
   }
-  if (usable.length === 1) return usable[0]!;
+  if (usable.length === 1) {
+    const single = usable[0]!;
+    return {
+      ...single,
+      lines: single.lines.map((line, i) => normalizeInvoiceLine(line, i)),
+    };
+  }
 
   const ranked = [...usable].sort((a, b) => scoreInvoiceData(b) - scoreInvoiceData(a));
   const best = ranked[0]!;
@@ -339,11 +458,14 @@ export function mergeInvoiceData(...sources: InvoiceData[]): InvoiceData {
     usable.map((s) => s.invoiceDate).find((d) => d && d !== new Date().toISOString().split("T")[0]) ??
     best.invoiceDate;
 
-  return { vendor, invoiceNumber, amount, invoiceDate, lines };
+  const normalizedLines = lines.map((line, i) => normalizeInvoiceLine(line, i));
+
+  return { vendor, invoiceNumber, amount, invoiceDate, lines: normalizedLines };
 }
 
 export function parseInvoiceFromText(rawText: string, ctx?: InvoiceParseContext): InvoiceData {
   const text = normalizeOcrText(rawText);
+  const vendor = extractVendorName(text);
   const lines = parseLineItems(text, ctx);
   const amount = reconcileAmount(
     extractTotalAmount(text, { totalLabel: ctx?.totalLabel ?? "Total Invoice", lineItemCount: lines.length }),
@@ -351,11 +473,40 @@ export function parseInvoiceFromText(rawText: string, ctx?: InvoiceParseContext)
   );
 
   return {
-    vendor: extractVendorName(text),
+    vendor,
     invoiceNumber: extractInvoiceNumber(text),
     amount,
-    invoiceDate: extractDocumentDate(text),
-    lines,
+    invoiceDate: extractDocumentDate(text, { vendor }),
+    lines: lines.map((line, i) => normalizeInvoiceLine(line, i)),
+  };
+}
+
+/** Normalize a line so SKU never occupies the description field. */
+export function normalizeInvoiceLine(
+  line: Partial<InvoiceLineData>,
+  index: number
+): InvoiceLineData {
+  let description = stripEmbeddedDates(String(line.description ?? "").trim());
+  let sku = line.sku ? String(line.sku).trim().toUpperCase() : undefined;
+
+  if (!sku && looksLikeSku(description)) {
+    sku = description.toUpperCase();
+    description = "";
+  }
+  if (sku && description.toUpperCase() === sku) {
+    description = "";
+  }
+
+  return {
+    description: description || (sku ? "" : `Line item ${index + 1}`),
+    qty: Number(line.qty) || 0,
+    unit: String(line.unit ?? "each"),
+    unitPrice: Number(line.unitPrice) || 0,
+    lineTotal: Number(line.lineTotal) || 0,
+    sku,
+    inventoryItemId: line.inventoryItemId,
+    catchWeightBilled: line.catchWeightBilled,
+    catchWeightUnit: line.catchWeightUnit,
   };
 }
 
