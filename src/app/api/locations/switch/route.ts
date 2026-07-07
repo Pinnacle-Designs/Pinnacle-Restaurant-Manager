@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { LOCATION_COOKIE_NAME } from "@/lib/location";
 import { requireSecureAuth } from "@/lib/api-auth";
 import { applyAuthCookies } from "@/lib/auth-cookies";
-import { isProductionRuntime } from "@/lib/dev-routes";
+import { canUserAccessLocation } from "@/lib/location-access";
 import { privateJsonResponse } from "@/lib/secure-response";
 import { isProCleanAccountEmail } from "@/lib/pro-clean-email";
 
@@ -22,22 +22,16 @@ export async function POST(request: NextRequest) {
     return privateJsonResponse({ error: "Location is required" }, { status: 400 });
   }
 
-  if (isProCleanAccountEmail(user!.email) && locationId !== user!.locationId) {
+  if (!canUserAccessLocation(user!, locationId)) {
     return privateJsonResponse({ error: "Forbidden" }, { status: 403 });
   }
 
-  if (isProductionRuntime()) {
-    if (locationId !== user!.locationId) {
-      return privateJsonResponse({ error: "Forbidden" }, { status: 403 });
-    }
-  } else {
-    const exists = await prisma.location.findUnique({
-      where: { id: locationId },
-      select: { id: true },
-    });
-    if (!exists) {
-      return privateJsonResponse({ error: "Location not found" }, { status: 404 });
-    }
+  const exists = await prisma.location.findUnique({
+    where: { id: locationId },
+    select: { id: true },
+  });
+  if (!exists) {
+    return privateJsonResponse({ error: "Location not found" }, { status: 404 });
   }
 
   const response = privateJsonResponse({ success: true, locationId });

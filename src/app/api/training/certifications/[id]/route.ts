@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getLocationIdFromRequest } from "@/lib/location";
 import { requirePermission } from "@/lib/api-auth";
+import { tenantWhere } from "@/lib/tenant-resource";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -21,7 +22,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   const cert = await prisma.staffCertification.update({
-    where: { id },
+    where: tenantWhere(id, locationId),
     data: {
       issuer: body.issuer !== undefined ? body.issuer?.trim() || null : undefined,
       certificateNumber:
@@ -56,6 +57,6 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  await prisma.staffCertification.delete({ where: { id } });
+  await prisma.staffCertification.delete({ where: tenantWhere(id, locationId) });
   return NextResponse.json({ ok: true });
 }

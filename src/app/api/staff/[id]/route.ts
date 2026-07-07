@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePermission, stripSalaries } from "@/lib/api-auth";
+import { getLocationIdFromRequest } from "@/lib/location";
+import { tenantNotFoundResponse, tenantWhere } from "@/lib/tenant-resource";
 import { hashClockPin, isValidClockPin } from "@/lib/timeclock/clock-pin";
 import {
   assertPinAvailableAtLocation,
@@ -16,11 +18,14 @@ export async function PATCH(
   if (error) return error;
 
   const { id } = await params;
+  const locationId = await getLocationIdFromRequest(request);
   const body = await request.json();
 
-  const existing = await prisma.staffMember.findUnique({ where: { id } });
+  const existing = await prisma.staffMember.findFirst({
+    where: tenantWhere(id, locationId),
+  });
   if (!existing) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return tenantNotFoundResponse();
   }
 
   const appLoginEnabled =
@@ -62,7 +67,7 @@ export async function PATCH(
   const nextRole = body.role !== undefined ? body.role : existing.role;
 
   const member = await prisma.staffMember.update({
-    where: { id },
+    where: tenantWhere(id, locationId),
     data: {
       name: body.name,
       role: body.role,
@@ -124,18 +129,23 @@ export async function DELETE(
   if (error) return error;
 
   const { id } = await params;
-  const existing = await prisma.staffMember.findUnique({
-    where: { id },
+  const locationId = await getLocationIdFromRequest(request);
+  const existing = await prisma.staffMember.findFirst({
+    where: tenantWhere(id, locationId),
     select: { userId: true },
   });
 
-  if (existing?.userId) {
+  if (!existing) {
+    return tenantNotFoundResponse();
+  }
+
+  if (existing.userId) {
     await prisma.user.update({
       where: { id: existing.userId },
       data: { active: false },
     });
   }
 
-  await prisma.staffMember.delete({ where: { id } });
+  await prisma.staffMember.delete({ where: tenantWhere(id, locationId) });
   return NextResponse.json({ success: true });
 }

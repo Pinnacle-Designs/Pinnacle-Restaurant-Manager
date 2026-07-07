@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getLocationIdFromRequest } from "@/lib/location";
 import { requirePermission } from "@/lib/api-auth";
+import { tenantWhere } from "@/lib/tenant-resource";
 
 export async function DELETE(
   request: NextRequest,
@@ -20,6 +21,6 @@ export async function DELETE(
     return NextResponse.json({ error: "Feedback not found." }, { status: 404 });
   }
 
-  await prisma.shiftFeedback.delete({ where: { id } });
+  await prisma.shiftFeedback.delete({ where: tenantWhere(id, locationId) });
   return NextResponse.json({ success: true });
 }

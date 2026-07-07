@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAnyPermission } from "@/lib/api-auth";
+import { getLocationIdFromRequest } from "@/lib/location";
 import { getOrderBalanceDue, needsTipEntry, ORDER_INCLUDE } from "@/lib/orders";
+import { tenantNotFoundResponse, tenantWhere } from "@/lib/tenant-resource";
 
 export async function POST(
   request: NextRequest,
@@ -14,16 +16,17 @@ export async function POST(
   if (error) return error;
 
   const { id } = await params;
+  const locationId = await getLocationIdFromRequest(request);
   const body = await request.json().catch(() => ({}));
   const skipTipWarning = body.skipTipWarning === true;
 
-  const order = await prisma.order.findUnique({
-    where: { id },
+  const order = await prisma.order.findFirst({
+    where: tenantWhere(id, locationId),
     include: { payments: true, table: true },
   });
 
   if (!order) {
-    return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    return tenantNotFoundResponse("Order not found");
   }
 
   const balanceDue = getOrderBalanceDue(order, order.payments);
@@ -47,7 +50,7 @@ export async function POST(
 
   const updated = await prisma.$transaction(async (tx) => {
     const result = await tx.order.update({
-      where: { id },
+      where: tenantWhere(id, locationId),
       data: {
         checkStatus: "CLOSED",
         status: "PAID",

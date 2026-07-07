@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAnyPermission } from "@/lib/api-auth";
+import { getLocationIdFromRequest } from "@/lib/location";
 import {
   deriveCheckStatus,
   getOrderBalanceDue,
@@ -8,6 +9,7 @@ import {
   ORDER_INCLUDE,
   roundMoney,
 } from "@/lib/orders";
+import { tenantNotFoundResponse, tenantWhere } from "@/lib/tenant-resource";
 
 export async function POST(
   request: NextRequest,
@@ -20,6 +22,7 @@ export async function POST(
   if (error) return error;
 
   const { id } = await params;
+  const locationId = await getLocationIdFromRequest(request);
   const body = await request.json();
   const tipAmount = roundMoney(Number(body.tipAmount));
   const paymentId = typeof body.paymentId === "string" ? body.paymentId : undefined;
@@ -28,13 +31,13 @@ export async function POST(
     return NextResponse.json({ error: "Invalid tip amount" }, { status: 400 });
   }
 
-  const order = await prisma.order.findUnique({
-    where: { id },
+  const order = await prisma.order.findFirst({
+    where: tenantWhere(id, locationId),
     include: { payments: { orderBy: { createdAt: "desc" } } },
   });
 
   if (!order) {
-    return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    return tenantNotFoundResponse("Order not found");
   }
   if (order.checkStatus === "CLOSED") {
     return NextResponse.json(
@@ -63,8 +66,8 @@ export async function POST(
       data: { tipAmount },
     });
 
-    const fresh = await tx.order.findUnique({
-      where: { id },
+    const fresh = await tx.order.findFirst({
+      where: tenantWhere(id, locationId),
       include: { payments: true },
     });
     if (!fresh) throw new Error("Order missing");
@@ -78,7 +81,7 @@ export async function POST(
     });
 
     const result = await tx.order.update({
-      where: { id },
+      where: tenantWhere(id, locationId),
       data: { checkStatus: nextCheckStatus },
       include: ORDER_INCLUDE,
     });

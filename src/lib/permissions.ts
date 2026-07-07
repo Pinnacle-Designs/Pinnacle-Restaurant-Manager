@@ -226,6 +226,11 @@ const ROUTE_PERMISSION_MAP: Record<string, Permission> = {
   "/api/compliance/alerts": "manage_schedule",
   "/api/timeclock/entries": "clock_in",
   "/api/shift-swaps": "view_own_schedule",
+  "/api/menu": "manage_menu",
+  "/api/tables": "manage_tables",
+  "/api/staff": "edit_staff",
+  "/api/orders": "place_orders",
+  "/api/schedule": "manage_schedule",
 };
 
 function routeBase(pathname: string): string {

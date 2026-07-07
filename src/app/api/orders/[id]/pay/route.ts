@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { PaymentMethod } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAnyPermission } from "@/lib/api-auth";
+import { getLocationIdFromRequest } from "@/lib/location";
 import {
   deriveCheckStatus,
   getOrderBalanceDue,
@@ -9,6 +10,7 @@ import {
   ORDER_INCLUDE,
   roundMoney,
 } from "@/lib/orders";
+import { tenantNotFoundResponse, tenantWhere } from "@/lib/tenant-resource";
 
 const VALID_METHODS = new Set<PaymentMethod>([
   "CASH",
@@ -30,6 +32,7 @@ export async function POST(
   if (error) return error;
 
   const { id } = await params;
+  const locationId = await getLocationIdFromRequest(request);
   const body = await request.json();
 
   const method = body.method as PaymentMethod;
@@ -51,13 +54,13 @@ export async function POST(
     return NextResponse.json({ error: "Payment amount must be greater than zero" }, { status: 400 });
   }
 
-  const order = await prisma.order.findUnique({
-    where: { id },
+  const order = await prisma.order.findFirst({
+    where: tenantWhere(id, locationId),
     include: { payments: true, table: true, checks: true },
   });
 
   if (!order) {
-    return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    return tenantNotFoundResponse("Order not found");
   }
   if (order.checkStatus === "CLOSED") {
     return NextResponse.json({ error: "Check is closed" }, { status: 400 });
@@ -86,8 +89,8 @@ export async function POST(
       data: { orderId: id, checkId, method, amount, tipAmount, reference },
     });
 
-    const fresh = await tx.order.findUnique({
-      where: { id },
+    const fresh = await tx.order.findFirst({
+      where: tenantWhere(id, locationId),
       include: { payments: true },
     });
     if (!fresh) throw new Error("Order missing");
@@ -101,7 +104,7 @@ export async function POST(
     });
 
     const result = await tx.order.update({
-      where: { id },
+      where: tenantWhere(id, locationId),
       data: {
         checkStatus: nextCheckStatus,
         status:

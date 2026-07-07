@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/api-auth";
+import { getLocationIdFromRequest } from "@/lib/location";
 import { validateShiftForMinor, violationsToError } from "@/lib/compliance/validate-shift";
+import { tenantNotFoundResponse, tenantWhere } from "@/lib/tenant-resource";
 
 export async function PATCH(
   request: NextRequest,
@@ -11,14 +13,15 @@ export async function PATCH(
   if (error) return error;
 
   const { id } = await params;
+  const locationId = await getLocationIdFromRequest(request);
   const body = await request.json();
 
-  const existing = await prisma.shift.findUnique({
-    where: { id },
+  const existing = await prisma.shift.findFirst({
+    where: tenantWhere(id, locationId),
     include: { staffMember: true },
   });
   if (!existing) {
-    return NextResponse.json({ error: "Shift not found" }, { status: 404 });
+    return tenantNotFoundResponse("Shift not found");
   }
 
   const staffMemberId = body.staffMemberId ?? existing.staffMemberId;
@@ -46,7 +49,7 @@ export async function PATCH(
   }
 
   const shift = await prisma.shift.update({
-    where: { id },
+    where: tenantWhere(id, locationId),
     data: {
       staffMemberId: body.staffMemberId,
       date: body.date ? new Date(body.date) : undefined,
@@ -69,6 +72,15 @@ export async function DELETE(
   if (error) return error;
 
   const { id } = await params;
-  await prisma.shift.delete({ where: { id } });
+  const locationId = await getLocationIdFromRequest(request);
+  const existing = await prisma.shift.findFirst({
+    where: tenantWhere(id, locationId),
+    select: { id: true },
+  });
+  if (!existing) {
+    return tenantNotFoundResponse("Shift not found");
+  }
+
+  await prisma.shift.delete({ where: tenantWhere(id, locationId) });
   return NextResponse.json({ success: true });
 }

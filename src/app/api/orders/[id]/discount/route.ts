@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/api-auth";
+import { getLocationIdFromRequest } from "@/lib/location";
 import { DISCOUNT_TYPES, hasPaymentsAttached, ORDER_INCLUDE, roundMoney } from "@/lib/orders";
+import { tenantNotFoundResponse, tenantWhere } from "@/lib/tenant-resource";
 
 export async function POST(
   request: NextRequest,
@@ -11,6 +13,7 @@ export async function POST(
   if (error) return error;
 
   const { id } = await params;
+  const locationId = await getLocationIdFromRequest(request);
   const body = await request.json();
   const type = body.type as string;
   const amount = roundMoney(Number(body.amount));
@@ -20,13 +23,13 @@ export async function POST(
     return NextResponse.json({ error: "Invalid discount" }, { status: 400 });
   }
 
-  const order = await prisma.order.findUnique({
-    where: { id },
+  const order = await prisma.order.findFirst({
+    where: tenantWhere(id, locationId),
     include: { payments: true },
   });
 
   if (!order) {
-    return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    return tenantNotFoundResponse("Order not found");
   }
   if (order.checkStatus === "CLOSED") {
     return NextResponse.json({ error: "Check is closed" }, { status: 400 });
@@ -50,7 +53,7 @@ export async function POST(
         };
 
   const updated = await prisma.order.update({
-    where: { id },
+    where: tenantWhere(id, locationId),
     data,
     include: ORDER_INCLUDE,
   });

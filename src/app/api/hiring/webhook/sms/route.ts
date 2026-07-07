@@ -41,21 +41,14 @@ export async function POST(request: NextRequest) {
   }
 
   const fromPhone = normalizePhone(from);
-  const settings = await prisma.hiringSettings.findFirst({
+  const hiring = await prisma.hiringSettings.findFirst({
     where: { OR: [{ applyPhone: to }, { applyPhone: normalizePhone(to) }] },
     include: { location: true },
   });
 
-  if (!settings) {
-    const fallback = await prisma.hiringSettings.findFirst({
-      include: { location: true },
-    });
-    if (!fallback) {
-      return twimlResponse("Thanks for your message. Hiring is not configured yet.");
-    }
+  if (!hiring) {
+    return twimlResponse("Thanks for your message. Hiring is not configured for this number.");
   }
-
-  const hiring = settings ?? (await prisma.hiringSettings.findFirst({ include: { location: true } }))!;
   const locationId = hiring.locationId;
   const keyword = hiring.applyKeyword.toUpperCase();
   const upper = body.toUpperCase();

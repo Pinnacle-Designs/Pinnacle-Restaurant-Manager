@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/api-auth";
+import { getLocationIdFromRequest } from "@/lib/location";
 import {
   computeRecipeCostFromLines,
   getFlattenedRecipeLines,
@@ -10,21 +11,23 @@ import {
   type RecipeComponentInput,
   type RecipeLineInput,
 } from "@/lib/menu/recipe";
+import { tenantNotFoundResponse, tenantWhere } from "@/lib/tenant-resource";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requirePermission(_request, "manage_menu");
+  const { error } = await requirePermission(request, "manage_menu");
   if (error) return error;
 
   const { id } = await params;
-  const menuItem = await prisma.menuItem.findUnique({
-    where: { id },
+  const locationId = await getLocationIdFromRequest(request);
+  const menuItem = await prisma.menuItem.findFirst({
+    where: tenantWhere(id, locationId),
     select: { id: true, name: true, price: true, recipeCost: true, locationId: true },
   });
   if (!menuItem) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return tenantNotFoundResponse();
   }
 
   const [lines, components, flattenedLines] = await Promise.all([
@@ -56,13 +59,14 @@ export async function PUT(
   if (error) return error;
 
   const { id } = await params;
+  const locationId = await getLocationIdFromRequest(request);
   const body = await request.json();
-  const menuItem = await prisma.menuItem.findUnique({
-    where: { id },
+  const menuItem = await prisma.menuItem.findFirst({
+    where: tenantWhere(id, locationId),
     select: { locationId: true },
   });
   if (!menuItem) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return tenantNotFoundResponse();
   }
 
   const lines: RecipeLineInput[] = Array.isArray(body.lines)

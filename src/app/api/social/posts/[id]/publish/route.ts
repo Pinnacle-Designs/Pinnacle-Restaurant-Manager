@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/api-auth";
+import { getLocationIdFromRequest } from "@/lib/location";
 import { publishToPlatform } from "@/lib/social";
 import type { SocialPostStatus } from "@prisma/client";
+import { tenantNotFoundResponse, tenantWhere } from "@/lib/tenant-resource";
 
 export async function POST(
   request: NextRequest,
@@ -12,20 +14,21 @@ export async function POST(
   if (error) return error;
 
   const { id } = await params;
+  const locationId = await getLocationIdFromRequest(request);
 
-  const post = await prisma.socialPost.findUnique({
-    where: { id },
+  const post = await prisma.socialPost.findFirst({
+    where: tenantWhere(id, locationId),
     include: {
       targets: { include: { account: true } },
     },
   });
 
   if (!post) {
-    return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    return tenantNotFoundResponse("Post not found");
   }
 
   await prisma.socialPost.update({
-    where: { id },
+    where: tenantWhere(id, locationId),
     data: { status: "PUBLISHING" },
   });
 
@@ -76,7 +79,7 @@ export async function POST(
   else if (failCount > 0) finalStatus = "PARTIAL";
 
   const updated = await prisma.socialPost.update({
-    where: { id },
+    where: tenantWhere(id, locationId),
     data: {
       status: finalStatus,
       publishedAt: successCount > 0 ? new Date() : null,

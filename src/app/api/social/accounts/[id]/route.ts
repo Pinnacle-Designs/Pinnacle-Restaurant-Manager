@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/api-auth";
+import { getLocationIdFromRequest } from "@/lib/location";
+import { tenantNotFoundResponse, tenantWhere } from "@/lib/tenant-resource";
 
 export async function PATCH(
   request: NextRequest,
@@ -10,10 +12,19 @@ export async function PATCH(
   if (error) return error;
 
   const { id } = await params;
+  const locationId = await getLocationIdFromRequest(request);
   const body = await request.json();
 
+  const existing = await prisma.socialAccount.findFirst({
+    where: tenantWhere(id, locationId),
+    select: { id: true },
+  });
+  if (!existing) {
+    return tenantNotFoundResponse();
+  }
+
   const account = await prisma.socialAccount.update({
-    where: { id },
+    where: tenantWhere(id, locationId),
     data: {
       ...(body.accountName !== undefined && { accountName: body.accountName }),
       ...(body.followers !== undefined && { followers: body.followers }),
@@ -33,8 +44,18 @@ export async function DELETE(
   if (error) return error;
 
   const { id } = await params;
+  const locationId = await getLocationIdFromRequest(request);
+
+  const existing = await prisma.socialAccount.findFirst({
+    where: tenantWhere(id, locationId),
+    select: { id: true },
+  });
+  if (!existing) {
+    return tenantNotFoundResponse();
+  }
+
   await prisma.socialAccount.update({
-    where: { id },
+    where: tenantWhere(id, locationId),
     data: { connected: false },
   });
 

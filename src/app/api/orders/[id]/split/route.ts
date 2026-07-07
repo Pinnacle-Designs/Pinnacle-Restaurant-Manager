@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAnyPermission } from "@/lib/api-auth";
+import { getLocationIdFromRequest } from "@/lib/location";
 import { getCheckItemTotal, hasPaymentsAttached, ORDER_INCLUDE } from "@/lib/orders";
+import { tenantNotFoundResponse, tenantWhere } from "@/lib/tenant-resource";
 
 type SplitAssignment = { itemId: string; checkId: string | null };
 
@@ -16,18 +18,19 @@ export async function POST(
   if (error) return error;
 
   const { id } = await params;
+  const locationId = await getLocationIdFromRequest(request);
   const body = await request.json();
   const mode = body.mode as "even" | "item" | "seat";
   const ways = Math.max(2, Math.min(12, parseInt(body.ways, 10) || 2));
   const assignments = (body.assignments ?? []) as SplitAssignment[];
 
-  const order = await prisma.order.findUnique({
-    where: { id },
+  const order = await prisma.order.findFirst({
+    where: tenantWhere(id, locationId),
     include: { items: true, payments: true, checks: true },
   });
 
   if (!order) {
-    return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    return tenantNotFoundResponse("Order not found");
   }
   if (order.checkStatus === "CLOSED") {
     return NextResponse.json({ error: "Check is closed" }, { status: 400 });
@@ -120,8 +123,8 @@ export async function POST(
       }
     }
 
-    return tx.order.findUnique({
-      where: { id },
+    return tx.order.findFirst({
+      where: tenantWhere(id, locationId),
       include: ORDER_INCLUDE,
     });
   });

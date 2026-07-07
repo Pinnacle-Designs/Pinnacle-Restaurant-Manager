@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { OrderStatus } from "@prisma/client";
 import { requireAnyPermission, requirePermission } from "@/lib/api-auth";
+import { getLocationIdFromRequest } from "@/lib/location";
 import { ORDER_INCLUDE } from "@/lib/orders";
+import { tenantNotFoundResponse, tenantWhere } from "@/lib/tenant-resource";
 
 export async function GET(
   request: NextRequest,
@@ -12,12 +14,13 @@ export async function GET(
   if (error) return error;
 
   const { id } = await params;
-  const order = await prisma.order.findUnique({
-    where: { id },
+  const locationId = await getLocationIdFromRequest(request);
+  const order = await prisma.order.findFirst({
+    where: tenantWhere(id, locationId),
     include: ORDER_INCLUDE,
   });
   if (!order) {
-    return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    return tenantNotFoundResponse("Order not found");
   }
   return NextResponse.json(order);
 }
@@ -36,8 +39,17 @@ export async function PATCH(
     : await requirePermission(request, "manage_orders");
   if (error) return error;
 
+  const locationId = await getLocationIdFromRequest(request);
+  const existing = await prisma.order.findFirst({
+    where: tenantWhere(id, locationId),
+    select: { id: true },
+  });
+  if (!existing) {
+    return tenantNotFoundResponse("Order not found");
+  }
+
   const order = await prisma.order.update({
-    where: { id },
+    where: tenantWhere(id, locationId),
     data: {
       status: body.status as OrderStatus | undefined,
       tableId: body.tableId,
@@ -64,6 +76,15 @@ export async function DELETE(
   if (error) return error;
 
   const { id } = await params;
-  await prisma.order.delete({ where: { id } });
+  const locationId = await getLocationIdFromRequest(request);
+  const existing = await prisma.order.findFirst({
+    where: tenantWhere(id, locationId),
+    select: { id: true },
+  });
+  if (!existing) {
+    return tenantNotFoundResponse("Order not found");
+  }
+
+  await prisma.order.delete({ where: tenantWhere(id, locationId) });
   return NextResponse.json({ success: true });
 }

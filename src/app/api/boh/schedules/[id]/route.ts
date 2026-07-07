@@ -3,6 +3,7 @@ import { getLocationIdFromRequest } from "@/lib/location";
 import { requirePermission } from "@/lib/api-auth";
 import { bumpMenuRevision } from "@/lib/menu/stock";
 import { prisma } from "@/lib/prisma";
+import { tenantNotFoundResponse, tenantWhere } from "@/lib/tenant-resource";
 
 export async function PATCH(
   request: NextRequest,
@@ -15,8 +16,16 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
 
+  const existing = await prisma.menuScheduleRule.findFirst({
+    where: tenantWhere(id, locationId),
+    select: { id: true },
+  });
+  if (!existing) {
+    return tenantNotFoundResponse();
+  }
+
   const rule = await prisma.menuScheduleRule.update({
-    where: { id },
+    where: tenantWhere(id, locationId),
     data: {
       name: body.name,
       mode: body.mode,
@@ -42,7 +51,16 @@ export async function DELETE(
 
   const locationId = await getLocationIdFromRequest(_request);
   const { id } = await params;
-  await prisma.menuScheduleRule.delete({ where: { id } });
+
+  const existing = await prisma.menuScheduleRule.findFirst({
+    where: tenantWhere(id, locationId),
+    select: { id: true },
+  });
+  if (!existing) {
+    return tenantNotFoundResponse();
+  }
+
+  await prisma.menuScheduleRule.delete({ where: tenantWhere(id, locationId) });
   await bumpMenuRevision(locationId);
   return NextResponse.json({ ok: true });
 }
