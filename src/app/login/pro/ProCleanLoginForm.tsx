@@ -9,6 +9,7 @@ import {
   isProCleanAccountEmail,
   PRO_CLEAN_POST_CHECKOUT_PATH,
 } from "@/lib/pro-clean-email";
+import { clearEmbedSessionCache, isEmbedMode } from "@/lib/embed-api-client";
 
 export default function ProCleanLoginForm() {
   const [email, setEmail] = useState("pro-clean@pinnacle.app");
@@ -19,17 +20,23 @@ export default function ProCleanLoginForm() {
   const [existingSessionEmail, setExistingSessionEmail] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isEmbedMode()) {
+      clearEmbedSessionCache();
+    }
     let cancelled = false;
-    fetch("/api/auth/login")
-      .then((res) => (res.ok ? res.json() : { user: null }))
-      .then((data: { user?: { email: string } | null }) => {
-        if (cancelled || !data.user) return;
-        const sessionEmail = data.user.email.toLowerCase();
-        if (isProCleanAccountEmail(sessionEmail)) {
+    Promise.all([
+      fetch("/api/auth/pro-login").then((res) => (res.ok ? res.json() : { user: null })),
+      fetch("/api/auth/login").then((res) => (res.ok ? res.json() : { user: null })),
+    ])
+      .then(([proData, loginData]: [{ user?: { email: string } | null }, { user?: { email: string } | null }]) => {
+        if (cancelled) return;
+        if (proData.user && isProCleanAccountEmail(proData.user.email.toLowerCase())) {
           window.location.assign(PRO_CLEAN_POST_CHECKOUT_PATH);
           return;
         }
-        setExistingSessionEmail(data.user.email);
+        if (loginData.user && !isProCleanAccountEmail(loginData.user.email.toLowerCase())) {
+          setExistingSessionEmail(loginData.user.email);
+        }
       })
       .catch(() => undefined)
       .finally(() => {
@@ -64,6 +71,9 @@ export default function ProCleanLoginForm() {
       }
       if (data.workspaceError) {
         throw new Error(data.workspaceError);
+      }
+      if (!isEmbedMode()) {
+        clearEmbedSessionCache();
       }
       window.location.assign(data.redirectTo || PRO_CLEAN_POST_CHECKOUT_PATH);
     } catch (err) {

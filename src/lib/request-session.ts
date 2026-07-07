@@ -1,17 +1,19 @@
 import type { NextRequest } from "next/server";
 import { AUTH_COOKIE_NAME, parseSessionToken, type SessionUser } from "./session";
 import { EMBED_SESSION_PARAM } from "./embed-constants";
+import { isEmbeddableEmbedParam } from "./embed-config";
 
 /**
- * Read session JWT. When `_st` is present it wins over cookies so the demo works
- * in normal browsers that still have an old login session.
+ * Read session JWT. Embed `_st` wins only inside an embed context so stale demo
+ * tokens cannot override a normal pro-clean / owner cookie session.
  */
 export function getRequestSessionToken(request: NextRequest): string | undefined {
+  const embedParam = request.nextUrl.searchParams.get("embed");
   const embedSt = request.nextUrl.searchParams.get(EMBED_SESSION_PARAM);
-  if (embedSt) return embedSt;
+  if (embedSt && isEmbeddableEmbedParam(embedParam)) return embedSt;
 
   const auth = request.headers.get("authorization");
-  if (auth?.toLowerCase().startsWith("bearer ")) {
+  if (auth?.toLowerCase().startsWith("bearer ") && isEmbeddableEmbedParam(embedParam)) {
     return auth.slice(7).trim();
   }
 

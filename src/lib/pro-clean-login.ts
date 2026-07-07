@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { clearSessionCookieOptions } from "@/lib/auth";
 import { prepareAuthSession, attachAuthCookies } from "@/lib/auth-cookies";
 import { LOCATION_COOKIE_NAME } from "@/lib/location";
 import { applyEmbedAuthCookies } from "@/lib/embed-cookies";
@@ -7,6 +8,7 @@ import { privateJsonResponse } from "@/lib/secure-response";
 import { clearWorkspaceCookieOptions } from "@/lib/workspace-cookie";
 import type { SessionUser } from "@/lib/session";
 import { syncProCleanUserLocation } from "@/lib/pro-clean-account";
+import { EMBED_API_COOKIE_NAME } from "@/lib/embed-constants";
 import {
   isProCleanAccountEmail,
   PRO_CLEAN_LOGIN_PATH,
@@ -70,6 +72,15 @@ export async function completeProCleanLogin({
 
   // Drop any prior owner/demo session and location cookies before setting pro-clean session.
   response.cookies.set(clearWorkspaceCookieOptions());
+  response.cookies.set(clearSessionCookieOptions());
+  response.cookies.set({
+    name: EMBED_API_COOKIE_NAME,
+    value: "",
+    path: "/",
+    maxAge: 0,
+    httpOnly: false,
+    sameSite: "lax",
+  });
   response.cookies.set(LOCATION_COOKIE_NAME, "", {
     path: "/",
     maxAge: 0,

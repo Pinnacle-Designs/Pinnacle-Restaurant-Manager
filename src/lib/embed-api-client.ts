@@ -82,8 +82,10 @@ export function getEmbedSessionToken(): string | null {
 
 /** Append Authorization header + optional `_st` for embed API requests. */
 function embedFetchInit(init?: RequestInit): RequestInit {
-  const token = getEmbedSessionToken();
   const next: RequestInit = { ...init, credentials: init?.credentials ?? "include" };
+  if (!isEmbedMode()) return next;
+
+  const token = getEmbedSessionToken();
   if (!token) return next;
 
   const headers = new Headers(init?.headers);
@@ -96,6 +98,8 @@ function embedFetchInit(init?: RequestInit): RequestInit {
 
 /** Append embed session token for API requests when httpOnly cookies are not sent. */
 export function withEmbedSession(url: string): string {
+  if (!isEmbedMode()) return url;
+
   const token = getEmbedSessionToken();
   if (!token) return url;
 
@@ -191,6 +195,17 @@ export function installEmbedFetchPatch(): void {
 }
 
 export function clientFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const credentials = init?.credentials ?? "include";
+  if (!isEmbedMode()) {
+    if (typeof input === "string") {
+      return fetch(input, { ...init, credentials });
+    }
+    if (input instanceof URL) {
+      return fetch(input.toString(), { ...init, credentials });
+    }
+    return fetch(input, { ...init, credentials });
+  }
+
   installEmbedFetchPatch();
   const patchedInit = embedFetchInit(init);
 

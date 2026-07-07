@@ -9,7 +9,6 @@ import {
 } from "./session";
 import { getRequestSessionUser } from "./request-session";
 import {
-  EMBED_API_COOKIE_NAME,
   EMBED_SESSION_HEADER,
 } from "./embed-constants";
 
@@ -47,9 +46,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   }
 
   const cookieStore = await cookies();
-  const token =
-    cookieStore.get(AUTH_COOKIE_NAME)?.value ??
-    cookieStore.get(EMBED_API_COOKIE_NAME)?.value;
+  const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
 
   if (!token) return null;
   return parseSessionToken(token);
