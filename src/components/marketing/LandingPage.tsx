@@ -31,7 +31,6 @@ import {
   MARKETING_STATS,
 } from "@/lib/marketing-content";
 import { launchDemo } from "@/lib/demo-launch";
-import { cn } from "@/lib/utils";
 
 const ICONS = {
   "layout-dashboard": LayoutDashboard,
@@ -261,15 +260,10 @@ export function LandingPage() {
             </p>
           </div>
           <div className="mt-10 flex flex-wrap justify-center gap-2">
-            {ANALYTICS_TABS.map((tab, i) => (
+            {ANALYTICS_TABS.map((tab) => (
               <span
                 key={tab}
-                className={cn(
-                  "rounded-lg border px-3 py-2 text-sm font-medium",
-                  i < 3
-                    ? "border-orange-200 bg-orange-50 text-orange-800"
-                    : "border-slate-200 bg-white text-slate-700"
-                )}
+                className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-medium text-orange-800"
               >
                 {tab}
               </span>
