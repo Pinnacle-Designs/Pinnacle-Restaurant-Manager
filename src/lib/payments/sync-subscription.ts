@@ -81,6 +81,25 @@ export async function syncLocationFromStripeSubscription(
       ...(plan ? { plan } : {}),
     },
   });
+
+  if (autopayEnabled) {
+    await grantOwnerAccessAfterPurchase(locationId);
+  }
+}
+
+/** Confirmed Stripe subscription — owners can sign in at /login without extra gates. */
+export async function grantOwnerAccessAfterPurchase(locationId: string) {
+  await prisma.user.updateMany({
+    where: {
+      locationId,
+      role: "OWNER",
+      OR: [{ emailVerifiedAt: null }, { active: false }],
+    },
+    data: {
+      emailVerifiedAt: new Date(),
+      active: true,
+    },
+  });
 }
 
 export async function clearStripeSubscriptionForLocation(locationId: string) {

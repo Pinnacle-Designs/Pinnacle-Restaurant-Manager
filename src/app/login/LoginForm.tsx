@@ -6,11 +6,12 @@ import { useSearchParams } from "next/navigation";
 import { Logo } from "@/components/layout/Logo";
 import { Button } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { SignupPlanModal } from "@/components/auth/SignupPlanModal";
 import { PlanDemoLogins } from "@/components/auth/PlanDemoLogins";
 import { ProCleanDevLogin } from "@/components/auth/ProCleanDevLogin";
 import { TeamPinLogin } from "@/components/auth/TeamPinLogin";
-import { isProCleanAccountEmail, PRO_CLEAN_DEFAULT_EMAIL, PRO_CLEAN_LOGIN_PATH } from "@/lib/pro-clean-email";
+import { isProCleanAccountEmail, PRO_CLEAN_DEFAULT_EMAIL } from "@/lib/pro-clean-email";
 
 export default function LoginForm() {
   const searchParams = useSearchParams();
@@ -249,11 +250,11 @@ export default function LoginForm() {
                     />
                   </FormField>
                   <FormField label="Password">
-                    <Input
-                      type="password"
+                    <PasswordInput
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
+                      autoComplete="current-password"
                     />
                   </FormField>
                   <p className="text-right text-sm">
@@ -368,12 +369,6 @@ export default function LoginForm() {
           Just exploring?{" "}
           <Link href="/demo" className="text-orange-600 hover:text-orange-500">
             Try the live demo
-          </Link>
-        </p>
-        <p className="mt-2 text-center text-sm text-slate-400">
-          Subscribed to Pro?{" "}
-          <Link href={PRO_CLEAN_LOGIN_PATH} className="text-orange-600 hover:text-orange-500">
-            Pro customer sign-in
           </Link>
         </p>
       </div>

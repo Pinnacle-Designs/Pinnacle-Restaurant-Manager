@@ -27,11 +27,11 @@ export async function buildWorkspaceSnapshot(
     select: { provider: true, status: true },
   });
 
-  const stripeSubscriptionActive =
-    subscription?.status === "connected" &&
-    (subscription.provider === "STRIPE"
+  const stripeSubscriptionActive = subscription
+    ? subscription.provider === "STRIPE"
       ? isActiveStripeSubscriptionStatus(subscription.status)
-      : subscription.provider === "MANUAL");
+      : subscription.status === "connected"
+    : false;
 
   const plan = location.plan as PlanId;
   const required = billingRequired();

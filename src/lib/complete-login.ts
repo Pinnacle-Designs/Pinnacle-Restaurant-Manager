@@ -18,6 +18,7 @@ import { clearWorkspaceCookieOptions } from "@/lib/workspace-cookie";
 import { isProCleanAccountEmail } from "@/lib/pro-clean-email";
 import { completeProCleanLogin } from "@/lib/pro-clean-login";
 import { EMBED_API_COOKIE_NAME } from "@/lib/embed-constants";
+import { grantOwnerAccessAfterPurchase } from "@/lib/payments/sync-subscription";
 
 interface CompleteLoginOptions {
   request: NextRequest;
@@ -54,6 +55,18 @@ export async function completeUserLogin({
       }
     } else {
       workspace = await resolveUserWorkspace(user);
+      if (user.role === "OWNER" && user.locationId) {
+        const location = await prisma.location.findUnique({
+          where: { id: user.locationId },
+          select: { autopayEnabled: true, setupComplete: true },
+        });
+        if (location?.autopayEnabled) {
+          await grantOwnerAccessAfterPurchase(user.locationId);
+          if (!location.setupComplete) {
+            redirectTo = "/onboarding";
+          }
+        }
+      }
     }
   } catch (err) {
     console.error("User workspace resolution failed:", err);

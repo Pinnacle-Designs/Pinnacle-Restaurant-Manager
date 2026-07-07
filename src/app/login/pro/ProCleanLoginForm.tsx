@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Logo } from "@/components/layout/Logo";
 import { Button } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import {
   isProCleanAccountEmail,
   PRO_CLEAN_POST_CHECKOUT_PATH,
@@ -138,8 +139,7 @@ export default function ProCleanLoginForm() {
             />
           </FormField>
           <FormField label="Password">
-            <Input
-              type="password"
+            <PasswordInput
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
