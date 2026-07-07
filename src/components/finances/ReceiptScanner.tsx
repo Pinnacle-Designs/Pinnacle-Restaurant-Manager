@@ -9,6 +9,7 @@ import { submitScanForm } from "@/lib/scan/submit-scan";
 import { DocumentScanModeToggle } from "@/components/scan/DocumentScanModeToggle";
 import { DocumentQuickScanCapture } from "@/components/scan/DocumentQuickScanCapture";
 import { ScanOcrNotice } from "@/components/scan/ScanOcrNotice";
+import { ScannedImageViewer } from "@/components/scan/ScannedImageViewer";
 import { useDocumentQuickScan } from "@/hooks/useDocumentQuickScan";
 import type { OcrSource } from "@/lib/ocr/capabilities";
 
@@ -256,13 +257,12 @@ function ExtractedForm({
       </div>
 
       {previewSrc && (
-        <div className="overflow-hidden rounded-lg border border-green-200 bg-white">
-          <img
-            src={previewSrc}
-            alt="Scanned receipt"
-            className="mx-auto max-h-40 w-full object-contain"
-          />
-        </div>
+        <ScannedImageViewer
+          src={previewSrc}
+          alt="Scanned receipt"
+          previewClassName="max-h-48"
+          className="border-green-200 bg-white"
+        />
       )}
 
       <ScanOcrNotice

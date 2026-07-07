@@ -1,9 +1,18 @@
 import { isEmbeddableEmbedParam } from "./embed-config";
-import { EMBED_API_COOKIE_NAME, EMBED_SESSION_PARAM } from "./embed-constants";
+import {
+  API_SESSION_COOKIE_NAME,
+  EMBED_API_COOKIE_NAME,
+  EMBED_SESSION_PARAM,
+} from "./embed-constants";
 
-export { EMBED_API_COOKIE_NAME, EMBED_SESSION_PARAM } from "./embed-constants";
+export {
+  API_SESSION_COOKIE_NAME,
+  EMBED_API_COOKIE_NAME,
+  EMBED_SESSION_PARAM,
+} from "./embed-constants";
 
 const STORAGE_KEY = "pinnacle_embed_st";
+const API_STORAGE_KEY = "pinnacle_api_st";
 
 declare global {
   interface Window {
@@ -80,15 +89,61 @@ export function getEmbedSessionToken(): string | null {
   return null;
 }
 
+/** Readable session token for Authorization header on API requests. */
+export function getApiSessionToken(): string | null {
+  if (typeof window === "undefined") return null;
+
+  if (isEmbedMode()) {
+    return getEmbedSessionToken();
+  }
+
+  const apiMatch = document.cookie.match(
+    new RegExp(`(?:^|;\\s*)${API_SESSION_COOKIE_NAME}=([^;]+)`)
+  );
+  if (apiMatch?.[1]) {
+    const token = decodeURIComponent(apiMatch[1]);
+    if (parseEmbedSessionUser(token)) return token;
+  }
+
+  const embedMatch = document.cookie.match(
+    new RegExp(`(?:^|;\\s*)${EMBED_API_COOKIE_NAME}=([^;]+)`)
+  );
+  if (embedMatch?.[1]) {
+    const token = decodeURIComponent(embedMatch[1]);
+    if (parseEmbedSessionUser(token)) return token;
+  }
+
+  try {
+    const stored = sessionStorage.getItem(API_STORAGE_KEY);
+    if (stored && parseEmbedSessionUser(stored)) return stored;
+  } catch {
+    /* ignore */
+  }
+
+  return null;
+}
+
+/** Append Authorization header for API requests when cookies may not be sent. */
+function apiFetchInit(init?: RequestInit): RequestInit {
+  const next: RequestInit = { ...init, credentials: init?.credentials ?? "include" };
+  const headers = new Headers(init?.headers);
+  if (!headers.has("authorization")) {
+    const token = getApiSessionToken();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+  }
+  next.headers = headers;
+  return next;
+}
+
 /** Append Authorization header + optional `_st` for embed API requests. */
 function embedFetchInit(init?: RequestInit): RequestInit {
-  const next: RequestInit = { ...init, credentials: init?.credentials ?? "include" };
+  const next = apiFetchInit(init);
   if (!isEmbedMode()) return next;
 
   const token = getEmbedSessionToken();
   if (!token) return next;
 
-  const headers = new Headers(init?.headers);
+  const headers = new Headers(next.headers);
   if (!headers.has("authorization")) {
     headers.set("Authorization", `Bearer ${token}`);
   }
@@ -196,18 +251,19 @@ export function installEmbedFetchPatch(): void {
 
 export function clientFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const credentials = init?.credentials ?? "include";
+  const patchedInit = isEmbedMode() ? embedFetchInit(init) : apiFetchInit(init);
+
   if (!isEmbedMode()) {
     if (typeof input === "string") {
-      return fetch(input, { ...init, credentials });
+      return fetch(input, { ...patchedInit, credentials });
     }
     if (input instanceof URL) {
-      return fetch(input.toString(), { ...init, credentials });
+      return fetch(input.toString(), { ...patchedInit, credentials });
     }
-    return fetch(input, { ...init, credentials });
+    return fetch(input, { ...patchedInit, credentials });
   }
 
   installEmbedFetchPatch();
-  const patchedInit = embedFetchInit(init);
 
   if (typeof input === "string") {
     return fetch(withEmbedSession(input), patchedInit);

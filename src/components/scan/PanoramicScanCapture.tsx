@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { Camera, Upload, ScanLine, FileImage } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { ScannedImageViewer } from "@/components/scan/ScannedImageViewer";
 
 interface PanoramicScanCaptureProps {
   documentLabel?: string;
@@ -116,13 +117,12 @@ export function PanoramicScanCapture({
             Replace
           </Button>
         </div>
-        <div className="mx-auto max-h-[480px] max-w-md overflow-y-auto rounded-lg bg-white shadow-inner">
-          <img
-            src={preview}
-            alt={`Panoramic ${documentLabel}`}
-            className="w-full object-contain"
-          />
-        </div>
+        <ScannedImageViewer
+          src={preview}
+          alt={`Panoramic ${documentLabel}`}
+          previewClassName="max-h-[480px]"
+          className="rounded-lg bg-white shadow-inner"
+        />
         <p className="mt-2 text-center text-xs text-slate-500">
           Scroll to review the full panoramic {documentLabel}
         </p>

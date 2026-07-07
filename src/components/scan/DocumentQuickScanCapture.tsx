@@ -9,6 +9,7 @@ import {
 import { MultiPageScanCapture } from "@/components/scan/MultiPageScanCapture";
 import { PanoramicScanCapture } from "@/components/scan/PanoramicScanCapture";
 import type { DocumentQuickScan } from "@/hooks/useDocumentQuickScan";
+import { ScannedImageViewer } from "@/components/scan/ScannedImageViewer";
 
 interface DocumentQuickScanCaptureProps {
   scan: DocumentQuickScan;
@@ -114,14 +115,11 @@ export function DocumentQuickScanCapture({
       </div>
     ) : (
       <div className="space-y-4">
-        <div className="relative mx-auto max-w-xs">
-          {/* Native img — next/image can crash on large camera data URLs (iOS Safari). */}
-          <img
-            src={preview}
-            alt={documentLabel}
-            className="mx-auto max-h-[70vh] w-full rounded-lg object-contain"
-          />
-        </div>
+        <ScannedImageViewer
+          src={preview}
+          alt={documentLabel}
+          previewClassName="max-h-[70vh]"
+        />
         {showExtract && onExtract && (
           <Button
             onClick={onExtract}

@@ -4,6 +4,7 @@ export const PHOTO_CATEGORIES = [
   { value: "STAFF", label: "Staff", icon: "users", color: "bg-purple-100 text-purple-700" },
   { value: "FACILITY", label: "Facility", icon: "building", color: "bg-gray-100 text-gray-700" },
   { value: "RECEIPT", label: "Receipts", icon: "receipt", color: "bg-green-100 text-green-700" },
+  { value: "VENDOR_INVOICE", label: "Vendor Invoices", icon: "file-text", color: "bg-amber-100 text-amber-800" },
   { value: "FOOD_PREP", label: "Food Prep", icon: "chef-hat", color: "bg-red-100 text-red-700" },
   { value: "MARKETING", label: "Marketing", icon: "megaphone", color: "bg-pink-100 text-pink-700" },
   { value: "MAINTENANCE", label: "Maintenance", icon: "wrench", color: "bg-yellow-100 text-yellow-700" },

@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
-import { Brain, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Brain, Loader2, ExternalLink } from "lucide-react";
 import { Button, Badge } from "@/components/ui";
 import { PageSectionShell, PageSection } from "@/components/layout/PageSections";
 import { INSIGHT_SEVERITY_COLORS } from "@/lib/constants";
 import { showCriticalNotifications } from "@/lib/notifications";
 import { cn } from "@/lib/utils";
+import { ScannedImageViewer } from "@/components/scan/ScannedImageViewer";
+import { parsePhotoAnalysis, photoAnalysisSummary } from "@/lib/photos/photo-analysis";
 
 interface Insight {
   id: string;
@@ -140,42 +142,58 @@ export function PhotoGallery({ photos, categoryFilter }: PhotoGalleryProps) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {filtered.map((photo) => (
-        <div key={photo.id} className="card overflow-hidden !p-0">
-          <div className="relative aspect-video bg-slate-100">
-            {photo.url.startsWith("data:") ? (
-              <img
-                src={photo.url}
-                alt={photo.title || "Photo"}
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-            ) : (
-              <Image
-                src={photo.url}
-                alt={photo.title || "Photo"}
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, 33vw"
-                unoptimized={photo.url.startsWith("/uploads/")}
-              />
-            )}
-          </div>
-          <div className="p-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-medium text-slate-900">
-                {photo.title || "Untitled"}
-              </h3>
-              <Badge className="bg-slate-100 text-slate-600 text-xs">
-                {photo.category.replace("_", " ")}
-              </Badge>
-            </div>
-            {photo.aiAnalysis && (
-              <p className="mt-2 text-xs text-slate-500 line-clamp-2">
-                {photo.aiAnalysis}
-              </p>
-            )}
-          </div>
-        </div>
+        <PhotoGalleryCard key={photo.id} photo={photo} />
       ))}
+    </div>
+  );
+}
+
+function PhotoGalleryCard({
+  photo,
+}: {
+  photo: PhotoGalleryProps["photos"][number];
+}) {
+  const structured = parsePhotoAnalysis(photo.aiAnalysis);
+  const summary = photoAnalysisSummary(photo.aiAnalysis);
+
+  return (
+    <div className="card overflow-hidden !p-0">
+      <ScannedImageViewer
+        src={photo.url}
+        alt={photo.title || "Photo"}
+        previewClassName="max-h-48"
+      />
+      <div className="p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-medium text-slate-900">
+            {photo.title || "Untitled"}
+          </h3>
+          <Badge className="bg-slate-100 text-slate-600 text-xs">
+            {photo.category.replace("_", " ")}
+          </Badge>
+        </div>
+        {summary && (
+          <p className="mt-2 text-xs text-slate-500 line-clamp-2">{summary}</p>
+        )}
+        {structured?.kind === "receipt" && structured.expenseId && (
+          <Link
+            href="/finances"
+            className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-green-700 hover:text-green-800"
+          >
+            <ExternalLink className="h-3 w-3" />
+            View in Finances
+          </Link>
+        )}
+        {structured?.kind === "vendor_invoice" && structured.invoiceId && (
+          <Link
+            href="/purchase-orders"
+            className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-amber-700 hover:text-amber-800"
+          >
+            <ExternalLink className="h-3 w-3" />
+            View in Purchase Orders
+          </Link>
+        )}
+      </div>
     </div>
   );
 }

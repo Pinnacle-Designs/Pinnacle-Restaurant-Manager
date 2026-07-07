@@ -17,7 +17,7 @@ import { privateJsonResponse } from "@/lib/secure-response";
 import { clearWorkspaceCookieOptions } from "@/lib/workspace-cookie";
 import { isProCleanAccountEmail } from "@/lib/pro-clean-email";
 import { completeProCleanLogin } from "@/lib/pro-clean-login";
-import { EMBED_API_COOKIE_NAME } from "@/lib/embed-constants";
+import { EMBED_API_COOKIE_NAME, API_SESSION_COOKIE_NAME } from "@/lib/embed-constants";
 import { grantOwnerAccessAfterPurchase } from "@/lib/payments/sync-subscription";
 
 interface CompleteLoginOptions {
@@ -128,6 +128,14 @@ export function attachLogoutCookies(response: NextResponse) {
   response.cookies.set(clearWorkspaceCookieOptions());
   response.cookies.set({
     name: EMBED_API_COOKIE_NAME,
+    value: "",
+    path: "/",
+    maxAge: 0,
+    httpOnly: false,
+    sameSite: "lax",
+  });
+  response.cookies.set({
+    name: API_SESSION_COOKIE_NAME,
     value: "",
     path: "/",
     maxAge: 0,

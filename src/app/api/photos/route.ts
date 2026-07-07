@@ -5,15 +5,27 @@ import { getLocationIdFromRequest } from "@/lib/location";
 import { getSessionUserFromRequest } from "@/lib/auth";
 import { userCan } from "@/lib/permission-resolve";
 import { forbiddenResponse, unauthorizedResponse } from "@/lib/api-auth";
+import { getRequestPlan } from "@/lib/plan-api";
+import {
+  GROWTH_OCR_MONTHLY_LIMIT,
+  PLAN_BY_ID,
+  canUseReceiptOcr,
+  hasUnlimitedReceiptOcr,
+} from "@/lib/plans";
+import { startOfMonth } from "date-fns";
 import type { PhotoCategory } from "@prisma/client";
 import { persistUploadFile, uploadErrorMessage } from "@/lib/persist-upload";
+import { autoDigitizePhotoUpload } from "@/lib/photos/auto-digitize";
 import {
   base64Input,
   filesToBase64,
   parseScanFormData,
+  readOcrTextFromForm,
   scanUploadTooLarge,
   visionScanFromParsed,
 } from "@/lib/scan/parse-scan-form";
+
+const DIGITIZE_CATEGORIES = new Set(["RECEIPT", "VENDOR_INVOICE"]);
 
 export async function GET(request: NextRequest) {
   const user = await getSessionUserFromRequest(request);
@@ -21,8 +33,13 @@ export async function GET(request: NextRequest) {
 
   const locationId = await getLocationIdFromRequest(request);
   const category = request.nextUrl.searchParams.get("category");
+  const canViewReceipts = await userCan(user, "view_receipts");
+  const canManageInventory = await userCan(user, "manage_inventory");
 
-  if (category === "RECEIPT" && !(await userCan(user, "view_receipts"))) {
+  if (category === "RECEIPT" && !canViewReceipts) {
+    return forbiddenResponse();
+  }
+  if (category === "VENDOR_INVOICE" && !canManageInventory) {
     return forbiddenResponse();
   }
 
@@ -30,9 +47,8 @@ export async function GET(request: NextRequest) {
     where: {
       locationId,
       ...(category ? { category: category as PhotoCategory } : {}),
-      ...(!(await userCan(user, "view_receipts"))
-        ? { category: { not: "RECEIPT" as PhotoCategory } }
-        : {}),
+      ...(!canViewReceipts ? { category: { not: "RECEIPT" as PhotoCategory } } : {}),
+      ...(!canManageInventory ? { category: { not: "VENDOR_INVOICE" as PhotoCategory } } : {}),
     },
     orderBy: { createdAt: "desc" },
   });
@@ -53,6 +69,10 @@ export async function POST(request: NextRequest) {
     if (category === "RECEIPT" && !(await userCan(user, "view_receipts"))) {
       return forbiddenResponse();
     }
+    if (category === "VENDOR_INVOICE" && !(await userCan(user, "manage_inventory"))) {
+      return forbiddenResponse();
+    }
+
     const title = formData.get("title") as string | null;
     const description = formData.get("description") as string | null;
     const analyzeWithAI = formData.get("analyzeWithAI") === "true";
@@ -75,8 +95,56 @@ export async function POST(request: NextRequest) {
     let aiAnalysis: string | null = null;
     let photoTitle = title;
     let tags: string[] = [];
+    let digitized = null;
 
-    if (analyzeWithAI) {
+    if (analyzeWithAI && DIGITIZE_CATEGORIES.has(category)) {
+      if (category === "RECEIPT") {
+        const plan = await getRequestPlan(request);
+        if (!canUseReceiptOcr(plan)) {
+          return NextResponse.json(
+            {
+              error: `Receipt OCR is included on ${PLAN_BY_ID.GROWTH.name} and ${PLAN_BY_ID.PRO.name} plans.`,
+              requiredPlan: "GROWTH",
+            },
+            { status: 403 }
+          );
+        }
+
+        if (!hasUnlimitedReceiptOcr(plan)) {
+          const monthStart = startOfMonth(new Date());
+          const used = await prisma.photo.count({
+            where: {
+              locationId,
+              category: "RECEIPT",
+              createdAt: { gte: monthStart },
+            },
+          });
+          if (used >= GROWTH_OCR_MONTHLY_LIMIT) {
+            return NextResponse.json(
+              {
+                error: `Growth includes ${GROWTH_OCR_MONTHLY_LIMIT} receipt scans per month. Upgrade to ${PLAN_BY_ID.PRO.name} for unlimited OCR.`,
+                requiredPlan: "PRO",
+              },
+              { status: 429 }
+            );
+          }
+        }
+      }
+
+      const ocrText = readOcrTextFromForm(formData);
+      const result = await autoDigitizePhotoUpload({
+        locationId,
+        category,
+        imageUrl: url,
+        parsed,
+        ocrText,
+        title,
+      });
+      aiAnalysis = result.aiAnalysis;
+      photoTitle = result.photoTitle ?? photoTitle;
+      tags = result.tags;
+      digitized = result.digitized ?? null;
+    } else if (analyzeWithAI) {
       const base64Images = await filesToBase64(parsed.files);
       const vision = visionScanFromParsed(parsed);
       const analysis = await analyzePhoto(base64Input(base64Images), category, vision);
@@ -104,11 +172,13 @@ export async function POST(request: NextRequest) {
         action: "PHOTO_UPLOAD",
         entity: "photo",
         entityId: photo.id,
-        details: `Uploaded ${category} photo: ${photoTitle || filename}`,
+        details: digitized
+          ? `Uploaded & digitized ${category} photo: ${photoTitle || filename}`
+          : `Uploaded ${category} photo: ${photoTitle || filename}`,
       },
     });
 
-    return NextResponse.json(photo);
+    return NextResponse.json({ photo, digitized });
   } catch (error) {
     console.error("Photo upload error:", error);
     return NextResponse.json({ error: uploadErrorMessage(error) }, { status: 500 });

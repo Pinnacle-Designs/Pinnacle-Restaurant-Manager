@@ -8,7 +8,7 @@ import { privateJsonResponse } from "@/lib/secure-response";
 import { clearWorkspaceCookieOptions } from "@/lib/workspace-cookie";
 import type { SessionUser } from "@/lib/session";
 import { syncProCleanUserLocation } from "@/lib/pro-clean-account";
-import { EMBED_API_COOKIE_NAME } from "@/lib/embed-constants";
+import { API_SESSION_COOKIE_NAME, EMBED_API_COOKIE_NAME } from "@/lib/embed-constants";
 import {
   isProCleanAccountEmail,
   PRO_CLEAN_LOGIN_PATH,
@@ -75,6 +75,14 @@ export async function completeProCleanLogin({
   response.cookies.set(clearSessionCookieOptions());
   response.cookies.set({
     name: EMBED_API_COOKIE_NAME,
+    value: "",
+    path: "/",
+    maxAge: 0,
+    httpOnly: false,
+    sameSite: "lax",
+  });
+  response.cookies.set({
+    name: API_SESSION_COOKIE_NAME,
     value: "",
     path: "/",
     maxAge: 0,

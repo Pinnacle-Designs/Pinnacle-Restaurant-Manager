@@ -26,6 +26,9 @@ export async function submitScanForm<T = Record<string, unknown>>(
   const res = await clientFetch(url, { method, body: formData });
   const data = await parseJsonResponse<T & { error?: string }>(res);
   if (!res.ok) {
+    if (res.status === 401) {
+      throw new Error("Session expired. Please sign in again and retry.");
+    }
     throw new Error(data.error || "Scan failed");
   }
   return data;

@@ -10,6 +10,7 @@ import type { OcrSource } from "@/lib/ocr/capabilities";
 import { showCriticalNotifications } from "@/lib/notifications";
 import { DocumentQuickScanCapture } from "@/components/scan/DocumentQuickScanCapture";
 import { ScanOcrNotice } from "@/components/scan/ScanOcrNotice";
+import { ScannedImageViewer } from "@/components/scan/ScannedImageViewer";
 import { useDocumentQuickScan } from "@/hooks/useDocumentQuickScan";
 
 function normalizeInvoiceData(raw: Partial<InvoiceData> | null | undefined): InvoiceData {
@@ -241,13 +242,11 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
         {invoiceData && (
           <div className="space-y-3">
             {(scan.preview || scan.pages[0]?.dataUrl || scan.stitched?.dataUrl) && (
-              <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-                <img
-                  src={scan.preview ?? scan.stitched?.dataUrl ?? scan.pages[0]?.dataUrl ?? ""}
-                  alt="Scanned invoice"
-                  className="mx-auto max-h-40 w-full object-contain"
-                />
-              </div>
+              <ScannedImageViewer
+                src={scan.preview ?? scan.stitched?.dataUrl ?? scan.pages[0]?.dataUrl ?? ""}
+                alt="Scanned invoice"
+                previewClassName="max-h-48"
+              />
             )}
             <ScanOcrNotice
               source={ocrSource}

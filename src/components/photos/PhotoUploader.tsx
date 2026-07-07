@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Upload, Loader2 } from "lucide-react";
+import { Upload, Loader2, CheckCircle, ExternalLink } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui";
 import { PHOTO_CATEGORIES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { submitScanForm } from "@/lib/scan/submit-scan";
 import { DocumentQuickScanCapture } from "@/components/scan/DocumentQuickScanCapture";
 import { useDocumentQuickScan } from "@/hooks/useDocumentQuickScan";
+import type { PhotoDigitizePayload } from "@/lib/photos/photo-analysis";
 
 interface PhotoUploaderProps {
   onUploadComplete?: () => void;
@@ -33,11 +35,13 @@ export function PhotoUploader({
   const [description, setDescription] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastDigitized, setLastDigitized] = useState<PhotoDigitizePayload | null>(null);
 
   const handleUpload = async () => {
     if (!scan.canExtract) return;
     setUploading(true);
     setError(null);
+    setLastDigitized(null);
 
     try {
       const formData = scan.buildScanFormData({
@@ -47,11 +51,15 @@ export function PhotoUploader({
         ...(description ? { description } : {}),
       });
 
-      await submitScanForm("/api/photos", formData);
+      const data = await submitScanForm<{ digitized?: PhotoDigitizePayload | null }>(
+        "/api/photos",
+        formData
+      );
 
       scan.clear();
       setTitle("");
       setDescription("");
+      setLastDigitized(data.digitized ?? null);
       onUploadComplete?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -124,6 +132,28 @@ export function PhotoUploader({
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
+
+          {lastDigitized && (
+            <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+              <div className="flex items-start gap-2">
+                <CheckCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="font-medium">Added to {lastDigitized.kind === "receipt" ? "Finances" : "Purchase Orders"}</p>
+                  <p className="text-xs text-green-700">{lastDigitized.summary}</p>
+                  {lastDigitized.kind === "receipt" && (
+                    <Link href="/finances" className="mt-1 inline-flex items-center gap-1 text-xs font-medium underline">
+                      Open Finances <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  )}
+                  {lastDigitized.kind === "vendor_invoice" && (
+                    <Link href="/purchase-orders" className="mt-1 inline-flex items-center gap-1 text-xs font-medium underline">
+                      Open Purchase Orders <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           <Button onClick={handleUpload} disabled={uploading || !scan.canExtract} className="w-full">
             {uploading ? (

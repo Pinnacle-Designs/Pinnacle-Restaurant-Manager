@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { AUTH_COOKIE_NAME, parseSessionToken, type SessionUser } from "./session";
-import { EMBED_SESSION_PARAM } from "./embed-constants";
+import { API_SESSION_COOKIE_NAME, EMBED_API_COOKIE_NAME, EMBED_SESSION_PARAM } from "./embed-constants";
 import { isEmbeddableEmbedParam } from "./embed-config";
 
 /**
@@ -13,12 +13,19 @@ export function getRequestSessionToken(request: NextRequest): string | undefined
   if (embedSt && isEmbeddableEmbedParam(embedParam)) return embedSt;
 
   const auth = request.headers.get("authorization");
-  if (auth?.toLowerCase().startsWith("bearer ") && isEmbeddableEmbedParam(embedParam)) {
-    return auth.slice(7).trim();
+  if (auth?.toLowerCase().startsWith("bearer ")) {
+    const bearer = auth.slice(7).trim();
+    if (bearer) return bearer;
   }
 
   const cookie = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   if (cookie) return cookie;
+
+  const apiCookie = request.cookies.get(API_SESSION_COOKIE_NAME)?.value;
+  if (apiCookie) return apiCookie;
+
+  const embedCookie = request.cookies.get(EMBED_API_COOKIE_NAME)?.value;
+  if (embedCookie) return embedCookie;
 
   return undefined;
 }

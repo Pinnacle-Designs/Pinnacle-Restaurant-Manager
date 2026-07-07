@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { filterBySearchQuery } from "@/lib/search/text-match";
 import { usePageSearch } from "@/hooks/usePageSearch";
+import { clientFetch } from "@/lib/embed-api-client";
 
 interface Photo {
   id: string;
@@ -23,9 +24,12 @@ interface Photo {
 export default function PhotosPage() {
   const { can } = useAuth();
   const canViewReceipts = can("view_receipts");
-  const visibleCategories = PHOTO_CATEGORIES.filter(
-    (cat) => canViewReceipts || cat.value !== "RECEIPT"
-  );
+  const canManageInventory = can("manage_inventory");
+  const visibleCategories = PHOTO_CATEGORIES.filter((cat) => {
+    if (cat.value === "RECEIPT" && !canViewReceipts) return false;
+    if (cat.value === "VENDOR_INVOICE" && !canManageInventory) return false;
+    return true;
+  });
 
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string | undefined>();
@@ -44,7 +48,7 @@ export default function PhotosPage() {
   }, [photos, categoryFilter, query]);
 
   const fetchPhotos = useCallback(async () => {
-    const res = await fetch("/api/photos");
+    const res = await clientFetch("/api/photos");
     const data = await res.json();
     setPhotos(data);
     setLoading(false);
@@ -85,7 +89,10 @@ export default function PhotosPage() {
         <PageSection id="photos-upload" title="Upload photos">
           <PhotoUploader
             onUploadComplete={fetchPhotos}
-            excludeCategories={canViewReceipts ? [] : ["RECEIPT"]}
+            excludeCategories={[
+              ...(canViewReceipts ? [] : ["RECEIPT"]),
+              ...(canManageInventory ? [] : ["VENDOR_INVOICE"]),
+            ]}
           />
         </PageSection>
 

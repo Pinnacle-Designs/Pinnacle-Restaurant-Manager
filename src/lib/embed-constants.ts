@@ -4,6 +4,9 @@ export const EMBED_SESSION_PARAM = "_st";
 /** Non-httpOnly cookie so embedded iframes can attach `_st` to API fetches. */
 export const EMBED_API_COOKIE_NAME = "pinnacle_embed_st";
 
+/** Readable session mirror for same-origin API fetches (multipart uploads, PWA). */
+export const API_SESSION_COOKIE_NAME = "pinnacle_api_st";
+
 /** Internal request headers set by middleware so RSC can auth without cookies. */
 export const EMBED_SESSION_HEADER = "x-pinnacle-embed-session";
 export const EMBED_LOCATION_HEADER = "x-pinnacle-embed-location";

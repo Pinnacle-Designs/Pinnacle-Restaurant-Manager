@@ -7,17 +7,23 @@ export function ScannedImageViewer({
   src,
   alt = "Scanned document",
   className = "",
+  previewClassName = "max-h-56",
+  emptyMessage = "No scan image saved for this document.",
 }: {
   src: string | null | undefined;
   alt?: string;
   className?: string;
+  previewClassName?: string;
+  emptyMessage?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
 
   if (!src) {
     return (
-      <div className={`rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 ${className}`}>
-        No scan image saved for this invoice.
+      <div
+        className={`rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 ${className}`}
+      >
+        {emptyMessage}
       </div>
     );
   }
@@ -30,10 +36,14 @@ export function ScannedImageViewer({
         className={`group relative block w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-50 ${className}`}
         aria-label="View full-size scan"
       >
-        <img src={src} alt={alt} className="mx-auto max-h-56 w-full object-contain" />
-        <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
+        <img
+          src={src}
+          alt={alt}
+          className={`mx-auto w-full object-contain ${previewClassName}`}
+        />
+        <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
           <ZoomIn className="h-3 w-3" />
-          View full size
+          Tap to expand
         </span>
       </button>
 
