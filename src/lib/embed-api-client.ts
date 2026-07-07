@@ -12,7 +12,6 @@ export {
 } from "./embed-constants";
 
 const STORAGE_KEY = "pinnacle_embed_st";
-const API_STORAGE_KEY = "pinnacle_api_st";
 
 declare global {
   interface Window {
@@ -46,7 +45,10 @@ export function persistEmbedSessionToken(token: string | null | undefined): void
 export function getEmbedSessionToken(): string | null {
   if (typeof window === "undefined") return null;
 
-  // URL `_st` always wins — normal browsers may have stale memory/cookie sessions.
+  const embed = new URLSearchParams(window.location.search).get("embed");
+  const inEmbedContext = isEmbeddableEmbedParam(embed);
+  if (!inEmbedContext) return null;
+
   const fromUrl = new URLSearchParams(window.location.search).get(EMBED_SESSION_PARAM);
   if (fromUrl) {
     persistEmbedSessionToken(fromUrl);
@@ -103,21 +105,6 @@ export function getApiSessionToken(): string | null {
   if (apiMatch?.[1]) {
     const token = decodeURIComponent(apiMatch[1]);
     if (parseEmbedSessionUser(token)) return token;
-  }
-
-  const embedMatch = document.cookie.match(
-    new RegExp(`(?:^|;\\s*)${EMBED_API_COOKIE_NAME}=([^;]+)`)
-  );
-  if (embedMatch?.[1]) {
-    const token = decodeURIComponent(embedMatch[1]);
-    if (parseEmbedSessionUser(token)) return token;
-  }
-
-  try {
-    const stored = sessionStorage.getItem(API_STORAGE_KEY);
-    if (stored && parseEmbedSessionUser(stored)) return stored;
-  } catch {
-    /* ignore */
   }
 
   return null;
@@ -195,7 +182,7 @@ export function bootstrapEmbedSession(embedParam: string | null): void {
   ensureEmbedUrlHasSession();
 }
 
-/** Drop cached embed tokens when starting a fresh demo launch. */
+/** Drop cached embed tokens when leaving embed / demo context. */
 export function clearEmbedSessionCache(): void {
   memoryCachedToken = null;
   if (typeof window !== "undefined") {
@@ -206,6 +193,13 @@ export function clearEmbedSessionCache(): void {
       /* ignore */
     }
   }
+}
+
+/** Remove stale demo embed artifacts so they cannot override a normal login. */
+export function purgeStaleEmbedSessionArtifacts(): void {
+  clearEmbedSessionCache();
+  if (typeof window === "undefined") return;
+  document.cookie = `${EMBED_API_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
 }
 
 let fetchPatched = false;

@@ -14,6 +14,7 @@ import {
   clientFetch,
   getEmbedSessionToken,
   parseEmbedSessionUser,
+  purgeStaleEmbedSessionArtifacts,
 } from "@/lib/embed-api-client";
 
 export interface AuthUser {
@@ -85,7 +86,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Persist `_st` and sync user when the embed URL token changes.
   useEffect(() => {
-    if (!isEmbed) return;
+    if (!isEmbed) {
+      purgeStaleEmbedSessionArtifacts();
+      return;
+    }
     if (stParam) {
       clearEmbedSessionCache();
       const fromUrl = embedUserFromParam(stParam, true);
@@ -100,9 +104,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     if (isEmbed) {
       bootstrapEmbedUser(embedParam);
+    } else {
+      purgeStaleEmbedSessionArtifacts();
     }
 
-    const tokenUser = parseEmbedSessionUser(getEmbedSessionToken());
+    const tokenUser = isEmbed
+      ? parseEmbedSessionUser(getEmbedSessionToken())
+      : null;
 
     try {
       const res = await clientFetch("/api/auth/login");

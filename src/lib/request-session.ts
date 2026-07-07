@@ -4,28 +4,41 @@ import { API_SESSION_COOKIE_NAME, EMBED_API_COOKIE_NAME, EMBED_SESSION_PARAM } f
 import { isEmbeddableEmbedParam } from "./embed-config";
 
 /**
- * Read session JWT. Embed `_st` wins only inside an embed context so stale demo
- * tokens cannot override a normal pro-clean / owner cookie session.
+ * Read session JWT. The httpOnly auth cookie is authoritative for normal app use.
+ * Embed `_st` / embed cookies apply only inside an embed context.
  */
 export function getRequestSessionToken(request: NextRequest): string | undefined {
   const embedParam = request.nextUrl.searchParams.get("embed");
+  const isEmbed = isEmbeddableEmbedParam(embedParam);
   const embedSt = request.nextUrl.searchParams.get(EMBED_SESSION_PARAM);
-  if (embedSt && isEmbeddableEmbedParam(embedParam)) return embedSt;
 
-  const auth = request.headers.get("authorization");
-  if (auth?.toLowerCase().startsWith("bearer ")) {
-    const bearer = auth.slice(7).trim();
-    if (bearer) return bearer;
+  if (isEmbed && embedSt) return embedSt;
+
+  const httpOnlyCookie = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  if (httpOnlyCookie) return httpOnlyCookie;
+
+  if (isEmbed) {
+    const auth = request.headers.get("authorization");
+    if (auth?.toLowerCase().startsWith("bearer ")) {
+      const bearer = auth.slice(7).trim();
+      if (bearer) return bearer;
+    }
+
+    const embedCookie = request.cookies.get(EMBED_API_COOKIE_NAME)?.value;
+    if (embedCookie) return embedCookie;
   }
 
-  const cookie = request.cookies.get(AUTH_COOKIE_NAME)?.value;
-  if (cookie) return cookie;
-
+  // Readable mirror for multipart uploads when httpOnly cookie is not sent (PWA).
   const apiCookie = request.cookies.get(API_SESSION_COOKIE_NAME)?.value;
   if (apiCookie) return apiCookie;
 
-  const embedCookie = request.cookies.get(EMBED_API_COOKIE_NAME)?.value;
-  if (embedCookie) return embedCookie;
+  if (!isEmbed) {
+    const auth = request.headers.get("authorization");
+    if (auth?.toLowerCase().startsWith("bearer ")) {
+      const bearer = auth.slice(7).trim();
+      if (bearer) return bearer;
+    }
+  }
 
   return undefined;
 }

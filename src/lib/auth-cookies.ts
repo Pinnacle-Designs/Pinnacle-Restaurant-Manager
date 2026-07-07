@@ -73,6 +73,15 @@ export function attachAuthCookies(
       maxAge: AUTH_COOKIE_MAX_AGE,
       partitioned: true,
     });
+  } else {
+    response.cookies.set({
+      name: EMBED_API_COOKIE_NAME,
+      value: "",
+      path: "/",
+      maxAge: 0,
+      httpOnly: false,
+      sameSite: "lax",
+    });
   }
   if (prepared.workspaceToken) {
     response.cookies.set(workspaceCookieOptions(prepared.workspaceToken, options?.secure));
