@@ -248,7 +248,10 @@ function applyLineMemory(line: InvoiceLineData, ctx: VendorOcrContext): InvoiceL
   }
 
   if (next.qty > 0 && next.unitPrice > 0) {
-    next.lineTotal = next.qty * next.unitPrice;
+    const expected = next.qty * next.unitPrice;
+    if (next.lineTotal <= 0 || Math.abs(expected - next.lineTotal) <= Math.max(0.5, next.lineTotal * 0.03)) {
+      next.lineTotal = expected;
+    }
   }
 
   return next;

@@ -1,5 +1,6 @@
 import type { InvoiceData, InvoiceLineData } from "@/lib/ai/analyze-invoice";
 import type { SkuLineHint } from "./vendor-memory";
+import { normalizeSkuLikeToken } from "./ocr-corrections";
 import {
   extractDocumentDate,
   extractInvoiceNumber,
@@ -38,11 +39,19 @@ function itemCodeRegex(ctx?: InvoiceParseContext): RegExp {
 
 function expandOcrLines(text: string, itemCode: RegExp): string[] {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const joined = joinWrappedLineRows(lines, itemCode);
-  if (joined.length > 3) return joined;
+  const tabLines = lines.filter((l) => l.includes("\t") && (itemCode.test(l) || ALT_ITEM_CODE.test(l)));
+  const plainLines = lines.filter((l) => !l.includes("\t"));
+  const joined = joinWrappedLineRows(plainLines, itemCode);
 
-  const split = text.split(/\b(?=[A-Z]{2,6}\d{2,4}\b)/).map((l) => l.trim()).filter(Boolean);
-  return split.length > joined.length ? joinWrappedLineRows(split, itemCode) : joined;
+  if (joined.length + tabLines.length > 0) {
+    return [...joined, ...tabLines];
+  }
+
+  const split = text
+    .split(/\b(?=[A-Z]{2,6}\d{2,4}\b)/)
+    .map((l) => l.replace(/\r?\n/g, " ").trim())
+    .filter(Boolean);
+  return joinWrappedLineRows(split, itemCode);
 }
 
 function joinWrappedLineRows(rows: string[], itemCode: RegExp): string[] {
@@ -99,13 +108,24 @@ function parseCatchWeight(line: string, opts?: { unit?: string; qty?: number; un
 
 /** Distributor table tail: Qty Ordered · Qty Shipped · Package · Unit $ · Extended $ */
 
+function isMoneyToken(value: string): boolean {
+  return /^[$]?\s*[\d,]+\.\d{2}$/.test(value.trim());
+}
+
+function isQtyToken(value: string): boolean {
+  const t = value.trim().replace(/,/g, ".");
+  if (!/^\d+(?:\.\d{1,2})?$/.test(t)) return false;
+  const n = parseFloat(t);
+  return Number.isFinite(n) && n > 0 && n <= 9999;
+}
+
 interface ParsedDistributorTail {
   qtyOrdered: number;
   qtyShipped: number;
   packageRaw: string;
   unitPrice: number;
   lineTotal: number;
-  descEndIndex: number;
+  headerText: string;
 }
 
 function parseDistributorTail(line: string): ParsedDistributorTail | null {
@@ -117,6 +137,10 @@ function parseDistributorTail(line: string): ParsedDistributorTail | null {
   const unitPrice = parseMoney(unitPriceMatch[1]!);
   const lineTotal = parseMoney(lineTotalMatch[1]!);
   if (unitPrice <= 0 || lineTotal <= 0 || unitPrice > 50_000 || lineTotal > 50_000) return null;
+
+  const headerText = line.slice(0, unitPriceMatch.index!).trim();
+  const skuPrefix = headerText.match(/^([A-Z]{2,6}\d{2,4})\b/i)?.[0] ?? "";
+  const afterSku = skuPrefix ? headerText.slice(skuPrefix.length).trim() : headerText;
 
   if (moneyMatches.length >= 4) {
     const qtyOrdMatch = moneyMatches[moneyMatches.length - 4]!;
@@ -135,26 +159,25 @@ function parseDistributorTail(line: string): ParsedDistributorTail | null {
       packageRaw,
       unitPrice,
       lineTotal,
-      descEndIndex: qtyOrdMatch.index!,
+      headerText: line.slice(0, qtyOrdMatch.index!).trim(),
     };
   }
 
-  const beforeUnitPrice = line.slice(0, unitPriceMatch.index!).trimEnd();
-  const tailPair = beforeUnitPrice.match(
-    /(\d+\.\d{2})\s+(\d+\.\d{2})\s+(.+)\s*$/i
+  const tailPair = afterSku.match(
+    /^(\d+(?:\.\d{1,2})?)\s+(\d+(?:\.\d{1,2})?)\s+(.+)\s*$/i
   );
   if (tailPair) {
     return {
-      qtyOrdered: parseFloat(tailPair[1]!),
-      qtyShipped: parseFloat(tailPair[2]!),
+      qtyOrdered: parseFloat(tailPair[1]!.replace(/,/g, ".")),
+      qtyShipped: parseFloat(tailPair[2]!.replace(/,/g, ".")),
       packageRaw: tailPair[3]!.trim(),
       unitPrice,
       lineTotal,
-      descEndIndex: tailPair.index!,
+      headerText,
     };
   }
 
-  const singleQty = beforeUnitPrice.match(/(\d+\.\d{2})\s+(.+)\s*$/i);
+  const singleQty = afterSku.match(/^(\d+(?:\.\d{1,2})?)\s+(.+)\s*$/i);
   if (singleQty) {
     const qty = parseFloat(singleQty[1]!);
     return {
@@ -163,17 +186,17 @@ function parseDistributorTail(line: string): ParsedDistributorTail | null {
       packageRaw: singleQty[2]!.trim(),
       unitPrice,
       lineTotal,
-      descEndIndex: singleQty.index!,
+      headerText,
     };
   }
 
   return {
     qtyOrdered: 1,
     qtyShipped: 1,
-    packageRaw: beforeUnitPrice.split(/\s+/).slice(-1)[0] ?? "each",
+    packageRaw: afterSku.split(/\s+/).slice(-1)[0] ?? "each",
     unitPrice,
     lineTotal,
-    descEndIndex: beforeUnitPrice.length,
+    headerText,
   };
 }
 
@@ -201,7 +224,7 @@ function parseDistributorTableRow(
   const tail = parseDistributorTail(line);
   if (!tail) return null;
 
-  const header = line.slice(0, tail.descEndIndex).trim();
+  const header = tail.headerText.trim();
   const { sku, description } = extractSkuAndDescription(header, itemCode, { stripTailColumns: false });
   if (!sku && !description.trim()) return null;
 
@@ -210,6 +233,101 @@ function parseDistributorTableRow(
   const lineTotal = tail.lineTotal;
   const unit = parseUnitFromPackage(tail.packageRaw, line);
 
+  let resolvedQty = qty;
+  if (resolvedQty <= 1 && unitPrice > 0 && lineTotal > unitPrice * 1.4) {
+    const inferred = lineTotal / unitPrice;
+    const rounded = Math.round(inferred);
+    if (rounded > 1 && rounded <= 9999 && Math.abs(inferred - rounded) <= 0.06) {
+      resolvedQty = rounded;
+    }
+  }
+
+  if (resolvedQty > 0 && unitPrice > 0 && lineTotal > 0) {
+    const expected = unitPrice * resolvedQty;
+    if (Math.abs(expected - lineTotal) > Math.max(0.5, lineTotal * 0.05)) {
+      unitPrice = lineTotal / resolvedQty;
+    }
+  }
+
+  const catchWeight = parseCatchWeight(line, { unit, qty: resolvedQty, unitPrice, lineTotal });
+
+  return finalizeLineItem(
+    {
+      description,
+      qty: resolvedQty || 1,
+      unit,
+      unitPrice,
+      lineTotal,
+      sku,
+      ...(catchWeight.billed
+        ? { catchWeightBilled: catchWeight.billed, catchWeightUnit: catchWeight.unit ?? "lbs" }
+        : {}),
+    },
+    hints
+  );
+}
+
+/** Parse tab-separated distributor rows (SKU · desc · qty · qty · pkg · unit$ · ext$). */
+function parseDistributorTabRow(
+  tabParts: string[],
+  itemCode: RegExp,
+  line: string,
+  hints?: SkuLineHint[]
+): InvoiceLineData | null {
+  if (tabParts.length < 4) return null;
+
+  const moneyIdx = tabParts.map((p, i) => (isMoneyToken(p) ? i : -1)).filter((i) => i >= 0);
+  if (moneyIdx.length < 2) return null;
+
+  const extIdx = moneyIdx[moneyIdx.length - 1]!;
+  const unitIdx = moneyIdx[moneyIdx.length - 2]!;
+  const lineTotal = parseMoney(tabParts[extIdx]!);
+  let unitPrice = parseMoney(tabParts[unitIdx]!);
+
+  const qtyValues: number[] = [];
+  for (let i = unitIdx - 1; i >= 0; i -= 1) {
+    const part = tabParts[i]!;
+    if (isQtyToken(part)) {
+      qtyValues.unshift(parseFloat(part.replace(/,/g, ".")));
+      if (qtyValues.length >= 2) break;
+      continue;
+    }
+    if (isMoneyToken(part)) continue;
+    break;
+  }
+
+  const qty = qtyValues.length >= 2 ? qtyValues[1]! : qtyValues[0] ?? 1;
+  const packageIdx = unitIdx - qtyValues.length - 1;
+  const packageRaw =
+    packageIdx >= 0 &&
+    !isQtyToken(tabParts[packageIdx]!) &&
+    !isMoneyToken(tabParts[packageIdx]!)
+      ? tabParts[packageIdx]!
+      : "";
+
+  const leadingEnd = packageIdx >= 0 ? packageIdx : Math.max(0, unitIdx - qtyValues.length);
+  const leadingParts = tabParts.slice(0, leadingEnd);
+
+  let sku: string | undefined;
+  let description = "";
+
+  if (leadingParts.length >= 2) {
+    const extracted = extractSkuAndDescription(leadingParts[0]!, itemCode, { stripTailColumns: false });
+    sku = extracted.sku;
+    const rest = leadingParts
+      .slice(1)
+      .filter((p) => /[A-Za-z]{2,}/.test(p))
+      .join(" ");
+    description = extracted.description ? `${extracted.description} ${rest}`.trim() : rest;
+  } else if (leadingParts.length === 1) {
+    const extracted = extractSkuAndDescription(leadingParts[0]!, itemCode, { stripTailColumns: false });
+    sku = extracted.sku;
+    description = extracted.description;
+  }
+
+  if (!sku && !description.trim()) return null;
+
+  const unit = parseUnitFromPackage(packageRaw, line);
   if (qty > 0 && unitPrice > 0 && lineTotal > 0) {
     const expected = unitPrice * qty;
     if (Math.abs(expected - lineTotal) > Math.max(0.5, lineTotal * 0.05)) {
@@ -237,9 +355,11 @@ function parseDistributorTableRow(
 
 function parseQtyFromLine(beforePrices: string, description: string, sku?: string): number {
   let segment = beforePrices;
-  if (sku) segment = segment.replace(sku, "");
+  if (sku) segment = segment.replace(new RegExp(`\\b${sku}\\b`, "i"), "");
   segment = segment.replace(description, "");
   segment = segment
+    .replace(/\b[A-Z]{2,6}\d{2,4}\b/gi, " ")
+    .replace(/\b[A-Z]{2,5}[-\s]?\d{3,5}\b/gi, " ")
     .replace(/\d+\s*#\/\w+/gi, " ")
     .replace(/\d+\s*\/\s*\d+\s*#/gi, " ")
     .replace(/\b\d+\s*CT\b/gi, " ")
@@ -315,17 +435,17 @@ function extractSkuAndDescription(
 
   const atStart = rest.match(/^([A-Z]{2,6}\d{2,4})\b/i);
   if (atStart?.[1]) {
-    sku = atStart[1].toUpperCase();
+    sku = normalizeSkuLikeToken(atStart[1]);
     rest = rest.slice(atStart[0].length).trim();
   } else {
     const altStart = rest.match(/^([A-Z]{2,5}[-\s]?\d{3,5})\b/i);
     if (altStart?.[1]) {
-      sku = altStart[1].replace(/\s+/g, "").toUpperCase();
+      sku = normalizeSkuLikeToken(altStart[1].replace(/\s+/g, ""));
       rest = rest.slice(altStart[0].length).trim();
     } else {
       const embedded = rest.match(itemCode) ?? rest.match(ALT_ITEM_CODE);
       if (embedded?.[1] && (embedded.index ?? 99) <= 2) {
-        sku = embedded[1].replace(/\s+/g, "").toUpperCase();
+        sku = normalizeSkuLikeToken(embedded[1].replace(/\s+/g, ""));
         rest = rest.slice(0, embedded.index!) + rest.slice(embedded.index! + embedded[0].length);
         rest = rest.trim();
       }
@@ -392,11 +512,10 @@ function parseTabColumns(
   line: string,
   hints?: SkuLineHint[]
 ): InvoiceLineData | null {
-  const joined = tabParts.join("\t");
-  const distributorRow = parseDistributorTableRow(joined.replace(/\t+/g, " "), itemCode, hints);
-  if (distributorRow) return distributorRow;
+  const tabRow = parseDistributorTabRow(tabParts, itemCode, line, hints);
+  if (tabRow) return tabRow;
 
-  const moneyParts = tabParts.filter((p) => /^[\d,]+\.\d{2}$/.test(p));
+  const moneyParts = tabParts.filter((p) => isMoneyToken(p));
   if (!moneyParts.length) return null;
 
   const lineTotal = parseMoney(moneyParts[moneyParts.length - 1]!);
@@ -468,7 +587,7 @@ function parseLineFromMoneyColumns(
   if (distributorRow) return distributorRow;
 
   const tabParts = line.split(/\t+/).map((p) => p.trim()).filter(Boolean);
-  if (tabParts.length >= 3) {
+  if (tabParts.length >= 4) {
     const tabItem = parseTabColumns(tabParts, itemCode, line, hints);
     if (tabItem) return tabItem;
   }
@@ -554,7 +673,9 @@ export function scoreInvoiceData(data: InvoiceData): number {
   let score = 0;
   const vendor = data.vendor?.trim() ?? "";
   if (vendor && !/^unknown/i.test(vendor)) score += 4;
+  if (vendor && !/\b[A-Z]{2,6}\d{2,4}\b/.test(vendor)) score += 2;
   score += Math.min(data.lines.length, 30) * 3;
+  score += data.lines.filter((l) => l.sku).length * 2;
   if (data.invoiceNumber) score += 2;
   if (data.amount > 0) score += 1;
   if (data.lines.length > 0 && data.amount > 0) {
@@ -601,6 +722,16 @@ export function mergeInvoiceData(...sources: InvoiceData[]): InvoiceData {
         [] as InvoiceLineData[]
       );
 
+  const longestLines = usable.reduce(
+    (longest, s) => (s.lines.length > longest.length ? s.lines : longest),
+    [] as InvoiceLineData[]
+  );
+  const resolvedLines =
+    longestLines.length > lines.length + 1 &&
+    scoreInvoiceData({ ...best, lines: longestLines }) >= scoreInvoiceData(best) - 4
+      ? longestLines
+      : lines;
+
   const amountCandidates = usable.map((s) => s.amount).filter((a) => a > 0);
   let amount = amountCandidates.length ? Math.max(...amountCandidates) : best.amount;
   if (lines.length > 0 && amountCandidates.length > 0) {
@@ -617,7 +748,7 @@ export function mergeInvoiceData(...sources: InvoiceData[]): InvoiceData {
     usable.map((s) => s.invoiceDate).find((d) => d && d !== new Date().toISOString().split("T")[0]) ??
     best.invoiceDate;
 
-  const normalizedLines = lines.map((line, i) => normalizeInvoiceLine(line, i));
+  const normalizedLines = resolvedLines.map((line, i) => normalizeInvoiceLine(line, i));
 
   return { vendor, invoiceNumber, amount, invoiceDate, lines: normalizedLines };
 }

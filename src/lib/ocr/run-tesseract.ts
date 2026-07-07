@@ -2,12 +2,13 @@ import type { Worker } from "tesseract.js";
 import { pickBestOcrTextPassage, scoreOcrText, type OcrTextKind } from "./ocr-text-score";
 import { tesseractWordsFromData, wordsToTabularText } from "./tesseract-structured";
 
-type TesseractPsm = "6" | "4";
+type TesseractPsm = "3" | "6" | "4" | "11";
 
-/** Two reliable modes for tabular invoices — avoid merging noisy passes. */
 const OCR_PASSES: Array<{ psm: TesseractPsm; label: string }> = [
   { psm: "6", label: "block layout" },
   { psm: "4", label: "single column" },
+  { psm: "11", label: "sparse text" },
+  { psm: "3", label: "auto layout" },
 ];
 
 export async function configureTesseractForDocument(worker: Worker, psm: TesseractPsm): Promise<void> {
@@ -31,14 +32,20 @@ export async function recognizeWithBestPass(
     await configureTesseractForDocument(worker, pass.psm);
     const { data } = await worker.recognize(input as Parameters<Worker["recognize"]>[0]);
     const plain = (data.text ?? "").trim();
-    if (plain) candidates.push(plain);
-
-    const structured = wordsToTabularText(tesseractWordsFromData(data.words));
-    if (structured && scoreOcrText(structured, kind) > scoreOcrText(plain, kind)) {
-      candidates.push(structured);
+    if (plain) {
+      candidates.push(plain);
+      if (scoreOcrText(plain, kind) >= 82) break;
     }
 
-    if (scoreOcrText(plain, kind) >= 70 && plain.length > 180) break;
+    const structured = wordsToTabularText(tesseractWordsFromData(data.words));
+    if (structured) {
+      const plainScore = scoreOcrText(plain, kind);
+      const structScore = scoreOcrText(structured, kind);
+      if (structScore >= plainScore - 2) {
+        candidates.push(structured);
+        if (structScore >= 82) break;
+      }
+    }
   }
 
   return pickBestOcrTextPassage(kind, ...candidates);

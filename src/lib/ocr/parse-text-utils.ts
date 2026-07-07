@@ -84,6 +84,17 @@ export function extractTotalAmount(text: string, opts?: { totalLabel?: string; l
     .filter((n) => n > 0 && n < 250_000);
 
   if (bodyAmounts.length && (!opts?.lineItemCount || opts.lineItemCount < 2)) {
+    const skuLines = lines.filter((l) => /\b[A-Z]{2,6}\d{2,4}\b/.test(l));
+    if (skuLines.length >= 1 && bodyAmounts.length >= 2) {
+      const extendedCandidates = bodyAmounts.filter((amount) => {
+        const hits = bodyAmounts.filter((other) => Math.abs(other - amount) < 0.01).length;
+        return hits === 1 && amount >= 20;
+      });
+      if (extendedCandidates.length) return Math.max(...extendedCandidates);
+    }
+    if (bodyAmounts.length === 1 && skuLines.length >= 1) {
+      return 0;
+    }
     return Math.max(...bodyAmounts);
   }
 
@@ -235,19 +246,26 @@ export function extractDocumentDate(text: string, opts?: { vendor?: string }): s
 }
 
 export function extractInvoiceNumber(text: string): string {
+  const header = text.split(/\r?\n/).slice(0, 25).join("\n");
+
   const patterns = [
-    /(?:invoice\s*(?:#|no\.?|number)?|inv\.?\s*#?)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{2,})/i,
-    /(?:invoice\s*(?:#|no\.?|number)?|inv\.?\s*#?)\s*[:#]?\s*(\d{5,10})/i,
-    /\binvoice\s+(\d{4,})\b/i,
-    /\bour\s+order\s+(?:#|no\.?|number)?\s*[:#]?\s*(\d{4,})/i,
+    /(?:invoice\s*(?:#|no\.?|number)?|inv\.?\s*#?)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{4,})/i,
+    /(?:invoice\s*(?:#|no\.?|number)?|inv\.?\s*#?)\s*[:#]?\s*(\d{6,10})/i,
+    /\binvoice\s+(\d{6,10})\b/i,
+    /\bour\s+order\s+(?:#|no\.?|number)?\s*[:#]?\s*(\d{6,10})/i,
   ];
   for (const pattern of patterns) {
-    const match = text.match(pattern);
+    const match = header.match(pattern);
     if (match?.[1]) return match[1].trim();
   }
 
-  const nearInvoice = text.match(/invoice[^\d]{0,20}(\d{5,10})/i);
+  const nearInvoice = header.match(
+    /(?<!total\s)(?<!sub\s)invoice[^\d]{0,20}(\d{6,10})/i
+  );
   if (nearInvoice?.[1]) return nearInvoice[1];
+
+  const standalone = header.match(/\b(\d{7,10})\b/);
+  if (standalone?.[1]) return standalone[1];
 
   return "";
 }
@@ -258,21 +276,30 @@ const COMPANY_SUFFIX =
 const SKIP_LINE =
   /^(?:invoice|receipt|bill\s*to|ship\s*to|sold\s*to|deliver\s*to|date|page\s+\d|tel|phone|fax|www\.|http|route|customer|terms|purchase\s+order|salesperson|order\s+date|item\s+number|article|qty|quantity|extended|unit\s+price|package|special\s+instructions|authorization|paid\s+amount|amount\s+due|subtotal|tax|total|all\s+claims|all\s+prices|customer\s+original)/i;
 
+const SKU_LIKE_LINE = /\b[A-Z]{2,6}\d{2,4}\b/;
+const MONEY_LIKE_LINE = /[\d,]+\.\d{2}/;
+
 export function extractVendorName(text: string): string {
   const lines = text
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l.length > 1);
 
+  const isVendorCandidate = (line: string): boolean => {
+    if (line.length > 80 || SKIP_LINE.test(line) || /^[\d$.,\s]+$/.test(line)) return false;
+    if (/^[^a-zA-Z]*$/.test(line)) return false;
+    if (SKU_LIKE_LINE.test(line) && MONEY_LIKE_LINE.test(line)) return false;
+    if (/^\b[A-Z]{2,6}\d{2,4}\b(?:\s|$)/.test(line) && !COMPANY_SUFFIX.test(line)) return false;
+    return true;
+  };
+
   for (const line of lines.slice(0, 20)) {
-    if (line.length > 80 || SKIP_LINE.test(line) || /^[\d$.,\s]+$/.test(line)) continue;
-    if (/^[^a-zA-Z]*$/.test(line)) continue;
+    if (!isVendorCandidate(line)) continue;
     if (COMPANY_SUFFIX.test(line)) return line.replace(/\s{2,}/g, " ").trim();
   }
 
   for (const line of lines.slice(0, 20)) {
-    if (line.length > 80 || SKIP_LINE.test(line) || /^[\d$.,\s]+$/.test(line)) continue;
-    if (/^[^a-zA-Z]*$/.test(line)) continue;
+    if (!isVendorCandidate(line)) continue;
     if (/\b(?:street|st\.|avenue|ave\.|road|rd\.|boulevard|blvd\.|drive|dr\.|suite|ste\.)\b/i.test(line)) {
       continue;
     }

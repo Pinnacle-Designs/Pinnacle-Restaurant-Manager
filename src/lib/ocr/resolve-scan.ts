@@ -4,7 +4,7 @@ import type { ReceiptData } from "@/lib/ai";
 import { analyzeReceipt as analyzeReceiptWithAi } from "@/lib/ai";
 import type { OcrSource } from "./capabilities";
 import { prepareOcrTextForParsing } from "./ocr-corrections";
-import { isWeakOcrText, pickBestOcrTextPassage } from "./ocr-text-score";
+import { isWeakOcrText, pickBestOcrTextPassage, scoreOcrText } from "./ocr-text-score";
 import {
   hasUsefulInvoiceData,
   mergeInvoiceData,
@@ -67,13 +67,49 @@ async function resolveOcrText(
   imageBase64: string | string[],
   clientText: string | null,
   kind: "invoice" | "receipt"
-): Promise<string> {
-  const serverText =
-    !clientText || isWeakOcrText(clientText, kind)
-      ? await extractServerText(imageBase64, kind)
-      : null;
+): Promise<{ text: string; alternates: string[] }> {
+  const client = clientText?.trim() || "";
+  const clientScore = client ? scoreOcrText(client, kind) : 0;
+  const clientHasSkuLines = /\b[A-Z]{2,6}\d{2,4}\b/.test(client) && /[\d,]+\.\d{2}/.test(client);
 
-  return pickBestOcrTextPassage(kind, clientText, serverText);
+  let server = "";
+  const needsServer =
+    !client ||
+    isWeakOcrText(client, kind) ||
+    clientScore < 72 ||
+    (kind === "invoice" && !clientHasSkuLines);
+  if (needsServer) {
+    server = (await extractServerText(imageBase64, kind)) ?? "";
+  }
+
+  const text = pickBestOcrTextPassage(kind, client, server);
+  const alternates = [client, server].filter((t) => t && t !== text);
+  return { text, alternates: [...new Set(alternates)] };
+}
+
+function bestLocalInvoiceDraft(
+  passages: string[],
+  memoryCtx: Awaited<ReturnType<typeof buildVendorOcrContext>>
+): InvoiceData {
+  let best = emptyInvoice();
+  let bestScore = 0;
+
+  for (const passage of passages) {
+    if (!passage.trim()) continue;
+    const prepared = prepareOcrTextForParsing(passage, memoryCtx);
+    const parsed = parseInvoiceFromText(prepared, {
+      itemCodePattern: memoryCtx.layoutHints.itemCodePattern,
+      totalLabel: memoryCtx.layoutHints.totalLabel ?? "Total Invoice",
+      skuHints: memoryCtx.skuHints,
+    });
+    const score = scoreInvoiceData(parsed);
+    if (score > bestScore) {
+      best = parsed;
+      bestScore = score;
+    }
+  }
+
+  return best;
 }
 
 function pickInvoiceSource(
@@ -137,7 +173,7 @@ export async function resolveInvoiceScan(
   ocrText?: string | null
 ): Promise<{ invoice: InvoiceData; source: OcrSource; memoryApplied: boolean; memoryScanCount: number }> {
   const locationId = options.locationId;
-  const text = await resolveOcrText(imageBase64, ocrText?.trim() || null, "invoice");
+  const { text, alternates } = await resolveOcrText(imageBase64, ocrText?.trim() || null, "invoice");
 
   const roughDraft = text ? parseInvoiceFromText(text) : emptyInvoice();
   let vendorHint = roughDraft.vendor?.trim() || "";
@@ -159,12 +195,12 @@ export async function resolveInvoiceScan(
       };
 
   const preparedText = text ? prepareOcrTextForParsing(text, memoryCtx) : "";
-  const localDraft = preparedText
-    ? parseInvoiceFromText(preparedText, {
-        itemCodePattern: memoryCtx.layoutHints.itemCodePattern,
-        totalLabel: memoryCtx.layoutHints.totalLabel ?? "Total Invoice",
-        skuHints: memoryCtx.skuHints,
-      })
+  const passages = [
+    preparedText,
+    ...alternates.map((a) => prepareOcrTextForParsing(a, memoryCtx)),
+  ].filter(Boolean);
+  const localDraft = text
+    ? bestLocalInvoiceDraft([...new Set(passages)], memoryCtx)
     : emptyInvoice();
 
   let ai: InvoiceData | null = null;
@@ -215,7 +251,7 @@ export async function resolveReceiptScan(
   ocrText?: string | null
 ): Promise<{ receipt: ReceiptData; source: OcrSource; memoryApplied: boolean; memoryScanCount: number }> {
   const locationId = options.locationId;
-  const text = await resolveOcrText(imageBase64, ocrText?.trim() || null, "receipt");
+  const { text } = await resolveOcrText(imageBase64, ocrText?.trim() || null, "receipt");
 
   const roughDraft = text ? parseReceiptFromText(text) : emptyReceipt();
   let vendorHint = roughDraft.vendor?.trim() || "";

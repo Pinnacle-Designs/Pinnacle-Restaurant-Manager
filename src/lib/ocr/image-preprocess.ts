@@ -53,6 +53,18 @@ function otsuThreshold(gray: Uint8ClampedArray): number {
 
 /** Upscale + mild contrast + binarize for document OCR. */
 export async function preprocessImageFileForOcr(file: File): Promise<Blob> {
+  return preprocessImageVariant(file, { threshold: true });
+}
+
+/** Grayscale + contrast only — keeps faint table rules and colored stamps readable. */
+export async function preprocessImageFileSoftForOcr(file: File): Promise<Blob> {
+  return preprocessImageVariant(file, { threshold: false });
+}
+
+async function preprocessImageVariant(
+  file: File,
+  opts: { threshold: boolean }
+): Promise<Blob> {
   if (typeof document === "undefined") return file;
 
   const bitmap = await createImageBitmap(file);
@@ -83,10 +95,10 @@ export async function preprocessImageFileForOcr(file: File): Promise<Blob> {
     for (let i = 0; i < width * height; i += 1) {
       const idx = i * 4;
       const enhanced = stretchContrast(gray[i]!, low, high);
-      const binary = enhanced > threshold ? 255 : 0;
-      out.data[idx] = binary;
-      out.data[idx + 1] = binary;
-      out.data[idx + 2] = binary;
+      const value = opts.threshold ? (enhanced > threshold ? 255 : 0) : enhanced;
+      out.data[idx] = value;
+      out.data[idx + 1] = value;
+      out.data[idx + 2] = value;
       out.data[idx + 3] = 255;
     }
     ctx.putImageData(out, 0, 0);

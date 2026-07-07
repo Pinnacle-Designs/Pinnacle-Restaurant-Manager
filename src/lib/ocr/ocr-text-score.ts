@@ -21,8 +21,15 @@ export function scoreOcrText(text: string, kind: OcrTextKind = "generic"): numbe
     if (/\binvoice\b/i.test(normalized)) score += 8;
     if (/\btotal\b/i.test(normalized)) score += 6;
     if (/\bbill\s+to\b/i.test(normalized)) score += 4;
+    if (/\bqty\s*ordered\b/i.test(normalized) && /\bextended\b/i.test(normalized)) score += 12;
+    if (/\t/.test(normalized)) score += Math.min(normalized.split("\t").length, 30);
     score += [...normalized.matchAll(/\b[A-Z]{2,6}\d{2,4}\b/g)].length * 5;
     score += [...normalized.matchAll(/\b(?:case|cas|cs|lb|lbs|each|ea)\b/gi)].length * 2;
+    score += lines.filter((l) => /\b[A-Z]{2,6}\d{2,4}\b/.test(l) && /[\d,]+\.\d{2}/.test(l)).length * 8;
+    const lineSum = [...normalized.matchAll(/(?:^|\s)([\d,]+\.\d{2})(?:\s|$)/gm)]
+      .map((m) => parseFloat(m[1]!.replace(/,/g, "")))
+      .reduce((s, n) => s + n, 0);
+    if (lineSum > 100 && lineSum < 500_000) score += 6;
   }
 
   if (kind === "receipt") {

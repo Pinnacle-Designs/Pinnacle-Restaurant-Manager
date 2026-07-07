@@ -1,10 +1,10 @@
 "use client";
 
 import type { Worker } from "tesseract.js";
-import { getBrowserTesseractOptions, type OcrProgressHandler } from "./tesseract-options";
-import { preprocessImageFileForOcr } from "./image-preprocess";
+import { pickBestOcrTextPassage, scoreOcrText, type OcrTextKind } from "./ocr-text-score";
+import { preprocessImageFileForOcr, preprocessImageFileSoftForOcr } from "./image-preprocess";
 import { recognizeWithBestPass } from "./run-tesseract";
-import type { OcrTextKind } from "./ocr-text-score";
+import { getBrowserTesseractOptions, type OcrProgressHandler } from "./tesseract-options";
 
 let workerPromise: Promise<Worker> | null = null;
 let workerProgress: OcrProgressHandler | undefined;
@@ -41,14 +41,29 @@ export async function extractTextFromImageFile(
   onProgress?.("Enhancing photo for text recognition…");
   const worker = await getOcrWorker(onProgress);
 
-  let input: Blob | File = file;
+  const candidates: string[] = [];
+  const inputs: Array<{ blob: Blob | File; label: string }> = [{ blob: file, label: "original photo" }];
+
   try {
-    input = await preprocessImageFileForOcr(file);
+    inputs.unshift({ blob: await preprocessImageFileForOcr(file), label: "enhanced photo" });
   } catch {
-    /* use original */
+    /* use original only */
   }
 
-  return recognizeWithBestPass(worker, input, kind, onProgress);
+  try {
+    inputs.push({ blob: await preprocessImageFileSoftForOcr(file), label: "soft contrast photo" });
+  } catch {
+    /* optional */
+  }
+
+  for (const input of inputs) {
+    onProgress?.(`Reading ${input.label}…`);
+    const passage = await recognizeWithBestPass(worker, input.blob, kind, onProgress);
+    if (passage.trim()) candidates.push(passage);
+    if (scoreOcrText(passage, kind) >= 78) break;
+  }
+
+  return pickBestOcrTextPassage(kind, ...candidates);
 }
 
 /** Attach recognized text to a scan upload when not already present. */

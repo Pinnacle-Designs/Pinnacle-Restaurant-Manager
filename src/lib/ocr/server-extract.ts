@@ -1,8 +1,9 @@
 import { getServerTesseractOptions } from "./tesseract-options";
 import { recognizeWithBestPass } from "./run-tesseract";
-import type { OcrTextKind } from "./ocr-text-score";
+import { preprocessImageBufferForOcr, preprocessImageBufferSoftForOcr } from "./server-image-preprocess";
+import { pickBestOcrTextPassage, scoreOcrText, type OcrTextKind } from "./ocr-text-score";
 
-/** Server-side OCR with best-pass selection. */
+/** Server-side OCR with preprocessing + best-pass selection. */
 export async function extractTextFromImageBuffer(
   buffer: Buffer,
   kind: OcrTextKind = "generic"
@@ -11,7 +12,27 @@ export async function extractTextFromImageBuffer(
   const worker = await createWorker("eng", 1, getServerTesseractOptions());
 
   try {
-    return await recognizeWithBestPass(worker, buffer, kind);
+    const candidates: string[] = [];
+    const variants: Array<{ buffer: Buffer; label: string }> = [{ buffer, label: "original" }];
+
+    try {
+      variants.unshift({ buffer: await preprocessImageBufferForOcr(buffer), label: "enhanced" });
+    } catch {
+      /* optional */
+    }
+    try {
+      variants.push({ buffer: await preprocessImageBufferSoftForOcr(buffer), label: "soft" });
+    } catch {
+      /* optional */
+    }
+
+    for (const variant of variants) {
+      const passage = await recognizeWithBestPass(worker, variant.buffer, kind);
+      if (passage.trim()) candidates.push(passage);
+      if (scoreOcrText(passage, kind) >= 78) break;
+    }
+
+    return pickBestOcrTextPassage(kind, ...candidates);
   } finally {
     await worker.terminate();
   }
