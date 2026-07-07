@@ -10,6 +10,8 @@ import {
 import { userCan } from "./permission-resolve";
 
 import { isDemoAccountEmail, isPlanDemoAccountEmail } from "./demo-email";
+import { isProCleanAccountEmail } from "./pro-clean-email";
+import { syncProCleanUserLocation } from "./pro-clean-account";
 
 export function unauthorizedResponse() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -71,6 +73,11 @@ export async function requireActiveAccount(user: SessionUser | null) {
     return { user: null, error: unauthorizedResponse() };
   }
 
+  let locationId = dbUser.locationId;
+  if (isProCleanAccountEmail(dbUser.email)) {
+    locationId = (await syncProCleanUserLocation(dbUser)) ?? locationId;
+  }
+
   return {
     user: {
       ...user,
@@ -78,7 +85,7 @@ export async function requireActiveAccount(user: SessionUser | null) {
       email: dbUser.email,
       name: dbUser.name,
       role: dbUser.role,
-      locationId: dbUser.locationId,
+      locationId,
       avatarUrl: dbUser.avatarUrl,
     } satisfies SessionUser,
     error: null,

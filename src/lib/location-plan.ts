@@ -4,6 +4,8 @@ import type { PlanId } from "./plans";
 import type { SessionUser } from "./session";
 import { resolveEffectivePermissions } from "./permission-resolve";
 import { isPlatformAdmin } from "./platform-admin";
+import { isProCleanAccountEmail } from "./pro-clean-email";
+import { syncProCleanUserLocation } from "./pro-clean-account";
 
 export async function getLocationPlan(locationId: string | null | undefined): Promise<PlanId> {
   if (!locationId) return "STARTER";
@@ -95,5 +97,11 @@ export async function enrichUserWithPlan(user: SessionUser): Promise<SessionUser
 export async function getEnrichedSessionUser(): Promise<SessionUser | null> {
   const user = await getSessionUser();
   if (!user) return null;
+  if (isProCleanAccountEmail(user.email)) {
+    const locationId = await syncProCleanUserLocation(user);
+    if (locationId) {
+      user.locationId = locationId;
+    }
+  }
   return enrichUserWithPlan(user);
 }

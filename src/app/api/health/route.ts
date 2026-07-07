@@ -27,6 +27,7 @@ export async function GET() {
   let database = false;
   let proCleanAccount = false;
   let proCleanEmpty = false;
+  let proCleanLocationName: string | null = null;
   try {
     await prisma.$queryRaw`SELECT 1`;
     database = true;
@@ -40,6 +41,7 @@ export async function GET() {
       },
     });
     proCleanAccount = Boolean(proClean?.active && proClean.role === "OWNER");
+    proCleanLocationName = proClean?.location?.name ?? null;
     if (proCleanAccount && proClean?.locationId) {
       const [menu, orders, staff] = await Promise.all([
         prisma.menuItem.count({ where: { locationId: proClean.locationId } }),
@@ -67,6 +69,7 @@ export async function GET() {
         database,
         proCleanAccount,
         proCleanEmpty,
+        proCleanLocationName,
         documentOcr: isDocumentOcrAvailable(),
         ocrAssets,
         aiOcr: isAiOcrConfigured(),

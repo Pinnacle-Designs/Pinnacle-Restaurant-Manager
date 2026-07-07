@@ -6,8 +6,7 @@ import { resolveUserWorkspace } from "@/lib/user-workspace";
 import { privateJsonResponse } from "@/lib/secure-response";
 import { clearWorkspaceCookieOptions } from "@/lib/workspace-cookie";
 import type { SessionUser } from "@/lib/session";
-import { ensureProCleanAccount } from "@/lib/pro-clean-account";
-import { prisma } from "@/lib/prisma";
+import { syncProCleanUserLocation } from "@/lib/pro-clean-account";
 import {
   isProCleanAccountEmail,
   PRO_CLEAN_LOGIN_PATH,
@@ -45,13 +44,9 @@ export async function completeProCleanLogin({
   let workspaceError: string | undefined;
 
   try {
-    const ensured = await ensureProCleanAccount({ resetPassword: false });
-    if (ensured.locationId) {
-      user.locationId = ensured.locationId;
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { locationId: ensured.locationId },
-      });
+    const locationId = await syncProCleanUserLocation(user);
+    if (locationId) {
+      user.locationId = locationId;
     }
     workspace = await resolveUserWorkspace(user);
   } catch (err) {
@@ -72,6 +67,7 @@ export async function completeProCleanLogin({
     redirectTo: "/dashboard",
   });
 
+  // Drop any prior owner/demo session and location cookies before setting pro-clean session.
   response.cookies.set(clearWorkspaceCookieOptions());
   response.cookies.set(LOCATION_COOKIE_NAME, "", {
     path: "/",

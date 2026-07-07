@@ -15,6 +15,25 @@ const PLAN_DEMO_PREFIX = "Plan Demo -";
 
 export { isProCleanAccountEmail };
 
+/** Sync DB + return the isolated pro-clean location (relocates if bound to demo data). */
+export async function syncProCleanUserLocation(
+  user: { id: string; email: string; locationId?: string | null }
+): Promise<string | null> {
+  if (!isProCleanAccountEmail(user.email)) return user.locationId ?? null;
+
+  const locationId = await resolveProCleanLocationId(user);
+  if (!locationId) return null;
+
+  if (user.locationId !== locationId) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { locationId, role: "OWNER", active: true },
+    });
+  }
+
+  return locationId;
+}
+
 /** Fresh DB location for pro-clean — never trust session/cookies alone. */
 export async function resolveProCleanLocationId(
   user: { id: string; email: string } | null | undefined
@@ -74,7 +93,7 @@ async function locationNeedsCleanWorkspace(
   ]);
 
   if (location.name !== expectedName) {
-    return menuCount > 0 || orderCount > 0 || staffCount > 0;
+    return true;
   }
 
   return menuCount > 0 || orderCount > 0 || staffCount > 0;

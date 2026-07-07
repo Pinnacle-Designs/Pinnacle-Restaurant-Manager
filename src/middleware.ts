@@ -215,27 +215,7 @@ async function runMiddleware(request: NextRequest) {
   }
 
   if (pathname === "/login") {
-    const token = getRequestSessionToken(request);
-    const sessionUser = token ? await parseSessionToken(token) : null;
-    const switchAccount = request.nextUrl.searchParams.get("switch") === "1";
-    const loginAs = request.nextUrl.searchParams.get("account")?.trim().toLowerCase();
-
-    if (sessionUser && !switchAccount) {
-      // Allow signing in as a different account (e.g. pro-clean while owner session exists).
-      if (loginAs === "pro-clean" && !isProCleanAccountEmail(sessionUser.email)) {
-        return applyFramePolicy(request, NextResponse.next());
-      }
-      if (loginAs && loginAs !== sessionUser.email.toLowerCase()) {
-        return applyFramePolicy(request, NextResponse.next());
-      }
-
-      const from = request.nextUrl.searchParams.get("from");
-      const dest =
-        from && from.startsWith("/") && !from.startsWith("//") && from !== "/login"
-          ? from
-          : "/dashboard";
-      return applyFramePolicy(request, NextResponse.redirect(new URL(dest, request.url)));
-    }
+    // LoginForm handles session refresh and account switching — do not redirect here.
     return applyFramePolicy(request, NextResponse.next());
   }
 

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSecureAuth } from "@/lib/api-auth";
+import { getLocationIdFromRequest } from "@/lib/location";
 import { privateJsonResponse } from "@/lib/secure-response";
 import {
   syncLocationGeoFields,
@@ -34,12 +35,13 @@ export async function GET(request: NextRequest) {
   const { user, error } = await requireSecureAuth(request);
   if (error) return error;
 
-  if (!user!.locationId) {
+  const locationId = await getLocationIdFromRequest(request);
+  if (!locationId) {
     return privateJsonResponse({ error: "No location assigned" }, { status: 404 });
   }
 
   const location = await prisma.location.findUnique({
-    where: { id: user!.locationId },
+    where: { id: locationId },
     select: locationSelect,
   });
 

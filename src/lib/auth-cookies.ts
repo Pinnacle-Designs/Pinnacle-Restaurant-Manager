@@ -9,8 +9,8 @@ import {
 } from "./workspace-cookie";
 import { buildWorkspaceSnapshot } from "./workspace-snapshot";
 import { getSessionVersion } from "./session-version";
+import { syncProCleanUserLocation } from "./pro-clean-account";
 import { isProCleanAccountEmail } from "./pro-clean-email";
-import { resolveProCleanLocationId } from "./pro-clean-account";
 
 export interface PreparedAuthSession {
   sessionUser: SessionUser;
@@ -21,7 +21,7 @@ export interface PreparedAuthSession {
 export async function prepareAuthSession(user: SessionUser): Promise<PreparedAuthSession> {
   let baseUser = user;
   if (isProCleanAccountEmail(user.email)) {
-    const locationId = await resolveProCleanLocationId(user);
+    const locationId = await syncProCleanUserLocation(user);
     if (locationId) {
       baseUser = { ...user, locationId };
     }
