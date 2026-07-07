@@ -1,5 +1,6 @@
 import type { Worker } from "tesseract.js";
-import { scoreOcrText, type OcrTextKind } from "./ocr-text-score";
+import { mergeOcrTextPassages, scoreOcrText, type OcrTextKind } from "./ocr-text-score";
+import { tesseractWordsFromData, wordsToTabularText } from "./tesseract-structured";
 
 type TesseractPsm = "3" | "4" | "6" | "11";
 
@@ -15,8 +16,6 @@ export async function configureTesseractForDocument(worker: Worker, psm: Tessera
     tessedit_pageseg_mode: psm,
     preserve_interword_spaces: "1",
     user_defined_dpi: "300",
-    tessedit_char_whitelist:
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$.,:/#-&'() ",
   } as Record<string, string>);
 }
 
@@ -26,21 +25,32 @@ export async function recognizeWithBestPass(
   kind: OcrTextKind,
   onProgress?: (message: string) => void
 ): Promise<string> {
-  let bestText = "";
-  let bestScore = 0;
+  const passages: string[] = [];
+  let bestStructured = "";
+  let bestStructuredScore = 0;
 
   for (const pass of OCR_PASSES) {
     onProgress?.(`OCR pass (${pass.label})…`);
     await configureTesseractForDocument(worker, pass.psm);
     const { data } = await worker.recognize(input as Parameters<Worker["recognize"]>[0]);
     const text = (data.text ?? "").trim();
-    const score = scoreOcrText(text, kind);
-    if (score > bestScore) {
-      bestScore = score;
-      bestText = text;
+    if (text) passages.push(text);
+
+    const structured = wordsToTabularText(tesseractWordsFromData(data.words));
+    if (structured) {
+      const structuredScore = scoreOcrText(structured, kind);
+      if (structuredScore > bestStructuredScore) {
+        bestStructuredScore = structuredScore;
+        bestStructured = structured;
+      }
     }
-    if (score >= 80 && text.length > 200) break;
+
+    if (scoreOcrText(text, kind) >= 90 && text.length > 250) break;
   }
 
-  return bestText;
+  if (bestStructured) {
+    passages.push(bestStructured);
+  }
+
+  return mergeOcrTextPassages(...passages);
 }

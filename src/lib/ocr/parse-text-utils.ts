@@ -66,7 +66,13 @@ export function extractTotalAmount(text: string, opts?: { totalLabel?: string; l
   const footerAmounts = [...footerText.matchAll(/(?:^|\s|\$)([\d,]+\.\d{2})(?:\s|$)/gm)]
     .map((m) => parseMoney(m[1]!))
     .filter((n) => n > 0 && n < 250_000);
-  if (footerAmounts.length) return Math.max(...footerAmounts);
+  if (footerAmounts.length) {
+    const counts = new Map<number, number>();
+    for (const amount of footerAmounts) counts.set(amount, (counts.get(amount) ?? 0) + 1);
+    const repeated = [...counts.entries()].filter(([, c]) => c >= 2).map(([a]) => a);
+    if (repeated.length) return Math.max(...repeated);
+    return Math.max(...footerAmounts);
+  }
 
   // Avoid picking unit prices from the line-item body when many rows exist.
   const bodyEnd = opts?.lineItemCount && opts.lineItemCount >= 2
@@ -112,6 +118,7 @@ export function extractDocumentDate(text: string): string {
 export function extractInvoiceNumber(text: string): string {
   const patterns = [
     /(?:invoice\s*(?:#|no\.?|number)?|inv\.?\s*#?)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{2,})/i,
+    /(?:invoice\s*(?:#|no\.?|number)?|inv\.?\s*#?)\s*[:#]?\s*(\d{5,10})/i,
     /\binvoice\s+(\d{4,})\b/i,
     /\bour\s+order\s+(?:#|no\.?|number)?\s*[:#]?\s*(\d{4,})/i,
   ];
@@ -119,6 +126,10 @@ export function extractInvoiceNumber(text: string): string {
     const match = text.match(pattern);
     if (match?.[1]) return match[1].trim();
   }
+
+  const nearInvoice = text.match(/invoice[^\d]{0,20}(\d{5,10})/i);
+  if (nearInvoice?.[1]) return nearInvoice[1];
+
   return "";
 }
 
@@ -158,16 +169,23 @@ export function extractVendorName(text: string): string {
   return inline?.[1]?.replace(/\s{2,}/g, " ").trim() ?? "";
 }
 
-/** Normalize OCR text while preserving line breaks (needed for line-item parsing). */
+/** Normalize OCR text while preserving line breaks and tab columns. */
 export function normalizeOcrText(text: string): string {
   return text
     .replace(/\u2018|\u2019/g, "'")
     .replace(/\u201c|\u201d/g, '"')
     .replace(/[|]/g, "I")
-    .replace(/\t+/g, " ")
-    .replace(/ {2,}/g, "  ")
     .split(/\r?\n/)
-    .map((line) => line.replace(/\s+/g, " ").trim())
+    .map((line) => {
+      if (line.includes("\t")) {
+        return line
+          .split("\t")
+          .map((part) => part.replace(/\s+/g, " ").trim())
+          .filter(Boolean)
+          .join("\t");
+      }
+      return line.replace(/\s+/g, " ").trim();
+    })
     .filter(Boolean)
     .join("\n")
     .trim();

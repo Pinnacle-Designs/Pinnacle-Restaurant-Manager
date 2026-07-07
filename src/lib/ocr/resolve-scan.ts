@@ -159,13 +159,15 @@ export async function resolveInvoiceScan(
       };
 
   const preparedText = text ? prepareOcrTextForParsing(text, memoryCtx) : "";
-  const localDraft = preparedText
-    ? parseInvoiceFromText(preparedText, {
-        itemCodePattern: memoryCtx.layoutHints.itemCodePattern,
-        totalLabel: memoryCtx.layoutHints.totalLabel,
-        skuHints: memoryCtx.skuHints,
-      })
-    : emptyInvoice();
+  const parseCtx = {
+    itemCodePattern: memoryCtx.layoutHints.itemCodePattern,
+    totalLabel: memoryCtx.layoutHints.totalLabel ?? "Total Invoice",
+    skuHints: memoryCtx.skuHints,
+  };
+  const localDraft = mergeInvoiceData(
+    preparedText ? parseInvoiceFromText(preparedText, parseCtx) : emptyInvoice(),
+    text ? parseInvoiceFromText(text, parseCtx) : emptyInvoice()
+  );
 
   let ai: InvoiceData | null = null;
   if (aiOcrEnabled()) {
@@ -237,7 +239,10 @@ export async function resolveReceiptScan(
       };
 
   const preparedText = text ? prepareOcrTextForParsing(text, memoryCtx) : "";
-  const localDraft = preparedText ? parseReceiptFromText(preparedText) : emptyReceipt();
+  const localDraft = mergeReceiptData(
+    preparedText ? parseReceiptFromText(preparedText) : emptyReceipt(),
+    text ? parseReceiptFromText(text) : emptyReceipt()
+  );
 
   let ai: ReceiptData | null = null;
   if (aiOcrEnabled()) {
