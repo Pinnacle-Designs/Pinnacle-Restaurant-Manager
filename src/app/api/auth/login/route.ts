@@ -15,7 +15,9 @@ import { createMfaPendingToken } from "@/lib/mfa-pending";
 import { requireActiveAccount } from "@/lib/api-auth";
 import { isCrossOriginEmbedRequest } from "@/lib/embed-launch";
 import { isProCleanAccountEmail } from "@/lib/pro-clean-email";
-import { proCleanLoginRequiredResponse } from "@/lib/pro-clean-login";
+import { completeProCleanLogin } from "@/lib/pro-clean-login";
+import { ensureProCleanAccount } from "@/lib/pro-clean-account";
+import { LOCATION_COOKIE_NAME } from "@/lib/location";
 
 const LOGIN_FAILURE_DELAY_MS = 250;
 
@@ -35,7 +37,31 @@ export async function GET(request: NextRequest) {
   }
 
   if (isProCleanAccountEmail(activeUser.email)) {
-    return privateJsonResponse({ user: null });
+    const ensured = await ensureProCleanAccount({ resetPassword: false });
+    const sessionUser = ensured.locationId
+      ? { ...activeUser, locationId: ensured.locationId }
+      : activeUser;
+    const prepared = await prepareAuthSession(sessionUser);
+    const response = privateJsonResponse({ user: prepared.sessionUser });
+    const forEmbed = isCrossOriginEmbedRequest(request);
+    attachAuthCookies(response, prepared, forEmbed ? { forEmbed: true, secure: true } : undefined);
+    if (prepared.sessionUser.locationId) {
+      response.cookies.set(LOCATION_COOKIE_NAME, "", {
+        path: "/",
+        maxAge: 0,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+      });
+      response.cookies.set(LOCATION_COOKIE_NAME, prepared.sessionUser.locationId, {
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+      });
+    }
+    return response;
   }
 
   const prepared = await prepareAuthSession(activeUser);
@@ -57,10 +83,6 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const email = String(body.email || "").trim().toLowerCase();
 
-  if (isProCleanAccountEmail(email)) {
-    return proCleanLoginRequiredResponse();
-  }
-
   if (email && (await isRateLimited(`login:email:${email}`, 10, 60_000))) {
     return privateJsonResponse(
       { error: "Too many login attempts. Try again shortly." },
@@ -72,6 +94,15 @@ export async function POST(request: NextRequest) {
 
   if (!user) {
     return rejectLogin();
+  }
+
+  if (isProCleanAccountEmail(email)) {
+    return completeProCleanLogin({
+      request,
+      user,
+      email,
+      forEmbed: body.embed === true,
+    });
   }
 
   const forEmbed = body.embed === true;

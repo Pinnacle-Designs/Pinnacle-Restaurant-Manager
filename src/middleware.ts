@@ -217,12 +217,6 @@ async function runMiddleware(request: NextRequest) {
   if (pathname === "/login") {
     const token = getRequestSessionToken(request);
     const sessionUser = token ? await parseSessionToken(token) : null;
-    if (sessionUser?.email && isProCleanAccountEmail(sessionUser.email)) {
-      return applyFramePolicy(
-        request,
-        NextResponse.redirect(new URL(PRO_CLEAN_LOGIN_PATH, request.url))
-      );
-    }
     if (sessionUser) {
       const from = request.nextUrl.searchParams.get("from");
       const dest =

@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       ...result,
-      loginUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? request.nextUrl.origin}/login/pro`,
+      loginUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? request.nextUrl.origin}/login`,
     });
   } catch (err) {
     console.error("[setup/pro-account]", err);
