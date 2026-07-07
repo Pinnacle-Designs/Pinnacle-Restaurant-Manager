@@ -10,6 +10,7 @@ import { syncProCleanUserLocation } from "@/lib/pro-clean-account";
 import {
   isProCleanAccountEmail,
   PRO_CLEAN_LOGIN_PATH,
+  PRO_CLEAN_POST_CHECKOUT_PATH,
 } from "@/lib/pro-clean-email";
 
 export { PRO_CLEAN_LOGIN_PATH };
@@ -17,7 +18,7 @@ export { PRO_CLEAN_LOGIN_PATH };
 export function proCleanLoginRequiredResponse() {
   return privateJsonResponse(
     {
-      error: "Use the Pro clean workspace sign-in page.",
+      error: "Use the Pro customer sign-in page.",
       loginUrl: PRO_CLEAN_LOGIN_PATH,
     },
     { status: 403 }
@@ -64,7 +65,7 @@ export async function completeProCleanLogin({
     user: prepared.sessionUser,
     workspace,
     workspaceError,
-    redirectTo: "/dashboard",
+    redirectTo: PRO_CLEAN_POST_CHECKOUT_PATH,
   });
 
   // Drop any prior owner/demo session and location cookies before setting pro-clean session.

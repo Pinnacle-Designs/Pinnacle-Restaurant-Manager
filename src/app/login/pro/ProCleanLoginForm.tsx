@@ -5,6 +5,10 @@ import Link from "next/link";
 import { Logo } from "@/components/layout/Logo";
 import { Button } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
+import {
+  isProCleanAccountEmail,
+  PRO_CLEAN_POST_CHECKOUT_PATH,
+} from "@/lib/pro-clean-email";
 
 export default function ProCleanLoginForm() {
   const [email, setEmail] = useState("pro-clean@pinnacle.app");
@@ -12,14 +16,20 @@ export default function ProCleanLoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [existingSessionEmail, setExistingSessionEmail] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/auth/pro-login")
+    fetch("/api/auth/login")
       .then((res) => (res.ok ? res.json() : { user: null }))
       .then((data: { user?: { email: string } | null }) => {
         if (cancelled || !data.user) return;
-        window.location.assign("/dashboard");
+        const sessionEmail = data.user.email.toLowerCase();
+        if (isProCleanAccountEmail(sessionEmail)) {
+          window.location.assign(PRO_CLEAN_POST_CHECKOUT_PATH);
+          return;
+        }
+        setExistingSessionEmail(data.user.email);
       })
       .catch(() => undefined)
       .finally(() => {
@@ -35,6 +45,14 @@ export default function ProCleanLoginForm() {
     setLoading(true);
     setError(null);
     try {
+      if (
+        existingSessionEmail &&
+        existingSessionEmail.trim().toLowerCase() !== email.trim().toLowerCase()
+      ) {
+        await fetch("/api/auth/logout", { method: "POST" });
+        setExistingSessionEmail(null);
+      }
+
       const res = await fetch("/api/auth/pro-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -47,7 +65,7 @@ export default function ProCleanLoginForm() {
       if (data.workspaceError) {
         throw new Error(data.workspaceError);
       }
-      window.location.assign(data.redirectTo || "/dashboard");
+      window.location.assign(data.redirectTo || PRO_CLEAN_POST_CHECKOUT_PATH);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -72,12 +90,32 @@ export default function ProCleanLoginForm() {
 
       <div className="w-full max-w-md rounded-xl border border-slate-800 bg-white p-8 shadow-xl">
         <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">
-          Pro clean workspace
+          Pro plan
         </p>
-        <h1 className="mt-2 text-xl font-bold text-slate-900">Sign in</h1>
+        <h1 className="mt-2 text-xl font-bold text-slate-900">Sign in to your restaurant</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Empty Pro restaurant — no demo seed data, no shared BBQ workspace.
+          Use the email and password from your Pro subscription. After sign-in you can install the
+          app on your devices.
         </p>
+
+        {existingSessionEmail && (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+            Signed in as <strong>{existingSessionEmail}</strong>. Submit below to switch to your Pro
+            account, or{" "}
+            <button
+              type="button"
+              className="font-medium text-orange-600 underline hover:text-orange-700"
+              onClick={async () => {
+                await fetch("/api/auth/logout", { method: "POST" });
+                setExistingSessionEmail(null);
+                window.location.reload();
+              }}
+            >
+              sign out
+            </button>{" "}
+            first.
+          </div>
+        )}
 
         <form className="mt-6 space-y-4" onSubmit={handleLogin}>
           <FormField label="Email">
@@ -100,20 +138,19 @@ export default function ProCleanLoginForm() {
           </FormField>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Signing in…" : "Sign in to clean Pro workspace"}
+            {loading ? "Signing in…" : "Sign in"}
           </Button>
         </form>
 
         <p className="mt-6 text-center text-sm text-slate-500">
-          Demo or owner account?{" "}
+          Different account?{" "}
           <Link href="/login" className="text-orange-600 hover:text-orange-500">
             Standard sign-in
           </Link>
         </p>
         <p className="mt-2 text-center text-sm text-slate-400">
-          Just browsing?{" "}
-          <Link href="/demo" className="text-orange-600 hover:text-orange-500">
-            Try the live demo
+          <Link href="/forgot-password" className="text-orange-600 hover:text-orange-500">
+            Forgot password?
           </Link>
         </p>
       </div>

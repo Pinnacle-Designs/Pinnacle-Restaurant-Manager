@@ -10,7 +10,7 @@ import { SignupPlanModal } from "@/components/auth/SignupPlanModal";
 import { PlanDemoLogins } from "@/components/auth/PlanDemoLogins";
 import { ProCleanDevLogin } from "@/components/auth/ProCleanDevLogin";
 import { TeamPinLogin } from "@/components/auth/TeamPinLogin";
-import { isProCleanAccountEmail, PRO_CLEAN_DEFAULT_EMAIL } from "@/lib/pro-clean-email";
+import { isProCleanAccountEmail, PRO_CLEAN_DEFAULT_EMAIL, PRO_CLEAN_LOGIN_PATH } from "@/lib/pro-clean-email";
 
 export default function LoginForm() {
   const searchParams = useSearchParams();
@@ -55,6 +55,10 @@ export default function LoginForm() {
           setExistingSessionEmail(data.user.email);
           return;
         }
+        if (isProCleanAccountEmail(sessionEmail)) {
+          redirectAfterLogin({ redirectTo: "/download?from=checkout" });
+          return;
+        }
         redirectAfterLogin({});
       })
       .catch(() => undefined)
@@ -79,15 +83,30 @@ export default function LoginForm() {
   };
 
   const completeLogin = async (loginEmail = email, loginPassword = password) => {
-    if (
-      existingSessionEmail &&
-      loginEmail.trim().toLowerCase() !== existingSessionEmail.toLowerCase()
-    ) {
+    const normalizedEmail = loginEmail.trim().toLowerCase();
+    const loginEndpoint = isProCleanAccountEmail(normalizedEmail)
+      ? "/api/auth/pro-login"
+      : "/api/auth/login";
+
+    let sessionEmail: string | null = existingSessionEmail;
+    if (!sessionEmail) {
+      try {
+        const sessionRes = await fetch("/api/auth/login");
+        if (sessionRes.ok) {
+          const sessionData = (await sessionRes.json()) as { user?: { email: string } | null };
+          sessionEmail = sessionData.user?.email ?? null;
+        }
+      } catch {
+        sessionEmail = null;
+      }
+    }
+
+    if (sessionEmail && sessionEmail.trim().toLowerCase() !== normalizedEmail) {
       await fetch("/api/auth/logout", { method: "POST" });
       setExistingSessionEmail(null);
     }
 
-    const res = await fetch("/api/auth/login", {
+    const res = await fetch(loginEndpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: loginEmail, password: loginPassword }),
@@ -349,6 +368,12 @@ export default function LoginForm() {
           Just exploring?{" "}
           <Link href="/demo" className="text-orange-600 hover:text-orange-500">
             Try the live demo
+          </Link>
+        </p>
+        <p className="mt-2 text-center text-sm text-slate-400">
+          Subscribed to Pro?{" "}
+          <Link href={PRO_CLEAN_LOGIN_PATH} className="text-orange-600 hover:text-orange-500">
+            Pro customer sign-in
           </Link>
         </p>
       </div>

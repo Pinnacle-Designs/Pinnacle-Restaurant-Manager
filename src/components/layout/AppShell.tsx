@@ -19,7 +19,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isMarketing = pathname === "/" || pathname === "/demo";
-  const isLogin = pathname === "/login";
+  const isLogin = pathname === "/login" || pathname === "/login/pro";
   const isSignup = pathname === "/signup";
   const isOnboarding = pathname === "/onboarding";
   const isDownload = pathname === "/download";

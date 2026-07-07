@@ -5,12 +5,13 @@ import { validatePassword } from "./password-policy";
 import { ensureDefaultStorageZones } from "./walk-in/storage-zones";
 import { SUBSCRIPTION_CONTRACT_VERSION } from "./subscription-contracts";
 import { SEEDED_DEMO_LOCATION_NAMES, findSeededDemoLocationId } from "./demo-location";
+import { OWNER_DEMO_EMAIL } from "./demo-email";
 import { PRO_CLEAN_DEFAULT_EMAIL, isProCleanAccountEmail } from "./pro-clean-email";
 
 const DEFAULT_EMAIL = PRO_CLEAN_DEFAULT_EMAIL;
 const DEFAULT_PASSWORD = "PinnaclePro2026!";
 const DEFAULT_NAME = "Pro Owner";
-const DEFAULT_RESTAURANT = "Clean Pro Restaurant";
+const DEFAULT_RESTAURANT = "My Restaurant";
 const PLAN_DEMO_PREFIX = "Plan Demo -";
 
 export { isProCleanAccountEmail };
@@ -74,6 +75,12 @@ async function locationNeedsCleanWorkspace(
 ): Promise<boolean> {
   const demoLocationId = await findSeededDemoLocationId();
   if (demoLocationId && locationId === demoLocationId) return true;
+
+  const ownerUser = await prisma.user.findUnique({
+    where: { email: OWNER_DEMO_EMAIL },
+    select: { locationId: true },
+  });
+  if (ownerUser?.locationId && locationId === ownerUser.locationId) return true;
 
   const location = await prisma.location.findUnique({
     where: { id: locationId },
@@ -196,20 +203,9 @@ export async function ensureProCleanAccount(options?: {
   }
 
   if (existing && resetPassword) {
-    let locationId = existing.locationId;
-
-    if (
-      !locationId ||
-      (await locationNeedsCleanWorkspace(locationId, restaurantName))
-    ) {
-      const location = await createCleanProLocation(email, restaurantName);
-      locationId = location.id;
-    } else {
-      await prisma.location.update({
-        where: { id: locationId },
-        data: { name: restaurantName, plan: "PRO", billingEmail: email },
-      });
-    }
+    const location = await createCleanProLocation(email, restaurantName);
+    const locationId = location.id;
+    const relocated = locationId !== existing.locationId;
 
     await prisma.user.update({
       where: { id: existing.id },
@@ -224,7 +220,7 @@ export async function ensureProCleanAccount(options?: {
     });
 
     await ensureBilling(locationId, existing.id);
-    return { created: false, reset: true, relocated: locationId !== existing.locationId, email, locationId };
+    return { created: false, reset: true, relocated, email, locationId };
   }
 
   const location = await createCleanProLocation(email, restaurantName);

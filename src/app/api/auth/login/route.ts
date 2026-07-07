@@ -16,7 +16,6 @@ import { requireActiveAccount } from "@/lib/api-auth";
 import { isCrossOriginEmbedRequest } from "@/lib/embed-launch";
 import { isProCleanAccountEmail } from "@/lib/pro-clean-email";
 import { completeProCleanLogin } from "@/lib/pro-clean-login";
-import { LOCATION_COOKIE_NAME } from "@/lib/location";
 
 const LOGIN_FAILURE_DELAY_MS = 250;
 
@@ -36,28 +35,12 @@ export async function GET(request: NextRequest) {
   }
 
   if (isProCleanAccountEmail(activeUser.email)) {
-    const prepared = await prepareAuthSession(activeUser);
-    const response = privateJsonResponse({ user: prepared.sessionUser });
-    const forEmbed = isCrossOriginEmbedRequest(request);
-    attachAuthCookies(response, prepared, forEmbed ? { forEmbed: true, secure: true } : undefined);
-    const locationId = prepared.sessionUser.locationId;
-    if (locationId) {
-      response.cookies.set(LOCATION_COOKIE_NAME, "", {
-        path: "/",
-        maxAge: 0,
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-      });
-      response.cookies.set(LOCATION_COOKIE_NAME, locationId, {
-        path: "/",
-        maxAge: 60 * 60 * 24 * 365,
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-      });
-    }
-    return response;
+    return completeProCleanLogin({
+      request,
+      user: activeUser,
+      email: activeUser.email,
+      forEmbed: isCrossOriginEmbedRequest(request),
+    });
   }
 
   const prepared = await prepareAuthSession(activeUser);

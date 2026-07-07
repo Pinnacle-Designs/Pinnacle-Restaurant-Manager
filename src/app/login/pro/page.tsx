@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
+import ProCleanLoginForm from "./ProCleanLoginForm";
 
-/** Legacy URL — pro-clean uses the standard sign-in page. */
 export default function ProCleanLoginPage() {
-  redirect("/login");
+  return <ProCleanLoginForm />;
 }

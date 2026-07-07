@@ -201,16 +201,17 @@ async function runMiddleware(request: NextRequest) {
     return applyFramePolicy(request, embedSessionRedirect);
   }
 
-  // Installed app opens at /login — skip sign-in when session is still valid.
+  // Installed app opens at /login/pro — skip sign-in when pro-clean session is still valid.
   if (pathname === PRO_CLEAN_LOGIN_PATH) {
     const token = getRequestSessionToken(request);
     const sessionUser = token ? await parseSessionToken(token) : null;
     if (sessionUser?.email && isProCleanAccountEmail(sessionUser.email)) {
-      return applyFramePolicy(request, NextResponse.redirect(new URL("/dashboard", request.url)));
+      return applyFramePolicy(
+        request,
+        NextResponse.redirect(new URL("/dashboard", request.url))
+      );
     }
-    if (sessionUser && !isProCleanAccountEmail(sessionUser.email)) {
-      return applyFramePolicy(request, NextResponse.redirect(new URL("/login", request.url)));
-    }
+    // Allow owner/demo sessions through so ProCleanLoginForm can switch accounts.
     return applyFramePolicy(request, NextResponse.next());
   }
 
