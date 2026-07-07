@@ -5,16 +5,15 @@ import { validatePassword } from "./password-policy";
 import { ensureDefaultStorageZones } from "./walk-in/storage-zones";
 import { SUBSCRIPTION_CONTRACT_VERSION } from "./subscription-contracts";
 import { SEEDED_DEMO_LOCATION_NAMES } from "./demo-location";
+import { PRO_CLEAN_DEFAULT_EMAIL, isProCleanAccountEmail } from "./pro-clean-email";
 
-const DEFAULT_EMAIL = "pro-clean@pinnacle.app";
+const DEFAULT_EMAIL = PRO_CLEAN_DEFAULT_EMAIL;
 const DEFAULT_PASSWORD = "PinnaclePro2026!";
 const DEFAULT_NAME = "Pro Owner";
 const DEFAULT_RESTAURANT = "Clean Pro Restaurant";
 const PLAN_DEMO_PREFIX = "Plan Demo -";
 
-export function isProCleanAccountEmail(email: string): boolean {
-  return email.trim().toLowerCase() === DEFAULT_EMAIL;
-}
+export { isProCleanAccountEmail };
 
 /** Fresh DB location for pro-clean — never trust session/cookies alone. */
 export async function getProCleanLocationIdForUser(
@@ -209,4 +208,4 @@ export async function ensureProCleanAccount(options?: {
   return { created: true, email, locationId: location.id };
 }
 
-export const PRO_CLEAN_DEFAULT_EMAIL = DEFAULT_EMAIL;
+export { PRO_CLEAN_DEFAULT_EMAIL };

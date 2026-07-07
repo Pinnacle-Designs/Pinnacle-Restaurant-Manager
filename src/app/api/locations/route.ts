@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getLocationId } from "@/lib/location";
 import { ensureDefaultStorageZones } from "@/lib/walk-in/storage-zones";
 import { requireSecureAuth } from "@/lib/api-auth";
-import { isProCleanAccountEmail } from "@/lib/pro-clean-account";
+import { isProCleanAccountEmail } from "@/lib/pro-clean-email";
 import { privateJsonResponse } from "@/lib/secure-response";
 
 export async function GET(request: NextRequest) {

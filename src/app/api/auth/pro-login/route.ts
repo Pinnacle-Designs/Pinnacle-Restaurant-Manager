@@ -8,7 +8,6 @@ import { requireActiveAccount } from "@/lib/api-auth";
 import { isProCleanAccountEmail, ensureProCleanAccount } from "@/lib/pro-clean-account";
 import {
   completeProCleanLogin,
-  PRO_CLEAN_LOGIN_PATH,
 } from "@/lib/pro-clean-login";
 import { LOCATION_COOKIE_NAME } from "@/lib/location";
 
@@ -93,5 +92,3 @@ export async function POST(request: NextRequest) {
 
   return completeProCleanLogin({ request, user, email });
 }
-
-export { PRO_CLEAN_LOGIN_PATH };

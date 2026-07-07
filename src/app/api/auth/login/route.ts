@@ -14,7 +14,7 @@ import { privateJsonResponse } from "@/lib/secure-response";
 import { createMfaPendingToken } from "@/lib/mfa-pending";
 import { requireActiveAccount } from "@/lib/api-auth";
 import { isCrossOriginEmbedRequest } from "@/lib/embed-launch";
-import { isProCleanAccountEmail } from "@/lib/pro-clean-account";
+import { isProCleanAccountEmail } from "@/lib/pro-clean-email";
 import { proCleanLoginRequiredResponse } from "@/lib/pro-clean-login";
 
 const LOGIN_FAILURE_DELAY_MS = 250;

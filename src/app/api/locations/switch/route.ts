@@ -5,7 +5,7 @@ import { requireSecureAuth } from "@/lib/api-auth";
 import { applyAuthCookies } from "@/lib/auth-cookies";
 import { isProductionRuntime } from "@/lib/dev-routes";
 import { privateJsonResponse } from "@/lib/secure-response";
-import { isProCleanAccountEmail } from "@/lib/pro-clean-account";
+import { isProCleanAccountEmail } from "@/lib/pro-clean-email";
 
 export async function POST(request: NextRequest) {
   const { user, error } = await requireSecureAuth(request);

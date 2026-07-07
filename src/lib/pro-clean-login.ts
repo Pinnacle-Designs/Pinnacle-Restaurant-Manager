@@ -6,10 +6,8 @@ import { resolveUserWorkspace } from "@/lib/user-workspace";
 import { privateJsonResponse } from "@/lib/secure-response";
 import { clearWorkspaceCookieOptions } from "@/lib/workspace-cookie";
 import type { SessionUser } from "@/lib/session";
-import {
-  ensureProCleanAccount,
-  isProCleanAccountEmail,
-} from "@/lib/pro-clean-account";
+import { ensureProCleanAccount } from "@/lib/pro-clean-account";
+import { isProCleanAccountEmail } from "@/lib/pro-clean-email";
 
 export const PRO_CLEAN_LOGIN_PATH = "/login/pro";
 
