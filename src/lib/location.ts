@@ -5,7 +5,7 @@ import { isDemoAccountEmail, isPlanDemoAccountEmail } from "./demo-email";
 import { findSeededDemoLocationId } from "./demo-location";
 import { EMBED_LOCATION_HEADER } from "./embed-constants";
 import { isProductionRuntime } from "./env";
-import { resolveAuthorizedLocationId } from "./location-access";
+import { canUserAccessLocation, resolveAuthorizedLocationId } from "./location-access";
 import { prisma } from "./prisma";
 import { LOCATION_COOKIE_NAME } from "./location-constants";
 
@@ -49,18 +49,27 @@ export async function getLocationId(): Promise<string> {
   const cookieStore = await cookies();
   const cookieId = cookieStore.get(LOCATION_COOKIE_NAME)?.value;
 
-  if (cookieId && (await locationExists(cookieId))) {
+  if (user) {
+    if (
+      cookieId &&
+      (await locationExists(cookieId)) &&
+      canUserAccessLocation(user, cookieId)
+    ) {
+      return cookieId;
+    }
+    if (user.locationId && (await locationExists(user.locationId))) {
+      return user.locationId;
+    }
+  } else if (cookieId && (await locationExists(cookieId))) {
     return cookieId;
   }
 
   const hdrs = await headers();
   const headerLocationId = hdrs.get(EMBED_LOCATION_HEADER);
   if (headerLocationId && (await locationExists(headerLocationId))) {
-    return headerLocationId;
-  }
-
-  if (user?.locationId && (await locationExists(user.locationId))) {
-    return user.locationId;
+    if (!user || canUserAccessLocation(user, headerLocationId)) {
+      return headerLocationId;
+    }
   }
 
   if (isProductionRuntime()) {

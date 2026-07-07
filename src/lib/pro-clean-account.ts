@@ -4,11 +4,59 @@ import { prisma } from "./prisma";
 import { validatePassword } from "./password-policy";
 import { ensureDefaultStorageZones } from "./walk-in/storage-zones";
 import { SUBSCRIPTION_CONTRACT_VERSION } from "./subscription-contracts";
+import { SEEDED_DEMO_LOCATION_NAMES } from "./demo-location";
 
 const DEFAULT_EMAIL = "pro-clean@pinnacle.app";
 const DEFAULT_PASSWORD = "PinnaclePro2026!";
 const DEFAULT_NAME = "Pro Owner";
 const DEFAULT_RESTAURANT = "Clean Pro Restaurant";
+const PLAN_DEMO_PREFIX = "Plan Demo -";
+
+export function isProCleanAccountEmail(email: string): boolean {
+  return email.trim().toLowerCase() === DEFAULT_EMAIL;
+}
+
+/** True when the location is a demo workspace or already has seeded restaurant data. */
+async function locationNeedsCleanWorkspace(
+  locationId: string,
+  expectedName: string
+): Promise<boolean> {
+  const location = await prisma.location.findUnique({
+    where: { id: locationId },
+    select: { name: true },
+  });
+  if (!location) return true;
+
+  if ((SEEDED_DEMO_LOCATION_NAMES as readonly string[]).includes(location.name)) {
+    return true;
+  }
+  if (location.name.startsWith(PLAN_DEMO_PREFIX)) return true;
+
+  const [menuCount, orderCount, staffCount] = await Promise.all([
+    prisma.menuItem.count({ where: { locationId } }),
+    prisma.order.count({ where: { locationId } }),
+    prisma.staffMember.count({ where: { locationId } }),
+  ]);
+
+  if (location.name !== expectedName) {
+    return menuCount > 0 || orderCount > 0 || staffCount > 0;
+  }
+
+  return menuCount > 0 || orderCount > 0 || staffCount > 0;
+}
+
+async function createCleanProLocation(email: string, restaurantName: string) {
+  const location = await prisma.location.create({
+    data: {
+      name: restaurantName,
+      address: "Add your address",
+      plan: "PRO",
+      billingEmail: email,
+    },
+  });
+  await ensureDefaultStorageZones(location.id);
+  return location;
+}
 
 async function ensureBilling(locationId: string, userId: string) {
   await prisma.paymentProviderConnection.upsert({
@@ -71,10 +119,44 @@ export async function ensureProCleanAccount(options?: {
   });
 
   if (existing && !resetPassword) {
+    let locationId = existing.locationId;
+    if (
+      !locationId ||
+      (await locationNeedsCleanWorkspace(locationId, restaurantName))
+    ) {
+      const location = await createCleanProLocation(email, restaurantName);
+      locationId = location.id;
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: { locationId, role: "OWNER", active: true },
+      });
+      await ensureBilling(locationId, existing.id);
+      return {
+        created: false,
+        relocated: true,
+        email,
+        locationId,
+      };
+    }
     return { created: false, email, locationId: existing.locationId };
   }
 
   if (existing && resetPassword) {
+    let locationId = existing.locationId;
+
+    if (
+      !locationId ||
+      (await locationNeedsCleanWorkspace(locationId, restaurantName))
+    ) {
+      const location = await createCleanProLocation(email, restaurantName);
+      locationId = location.id;
+    } else {
+      await prisma.location.update({
+        where: { id: locationId },
+        data: { name: restaurantName, plan: "PRO", billingEmail: email },
+      });
+    }
+
     await prisma.user.update({
       where: { id: existing.id },
       data: {
@@ -83,24 +165,15 @@ export async function ensureProCleanAccount(options?: {
         emailVerifiedAt: existing.emailVerifiedAt ?? new Date(),
         mfaEnabled: false,
         role: "OWNER",
+        locationId,
       },
     });
-    if (existing.locationId) {
-      await ensureBilling(existing.locationId, existing.id);
-    }
-    return { created: false, reset: true, email, locationId: existing.locationId };
+
+    await ensureBilling(locationId, existing.id);
+    return { created: false, reset: true, relocated: locationId !== existing.locationId, email, locationId };
   }
 
-  const location = await prisma.location.create({
-    data: {
-      name: restaurantName,
-      address: "Add your address",
-      plan: "PRO",
-      billingEmail: email,
-    },
-  });
-
-  await ensureDefaultStorageZones(location.id);
+  const location = await createCleanProLocation(email, restaurantName);
 
   const user = await prisma.user.create({
     data: {
