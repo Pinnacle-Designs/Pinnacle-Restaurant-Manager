@@ -82,12 +82,157 @@ function joinWrappedLineRows(rows: string[], itemCode: RegExp): string[] {
   return joined;
 }
 
-function parseCatchWeight(line: string): { billed?: number; unit?: string } {
+function parseCatchWeight(line: string, opts?: { unit?: string; qty?: number; unitPrice?: number; lineTotal?: number }): { billed?: number; unit?: string } {
+  if (opts?.unit === "lb" && opts.qty && opts.unitPrice && opts.lineTotal) {
+    const expected = opts.qty * opts.unitPrice;
+    if (Math.abs(expected - opts.lineTotal) <= Math.max(0.5, opts.lineTotal * 0.05)) {
+      return {};
+    }
+  }
+
   const match = line.match(/\b(\d+(?:\.\d+)?)\s*(LB|LBS|KG|KGS)\b/i);
   if (!match) return {};
   const billed = parseFloat(match[1]!);
   if (!Number.isFinite(billed) || billed <= 0 || billed > 9999) return {};
   return { billed, unit: match[2]!.toLowerCase().startsWith("kg") ? "kg" : "lbs" };
+}
+
+/** Distributor table tail: Qty Ordered · Qty Shipped · Package · Unit $ · Extended $ */
+
+interface ParsedDistributorTail {
+  qtyOrdered: number;
+  qtyShipped: number;
+  packageRaw: string;
+  unitPrice: number;
+  lineTotal: number;
+  descEndIndex: number;
+}
+
+function parseDistributorTail(line: string): ParsedDistributorTail | null {
+  const moneyMatches = [...line.matchAll(/([\d,]+\.\d{2})/g)];
+  if (moneyMatches.length < 2) return null;
+
+  const unitPriceMatch = moneyMatches[moneyMatches.length - 2]!;
+  const lineTotalMatch = moneyMatches[moneyMatches.length - 1]!;
+  const unitPrice = parseMoney(unitPriceMatch[1]!);
+  const lineTotal = parseMoney(lineTotalMatch[1]!);
+  if (unitPrice <= 0 || lineTotal <= 0 || unitPrice > 50_000 || lineTotal > 50_000) return null;
+
+  if (moneyMatches.length >= 4) {
+    const qtyOrdMatch = moneyMatches[moneyMatches.length - 4]!;
+    const qtyShipMatch = moneyMatches[moneyMatches.length - 3]!;
+    const qtyOrdered = parseFloat(qtyOrdMatch[1]!.replace(/,/g, ""));
+    const qtyShipped = parseFloat(qtyShipMatch[1]!.replace(/,/g, ""));
+    if (!Number.isFinite(qtyOrdered) || !Number.isFinite(qtyShipped)) return null;
+
+    const packageRaw = line
+      .slice(qtyShipMatch.index! + qtyShipMatch[0].length, unitPriceMatch.index!)
+      .trim();
+
+    return {
+      qtyOrdered,
+      qtyShipped,
+      packageRaw,
+      unitPrice,
+      lineTotal,
+      descEndIndex: qtyOrdMatch.index!,
+    };
+  }
+
+  const beforeUnitPrice = line.slice(0, unitPriceMatch.index!).trimEnd();
+  const tailPair = beforeUnitPrice.match(
+    /(\d+\.\d{2})\s+(\d+\.\d{2})\s+(.+)\s*$/i
+  );
+  if (tailPair) {
+    return {
+      qtyOrdered: parseFloat(tailPair[1]!),
+      qtyShipped: parseFloat(tailPair[2]!),
+      packageRaw: tailPair[3]!.trim(),
+      unitPrice,
+      lineTotal,
+      descEndIndex: tailPair.index!,
+    };
+  }
+
+  const singleQty = beforeUnitPrice.match(/(\d+\.\d{2})\s+(.+)\s*$/i);
+  if (singleQty) {
+    const qty = parseFloat(singleQty[1]!);
+    return {
+      qtyOrdered: qty,
+      qtyShipped: qty,
+      packageRaw: singleQty[2]!.trim(),
+      unitPrice,
+      lineTotal,
+      descEndIndex: singleQty.index!,
+    };
+  }
+
+  return {
+    qtyOrdered: 1,
+    qtyShipped: 1,
+    packageRaw: beforeUnitPrice.split(/\s+/).slice(-1)[0] ?? "each",
+    unitPrice,
+    lineTotal,
+    descEndIndex: beforeUnitPrice.length,
+  };
+}
+
+function parseUnitFromPackage(packageRaw: string, lineFallback?: string): string {
+  const pkg = packageRaw.trim().toUpperCase();
+  if (!pkg) return parseUnitFromLine(lineFallback ?? "");
+
+  if (/^LB|^LBS$/.test(pkg)) return "lb";
+  if (/^EACH|^EA$/.test(pkg)) return "each";
+  if (/^CASE|^CAS|^CS$/.test(pkg)) return "case";
+  if (/^BAG|^PK|^BOX$/.test(pkg)) return "bag";
+  if (/#\/BAG|#\/BAGS|\d+\s*#\/\s*BAG/i.test(pkg)) return "bag";
+  if (/#\/CAS|\/CAS|\d+\/\d+#/i.test(pkg)) return "case";
+  if (/^GAL|^OZ$/.test(pkg)) return pkg.toLowerCase();
+
+  if (lineFallback) return parseUnitFromLine(lineFallback);
+  return "each";
+}
+
+function parseDistributorTableRow(
+  line: string,
+  itemCode: RegExp,
+  hints?: SkuLineHint[]
+): InvoiceLineData | null {
+  const tail = parseDistributorTail(line);
+  if (!tail) return null;
+
+  const header = line.slice(0, tail.descEndIndex).trim();
+  const { sku, description } = extractSkuAndDescription(header, itemCode, { stripTailColumns: false });
+  if (!sku && !description.trim()) return null;
+
+  const qty = tail.qtyShipped > 0 ? tail.qtyShipped : tail.qtyOrdered;
+  let unitPrice = tail.unitPrice;
+  let lineTotal = tail.lineTotal;
+  const unit = parseUnitFromPackage(tail.packageRaw, line);
+
+  if (qty > 0 && unitPrice > 0 && lineTotal > 0) {
+    const expected = unitPrice * qty;
+    if (Math.abs(expected - lineTotal) > Math.max(0.5, lineTotal * 0.05)) {
+      unitPrice = lineTotal / qty;
+    }
+  }
+
+  const catchWeight = parseCatchWeight(line, { unit, qty, unitPrice, lineTotal });
+
+  return finalizeLineItem(
+    {
+      description,
+      qty: qty || 1,
+      unit,
+      unitPrice,
+      lineTotal,
+      sku,
+      ...(catchWeight.billed
+        ? { catchWeightBilled: catchWeight.billed, catchWeightUnit: catchWeight.unit ?? "lbs" }
+        : {}),
+    },
+    hints
+  );
 }
 
 function parseQtyFromLine(beforePrices: string, description: string, sku?: string): number {
@@ -162,7 +307,8 @@ function isSkuOnlyDescription(description: string, sku?: string): boolean {
 /** Pull SKU from the front of a line segment and return the product name. */
 function extractSkuAndDescription(
   segment: string,
-  itemCode: RegExp
+  itemCode: RegExp,
+  opts?: { stripTailColumns?: boolean }
 ): { sku?: string; description: string } {
   let rest = segment.trim();
   let sku: string | undefined;
@@ -186,15 +332,16 @@ function extractSkuAndDescription(
     }
   }
 
-  rest = rest
-    .replace(
-      /(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(?:EACH|EA|CASE|CAS|CS|LB|LBS|BAG|PK|BOX|\d+(?:\s*\/\s*\d+)?\s*#(?:\/\w+)?)/gi,
-      " "
-    )
-    .replace(PACKAGE_PATTERN, " ")
-    .replace(/\b\d+\s*CT\b/gi, " ")
-    .replace(/\s{2,}/g, " ")
-    .trim();
+  if (opts?.stripTailColumns !== false) {
+    rest = rest
+      .replace(
+        /(\d+\.\d{2})\s+(\d+\.\d{2})\s+(?:EACH|EA|CASE|CAS|CS|LB|LBS|BAG|PK|BOX|\d+(?:\s*\/\s*\d+)?\s*#(?:\/\w+)?)/gi,
+        " "
+      )
+      .replace(PACKAGE_PATTERN, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  }
 
   if (isSkuOnlyDescription(rest, sku)) {
     rest = "";
@@ -245,6 +392,10 @@ function parseTabColumns(
   line: string,
   hints?: SkuLineHint[]
 ): InvoiceLineData | null {
+  const joined = tabParts.join("\t");
+  const distributorRow = parseDistributorTableRow(joined.replace(/\t+/g, " "), itemCode, hints);
+  if (distributorRow) return distributorRow;
+
   const moneyParts = tabParts.filter((p) => /^[\d,]+\.\d{2}$/.test(p));
   if (!moneyParts.length) return null;
 
@@ -282,7 +433,12 @@ function parseTabColumns(
 
   const qtySource = tabParts.filter((p) => !/^[\d,]+\.\d{2}$/.test(p)).join(" ");
   const qty = parseQtyFromLine(qtySource, description, sku);
-  const catchWeight = parseCatchWeight(line);
+  const catchWeight = parseCatchWeight(line, {
+    unit: parseUnitFromLine(line),
+    qty,
+    unitPrice: unitPrice || lineTotal,
+    lineTotal,
+  });
 
   return finalizeLineItem(
     {
@@ -307,6 +463,9 @@ function parseLineFromMoneyColumns(
 ): InvoiceLineData | null {
   if (SKIP_LINE.test(line)) return null;
   if (line.length < 8) return null;
+
+  const distributorRow = parseDistributorTableRow(line, itemCode, hints);
+  if (distributorRow) return distributorRow;
 
   const tabParts = line.split(/\t+/).map((p) => p.trim()).filter(Boolean);
   if (tabParts.length >= 3) {
@@ -338,7 +497,7 @@ function parseLineFromMoneyColumns(
   if (!description && !sku) return null;
 
   const unit = parseUnitFromLine(line);
-  const catchWeight = parseCatchWeight(line);
+  const catchWeight = parseCatchWeight(line, { unit, qty, unitPrice, lineTotal });
 
   if (qty > 0 && unitPrice > 0 && lineTotal > 0) {
     const expected = unitPrice * qty;
