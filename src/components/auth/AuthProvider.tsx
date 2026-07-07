@@ -13,7 +13,6 @@ import {
   clearEmbedSessionCache,
   clientFetch,
   getEmbedSessionToken,
-  hasEmbedSession,
   parseEmbedSessionUser,
 } from "@/lib/embed-api-client";
 
@@ -66,6 +65,13 @@ function tokenToAuthUser(parsed: NonNullable<ReturnType<typeof parseEmbedSession
   };
 }
 
+/** Decode `_st` from the URL — safe on server and client (no window/cookies). */
+function embedUserFromParam(stParam: string | null, isEmbed: boolean): AuthUser | null {
+  if (!isEmbed || !stParam) return null;
+  const parsed = parseEmbedSessionUser(stParam);
+  return parsed ? tokenToAuthUser(parsed) : null;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const embedParam = searchParams.get("embed");
@@ -73,20 +79,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const stParam = searchParams.get("_st");
   const retryRef = useRef(0);
 
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const initialEmbedUser = embedUserFromParam(stParam, isEmbed);
+  const [user, setUser] = useState<AuthUser | null>(initialEmbedUser);
+  const [loading, setLoading] = useState(!initialEmbedUser);
 
-  // Instant demo user from `_st` JWT — no waiting on cookies or /api/auth/login.
+  // Persist `_st` and sync user when the embed URL token changes.
   useEffect(() => {
     if (!isEmbed) return;
     if (stParam) {
       clearEmbedSessionCache();
+      const fromUrl = embedUserFromParam(stParam, true);
+      if (fromUrl) {
+        setUser(fromUrl);
+        setLoading(false);
+      }
     }
-    const parsed = bootstrapEmbedUser(embedParam);
-    if (parsed) {
-      setUser(tokenToAuthUser(parsed));
-      setLoading(false);
-    }
+    bootstrapEmbedUser(embedParam);
   }, [isEmbed, embedParam, stParam]);
 
   const refresh = useCallback(async () => {
@@ -159,7 +167,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return hasPermissionInList(user.permissions, permission);
     }
     if (user?.role === "OWNER" || user?.role === "MANAGER") return true;
-    if (isEmbed && hasEmbedSession()) return true;
+    // URL `_st` only — must match SSR (no cookie/window token reads during render).
+    if (isEmbed && stParam) return true;
     return false;
   };
 
@@ -171,7 +180,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         can,
         logout,
         refresh,
-        embedSession: isEmbed && hasEmbedSession(),
+        embedSession: isEmbed && Boolean(stParam),
       }}
     >
       {children}

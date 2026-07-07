@@ -7,6 +7,7 @@ import { privateJsonResponse } from "@/lib/secure-response";
 import { clearWorkspaceCookieOptions } from "@/lib/workspace-cookie";
 import type { SessionUser } from "@/lib/session";
 import { ensureProCleanAccount } from "@/lib/pro-clean-account";
+import { prisma } from "@/lib/prisma";
 import {
   isProCleanAccountEmail,
   PRO_CLEAN_LOGIN_PATH,
@@ -47,6 +48,10 @@ export async function completeProCleanLogin({
     const ensured = await ensureProCleanAccount({ resetPassword: false });
     if (ensured.locationId) {
       user.locationId = ensured.locationId;
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { locationId: ensured.locationId },
+      });
     }
     workspace = await resolveUserWorkspace(user);
   } catch (err) {

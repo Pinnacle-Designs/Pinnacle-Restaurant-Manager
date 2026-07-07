@@ -34,9 +34,6 @@ interface OnboardingPacket {
 }
 
 function onboardingHref(token: string) {
-  if (typeof window !== "undefined") {
-    return `${window.location.origin}/onboard/hire/${token}`;
-  }
   return `/onboard/hire/${token}`;
 }
 

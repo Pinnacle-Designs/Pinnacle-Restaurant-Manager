@@ -4,7 +4,7 @@ import { prisma } from "./prisma";
 import { validatePassword } from "./password-policy";
 import { ensureDefaultStorageZones } from "./walk-in/storage-zones";
 import { SUBSCRIPTION_CONTRACT_VERSION } from "./subscription-contracts";
-import { SEEDED_DEMO_LOCATION_NAMES } from "./demo-location";
+import { SEEDED_DEMO_LOCATION_NAMES, findSeededDemoLocationId } from "./demo-location";
 import { PRO_CLEAN_DEFAULT_EMAIL, isProCleanAccountEmail } from "./pro-clean-email";
 
 const DEFAULT_EMAIL = PRO_CLEAN_DEFAULT_EMAIL;
@@ -53,6 +53,9 @@ async function locationNeedsCleanWorkspace(
   locationId: string,
   expectedName: string
 ): Promise<boolean> {
+  const demoLocationId = await findSeededDemoLocationId();
+  if (demoLocationId && locationId === demoLocationId) return true;
+
   const location = await prisma.location.findUnique({
     where: { id: locationId },
     select: { name: true },

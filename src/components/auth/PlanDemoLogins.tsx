@@ -79,7 +79,7 @@ export function PlanDemoLogins({ onLogin, loading }: PlanDemoLoginsProps) {
             className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm hover:border-orange-300 hover:bg-orange-50 disabled:opacity-50"
           >
             <span className="font-medium text-slate-800">
-              {PLAN_BY_ID[account.plan].name}
+              {PLAN_BY_ID[account.plan].name} (sample data)
             </span>
             <span className="text-xs text-slate-500">{account.email}</span>
           </button>

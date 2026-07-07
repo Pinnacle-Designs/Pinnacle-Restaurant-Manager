@@ -13,7 +13,6 @@ import { LocationLocaleProvider } from "@/components/location/LocationLocaleProv
 import { GlobalSearchProvider } from "@/components/search/GlobalSearch";
 import { PageSearchStrip } from "@/components/search/PageSearchStrip";
 import { isEmbeddableEmbedParam } from "@/lib/embed-config";
-import { bootstrapEmbedSession } from "@/lib/embed-api-client";
 import { EmbedSessionBootstrap } from "@/components/layout/EmbedSessionBootstrap";
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
@@ -31,10 +30,6 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const isEmbed = isEmbeddableEmbedParam(embedParam);
 
   const isEmbedMobile = embedParam === "mobile" || embedParam === "1";
-
-  if (typeof window !== "undefined" && isEmbed) {
-    bootstrapEmbedSession(embedParam);
-  }
 
   if (isLogin || isSignup || isOnboarding || isDownload || isLegal || isMarketing || isEmbedRoute || isTableside) {
     return <>{children}</>;

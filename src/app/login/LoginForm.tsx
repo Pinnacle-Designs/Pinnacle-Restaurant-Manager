@@ -8,7 +8,9 @@ import { Button } from "@/components/ui";
 import { Input, FormField } from "@/components/ui/form";
 import { SignupPlanModal } from "@/components/auth/SignupPlanModal";
 import { PlanDemoLogins } from "@/components/auth/PlanDemoLogins";
+import { ProCleanDevLogin } from "@/components/auth/ProCleanDevLogin";
 import { TeamPinLogin } from "@/components/auth/TeamPinLogin";
+import { isProCleanAccountEmail, PRO_CLEAN_DEFAULT_EMAIL } from "@/lib/pro-clean-email";
 
 export default function LoginForm() {
   const searchParams = useSearchParams();
@@ -21,6 +23,17 @@ export default function LoginForm() {
   const [mfaCode, setMfaCode] = useState("");
   const [checkingSession, setCheckingSession] = useState(true);
   const [signInMode, setSignInMode] = useState<"owner" | "team">("owner");
+  const [existingSessionEmail, setExistingSessionEmail] = useState<string | null>(null);
+
+  const wantsAccountSwitch =
+    searchParams.get("switch") === "1" || searchParams.get("account") === "pro-clean";
+
+  useEffect(() => {
+    const account = searchParams.get("account");
+    if (account === "pro-clean") {
+      setEmail(PRO_CLEAN_DEFAULT_EMAIL);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,6 +41,20 @@ export default function LoginForm() {
       .then((res) => (res.ok ? res.json() : { user: null }))
       .then((data: { user?: { email: string } | null }) => {
         if (cancelled || !data.user) return;
+        const sessionEmail = data.user.email.toLowerCase();
+        const typedEmail = email.trim().toLowerCase();
+        const switchingToProClean =
+          wantsAccountSwitch ||
+          (typedEmail && isProCleanAccountEmail(typedEmail) && !isProCleanAccountEmail(sessionEmail));
+
+        if (switchingToProClean && sessionEmail !== typedEmail && typedEmail) {
+          setExistingSessionEmail(data.user.email);
+          return;
+        }
+        if (wantsAccountSwitch && !isProCleanAccountEmail(sessionEmail)) {
+          setExistingSessionEmail(data.user.email);
+          return;
+        }
         redirectAfterLogin({});
       })
       .catch(() => undefined)
@@ -37,6 +64,7 @@ export default function LoginForm() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only run on mount
   }, []);
 
   const redirectAfterLogin = (data: { redirectTo?: string }) => {
@@ -51,6 +79,14 @@ export default function LoginForm() {
   };
 
   const completeLogin = async (loginEmail = email, loginPassword = password) => {
+    if (
+      existingSessionEmail &&
+      loginEmail.trim().toLowerCase() !== existingSessionEmail.toLowerCase()
+    ) {
+      await fetch("/api/auth/logout", { method: "POST" });
+      setExistingSessionEmail(null);
+    }
+
     const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -164,6 +200,25 @@ export default function LoginForm() {
                   Sign in to your restaurant workspace. You&apos;ll stay signed in on this device.
                 </p>
 
+                {existingSessionEmail && (
+                  <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                    Signed in as <strong>{existingSessionEmail}</strong>. Submit the form below to
+                    switch accounts, or{" "}
+                    <button
+                      type="button"
+                      className="font-medium text-orange-600 underline hover:text-orange-700"
+                      onClick={async () => {
+                        await fetch("/api/auth/logout", { method: "POST" });
+                        setExistingSessionEmail(null);
+                        window.location.reload();
+                      }}
+                    >
+                      sign out
+                    </button>{" "}
+                    first.
+                  </div>
+                )}
+
                 <form className="mt-6 space-y-4" onSubmit={handleLogin}>
                   <FormField label="Email">
                     <Input
@@ -207,6 +262,21 @@ export default function LoginForm() {
                 <SignupPlanModal open={signupOpen} onClose={() => setSignupOpen(false)} />
 
                 <PlanDemoLogins
+                  loading={loading}
+                  onLogin={async (loginEmail, loginPassword) => {
+                    setLoading(true);
+                    setError(null);
+                    try {
+                      await completeLogin(loginEmail, loginPassword);
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "Login failed");
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                />
+
+                <ProCleanDevLogin
                   loading={loading}
                   onLogin={async (loginEmail, loginPassword) => {
                     setLoading(true);
