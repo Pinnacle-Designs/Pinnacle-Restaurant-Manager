@@ -23,8 +23,8 @@ export function ScanOcrNotice({
 
       {source === "local" && (
         <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-          Text was read from your photo — review the fields below and edit anything that looks off
-          before saving.
+          On-device OCR read your document — review the fields below and edit anything that looks
+          off before saving. Your corrections teach the system for this vendor.
         </p>
       )}
 

@@ -21,7 +21,8 @@ export async function submitScanForm<T = Record<string, unknown>>(
   validateScanFormData(formData);
   if (method === "POST" && options?.runLocalOcr !== false) {
     const { appendClientOcrText } = await import("@/lib/ocr/client-extract");
-    await appendClientOcrText(formData, options?.onOcrProgress);
+    const kind = url.includes("receipt") ? "receipt" : url.includes("invoice") ? "invoice" : "generic";
+    await appendClientOcrText(formData, options?.onOcrProgress, kind);
   }
   const res = await clientFetch(url, { method, body: formData });
   const data = await parseJsonResponse<T & { error?: string }>(res);

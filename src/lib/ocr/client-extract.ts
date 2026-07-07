@@ -2,6 +2,9 @@
 
 import type { Worker } from "tesseract.js";
 import { getBrowserTesseractOptions, type OcrProgressHandler } from "./tesseract-options";
+import { preprocessImageFileForOcr } from "./image-preprocess";
+import { recognizeWithBestPass } from "./run-tesseract";
+import type { OcrTextKind } from "./ocr-text-score";
 
 let workerPromise: Promise<Worker> | null = null;
 let workerProgress: OcrProgressHandler | undefined;
@@ -29,20 +32,30 @@ async function getOcrWorker(onProgress?: OcrProgressHandler): Promise<Worker> {
   return workerPromise;
 }
 
-/** Run OCR in the browser — loads engine from this app's /tesseract assets. */
+/** Run OCR in the browser — preprocesses image and tries multiple layout modes. */
 export async function extractTextFromImageFile(
   file: File,
-  onProgress?: OcrProgressHandler
+  onProgress?: OcrProgressHandler,
+  kind: OcrTextKind = "generic"
 ): Promise<string> {
+  onProgress?.("Enhancing photo for text recognition…");
   const worker = await getOcrWorker(onProgress);
-  const { data } = await worker.recognize(file);
-  return data.text ?? "";
+
+  let preprocessed: Blob;
+  try {
+    preprocessed = await preprocessImageFileForOcr(file);
+  } catch {
+    preprocessed = file;
+  }
+
+  return recognizeWithBestPass(worker, preprocessed, kind, onProgress);
 }
 
 /** Attach recognized text to a scan upload when not already present. */
 export async function appendClientOcrText(
   formData: FormData,
-  onProgress?: OcrProgressHandler
+  onProgress?: OcrProgressHandler,
+  kind: OcrTextKind = "generic"
 ): Promise<string | null> {
   if (formData.get("ocrText")) {
     return String(formData.get("ocrText"));
@@ -55,7 +68,7 @@ export async function appendClientOcrText(
 
   try {
     onProgress?.("Preparing photo for text recognition…");
-    const text = (await extractTextFromImageFile(file, onProgress)).trim();
+    const text = (await extractTextFromImageFile(file, onProgress, kind)).trim();
     if (text) {
       formData.set("ocrText", text);
       return text;

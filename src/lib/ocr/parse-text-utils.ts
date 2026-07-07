@@ -26,17 +26,26 @@ function amountsNearLabel(text: string, label: RegExp): number[] {
   return amounts;
 }
 
-export function extractTotalAmount(text: string): number {
+export function extractTotalAmount(text: string, opts?: { totalLabel?: string; lineItemCount?: number }): number {
   const lines = text.split(/\r?\n/);
+
+  if (opts?.totalLabel) {
+    const custom = new RegExp(
+      `${opts.totalLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[^\\d$]{0,24}\\$?\\s*([\\d,]+\\.\\d{2})`,
+      "i"
+    );
+    const match = text.match(custom);
+    if (match?.[1]) {
+      const value = parseMoney(match[1]);
+      if (value > 0) return value;
+    }
+  }
 
   for (const { pattern } of TOTAL_LABELS) {
     for (const line of lines) {
       if (!pattern.test(line)) continue;
-      const match = line.match(/([\d,]+\.\d{2})/);
-      if (match) {
-        const value = parseMoney(match[1]!);
-        if (value > 0) return value;
-      }
+      const amounts = [...line.matchAll(/([\d,]+\.\d{2})/g)].map((m) => parseMoney(m[1]!));
+      if (amounts.length) return amounts[amounts.length - 1]!;
     }
   }
 
@@ -52,18 +61,27 @@ export function extractTotalAmount(text: string): number {
   }
   if (best > 0) return best;
 
-  const footerStart = Math.max(0, Math.floor(lines.length * 0.65));
+  const footerStart = Math.max(0, Math.floor(lines.length * 0.7));
   const footerText = lines.slice(footerStart).join("\n");
   const footerAmounts = [...footerText.matchAll(/(?:^|\s|\$)([\d,]+\.\d{2})(?:\s|$)/gm)]
     .map((m) => parseMoney(m[1]!))
     .filter((n) => n > 0 && n < 250_000);
   if (footerAmounts.length) return Math.max(...footerAmounts);
 
-  const amounts = [...text.matchAll(/(?:^|\s|\$)([\d,]+\.\d{2})(?:\s|$)/gm)]
+  // Avoid picking unit prices from the line-item body when many rows exist.
+  const bodyEnd = opts?.lineItemCount && opts.lineItemCount >= 2
+    ? Math.max(0, Math.floor(lines.length * 0.65))
+    : lines.length;
+  const bodyText = lines.slice(0, bodyEnd).join("\n");
+  const bodyAmounts = [...bodyText.matchAll(/(?:^|\s|\$)([\d,]+\.\d{2})(?:\s|$)/gm)]
     .map((m) => parseMoney(m[1]!))
     .filter((n) => n > 0 && n < 250_000);
 
-  return amounts.length ? Math.max(...amounts) : 0;
+  if (bodyAmounts.length && (!opts?.lineItemCount || opts.lineItemCount < 2)) {
+    return Math.max(...bodyAmounts);
+  }
+
+  return 0;
 }
 
 export function extractDocumentDate(text: string): string {
@@ -146,6 +164,8 @@ export function normalizeOcrText(text: string): string {
     .replace(/\u2018|\u2019/g, "'")
     .replace(/\u201c|\u201d/g, '"')
     .replace(/[|]/g, "I")
+    .replace(/\t+/g, " ")
+    .replace(/ {2,}/g, "  ")
     .split(/\r?\n/)
     .map((line) => line.replace(/\s+/g, " ").trim())
     .filter(Boolean)

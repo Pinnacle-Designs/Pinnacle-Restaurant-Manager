@@ -34,6 +34,7 @@ export interface VendorOcrContext {
   aliases: Array<{ field: string; ocrValue: string; correctedValue: string; hitCount: number }>;
   skuHints: SkuLineHint[];
   topVendors: Array<{ displayName: string; scanCount: number }>;
+  layoutHints: { totalLabel?: string; itemCodePattern?: string };
   promptBlock: string;
 }
 
@@ -137,6 +138,15 @@ export async function buildVendorOcrContext(
     scanCount: p.scanCount,
   }));
 
+  let layoutHints: VendorOcrContext["layoutHints"] = {};
+  if (profile?.layoutHints) {
+    try {
+      layoutHints = JSON.parse(profile.layoutHints) as VendorOcrContext["layoutHints"];
+    } catch {
+      /* ignore */
+    }
+  }
+
   const lines: string[] = [];
   if (profile) {
     lines.push(
@@ -189,6 +199,7 @@ export async function buildVendorOcrContext(
     })),
     skuHints,
     topVendors,
+    layoutHints,
     promptBlock,
   };
 }

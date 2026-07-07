@@ -3,12 +3,20 @@ import { analyzeInvoice as analyzeInvoiceWithAi } from "@/lib/ai/analyze-invoice
 import type { ReceiptData } from "@/lib/ai";
 import { analyzeReceipt as analyzeReceiptWithAi } from "@/lib/ai";
 import type { OcrSource } from "./capabilities";
+import { prepareOcrTextForParsing } from "./ocr-corrections";
+import { isWeakOcrText, mergeOcrTextPassages } from "./ocr-text-score";
 import {
   hasUsefulInvoiceData,
   mergeInvoiceData,
   parseInvoiceFromText,
+  scoreInvoiceData,
 } from "./parse-invoice-text";
-import { hasUsefulReceiptData, mergeReceiptData, parseReceiptFromText } from "./parse-receipt-text";
+import {
+  hasUsefulReceiptData,
+  mergeReceiptData,
+  parseReceiptFromText,
+  scoreReceiptData,
+} from "./parse-receipt-text";
 import {
   applyVendorMemoryToInvoice,
   applyVendorMemoryToReceipt,
@@ -37,10 +45,17 @@ function emptyReceipt(today = new Date().toISOString().split("T")[0]!): ReceiptD
   };
 }
 
-async function extractServerText(imageBase64: string | string[]): Promise<string | null> {
+function aiOcrEnabled(): boolean {
+  return Boolean(process.env.OPENAI_API_KEY?.trim() && process.env.OCR_DISABLE_AI !== "true");
+}
+
+async function extractServerText(
+  imageBase64: string | string[],
+  kind: "invoice" | "receipt"
+): Promise<string | null> {
   try {
     const { extractTextFromBase64Images } = await import("./server-extract");
-    const text = (await extractTextFromBase64Images(imageBase64)).trim();
+    const text = (await extractTextFromBase64Images(imageBase64, kind)).trim();
     return text || null;
   } catch (err) {
     console.warn("Server OCR fallback failed:", err);
@@ -48,13 +63,66 @@ async function extractServerText(imageBase64: string | string[]): Promise<string
   }
 }
 
-function pickInvoiceSource(ai: InvoiceData | null, merged: InvoiceData): OcrSource {
-  if (!ai) return "local";
-  const aiUseful = hasUsefulInvoiceData(ai);
-  const mergedUseful = hasUsefulInvoiceData(merged);
-  if (!mergedUseful) return aiUseful ? "ai" : "none";
-  if (aiUseful && merged.lines.length <= ai.lines.length) return "ai";
-  if (aiUseful && ai.lines.length > 0) return "ai";
+async function resolveOcrText(
+  imageBase64: string | string[],
+  clientText: string | null,
+  kind: "invoice" | "receipt"
+): Promise<string> {
+  const serverText =
+    !clientText || isWeakOcrText(clientText, kind)
+      ? await extractServerText(imageBase64, kind)
+      : null;
+
+  return mergeOcrTextPassages(clientText, serverText);
+}
+
+function pickInvoiceSource(
+  ai: InvoiceData | null,
+  local: InvoiceData,
+  merged: InvoiceData
+): OcrSource {
+  if (!ai) {
+    return hasUsefulInvoiceData(local) ? "local" : "none";
+  }
+
+  const localScore = scoreInvoiceData(local);
+  const aiScore = scoreInvoiceData(ai);
+  const mergedScore = scoreInvoiceData(merged);
+
+  if (!hasUsefulInvoiceData(merged)) {
+    if (aiScore >= localScore && hasUsefulInvoiceData(ai)) return "ai";
+    if (hasUsefulInvoiceData(local)) return "local";
+    return "none";
+  }
+
+  if (localScore >= aiScore + 2 || local.lines.length > ai.lines.length) return "local";
+  if (aiScore > localScore && hasUsefulInvoiceData(ai)) return "ai";
+  if (mergedScore >= Math.max(localScore, aiScore)) return localScore >= aiScore ? "local" : "ai";
+  return "local";
+}
+
+function pickReceiptSource(
+  ai: ReceiptData | null,
+  local: ReceiptData,
+  merged: ReceiptData
+): OcrSource {
+  if (!ai) {
+    return hasUsefulReceiptData(local) ? "local" : "none";
+  }
+
+  const localScore = scoreReceiptData(local);
+  const aiScore = scoreReceiptData(ai);
+  const mergedScore = scoreReceiptData(merged);
+
+  if (!hasUsefulReceiptData(merged)) {
+    if (aiScore >= localScore && hasUsefulReceiptData(ai)) return "ai";
+    if (hasUsefulReceiptData(local)) return "local";
+    return "none";
+  }
+
+  if (localScore >= aiScore + 1 || local.items.length > ai.items.length) return "local";
+  if (aiScore > localScore && hasUsefulReceiptData(ai)) return "ai";
+  if (mergedScore >= Math.max(localScore, aiScore)) return localScore >= aiScore ? "local" : "ai";
   return "local";
 }
 
@@ -69,12 +137,10 @@ export async function resolveInvoiceScan(
   ocrText?: string | null
 ): Promise<{ invoice: InvoiceData; source: OcrSource; memoryApplied: boolean; memoryScanCount: number }> {
   const locationId = options.locationId;
-  const clientText = ocrText?.trim() || null;
-  const serverText = clientText ? null : await extractServerText(imageBase64);
-  const text = clientText || serverText || "";
+  const text = await resolveOcrText(imageBase64, ocrText?.trim() || null, "invoice");
 
-  const localDraft = text ? parseInvoiceFromText(text) : emptyInvoice();
-  let vendorHint = localDraft.vendor?.trim() || "";
+  const roughDraft = text ? parseInvoiceFromText(text) : emptyInvoice();
+  let vendorHint = roughDraft.vendor?.trim() || "";
 
   if (locationId && vendorHint) {
     const guessed = await guessVendorFromMemory(locationId, vendorHint);
@@ -88,15 +154,25 @@ export async function resolveInvoiceScan(
         aliases: [],
         skuHints: [],
         topVendors: [],
+        layoutHints: {},
         promptBlock: "",
       };
 
+  const preparedText = text ? prepareOcrTextForParsing(text, memoryCtx) : "";
+  const localDraft = preparedText
+    ? parseInvoiceFromText(preparedText, {
+        itemCodePattern: memoryCtx.layoutHints.itemCodePattern,
+        totalLabel: memoryCtx.layoutHints.totalLabel,
+        skuHints: memoryCtx.skuHints,
+      })
+    : emptyInvoice();
+
   let ai: InvoiceData | null = null;
-  if (process.env.OPENAI_API_KEY?.trim()) {
+  if (aiOcrEnabled()) {
     ai = await analyzeInvoiceWithAi(
       imageBase64,
       options,
-      text || undefined,
+      preparedText || undefined,
       memoryCtx.promptBlock || undefined
     );
   }
@@ -114,7 +190,7 @@ export async function resolveInvoiceScan(
 
     return {
       invoice: merged,
-      source: pickInvoiceSource(ai, merged),
+      source: pickInvoiceSource(ai, localDraft, merged),
       memoryApplied,
       memoryScanCount: memoryCtx.scanCount,
     };
@@ -122,18 +198,10 @@ export async function resolveInvoiceScan(
 
   return {
     invoice: merged,
-    source: ai ? pickInvoiceSource(ai, merged) : text && hasUsefulInvoiceData(localDraft) ? "local" : "none",
+    source: pickInvoiceSource(ai, localDraft, merged),
     memoryApplied: false,
     memoryScanCount: 0,
   };
-}
-
-function pickReceiptSource(ai: ReceiptData | null, merged: ReceiptData): OcrSource {
-  if (!ai) return "local";
-  if (hasUsefulReceiptData(ai) && hasUsefulReceiptData(merged)) return "ai";
-  if (hasUsefulReceiptData(ai)) return "ai";
-  if (hasUsefulReceiptData(merged)) return "local";
-  return "none";
 }
 
 export async function resolveReceiptScan(
@@ -147,12 +215,10 @@ export async function resolveReceiptScan(
   ocrText?: string | null
 ): Promise<{ receipt: ReceiptData; source: OcrSource; memoryApplied: boolean; memoryScanCount: number }> {
   const locationId = options.locationId;
-  const clientText = ocrText?.trim() || null;
-  const serverText = clientText ? null : await extractServerText(imageBase64);
-  const text = clientText || serverText || "";
+  const text = await resolveOcrText(imageBase64, ocrText?.trim() || null, "receipt");
 
-  const localDraft = text ? parseReceiptFromText(text) : emptyReceipt();
-  let vendorHint = localDraft.vendor?.trim() || "";
+  const roughDraft = text ? parseReceiptFromText(text) : emptyReceipt();
+  let vendorHint = roughDraft.vendor?.trim() || "";
 
   if (locationId && vendorHint) {
     const guessed = await guessVendorFromMemory(locationId, vendorHint);
@@ -166,15 +232,19 @@ export async function resolveReceiptScan(
         aliases: [],
         skuHints: [],
         topVendors: [],
+        layoutHints: {},
         promptBlock: "",
       };
 
+  const preparedText = text ? prepareOcrTextForParsing(text, memoryCtx) : "";
+  const localDraft = preparedText ? parseReceiptFromText(preparedText) : emptyReceipt();
+
   let ai: ReceiptData | null = null;
-  if (process.env.OPENAI_API_KEY?.trim()) {
+  if (aiOcrEnabled()) {
     ai = await analyzeReceiptWithAi(
       imageBase64,
       options,
-      text || undefined,
+      preparedText || undefined,
       memoryCtx.promptBlock || undefined
     );
   }
@@ -192,7 +262,7 @@ export async function resolveReceiptScan(
 
     return {
       receipt: merged,
-      source: pickReceiptSource(ai, merged),
+      source: pickReceiptSource(ai, localDraft, merged),
       memoryApplied,
       memoryScanCount: memoryCtx.scanCount,
     };
@@ -200,11 +270,7 @@ export async function resolveReceiptScan(
 
   return {
     receipt: merged,
-    source: ai
-      ? pickReceiptSource(ai, merged)
-      : text && hasUsefulReceiptData(localDraft)
-        ? "local"
-        : "none",
+    source: pickReceiptSource(ai, localDraft, merged),
     memoryApplied: false,
     memoryScanCount: 0,
   };
