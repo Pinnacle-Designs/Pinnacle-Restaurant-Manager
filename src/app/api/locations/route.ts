@@ -13,15 +13,13 @@ export async function GET(request: NextRequest) {
   const currentId = await getLocationId();
 
   if (isProCleanAccountEmail(user!.email)) {
-    const location = user!.locationId
-      ? await prisma.location.findFirst({
-          where: { id: user!.locationId, active: true },
-          orderBy: { name: "asc" },
-        })
-      : null;
+    const locationId = await getLocationId();
+    const location = await prisma.location.findFirst({
+      where: { id: locationId, active: true },
+    });
     return NextResponse.json({
       locations: location ? [location] : [],
-      currentId,
+      currentId: locationId,
     });
   }
 

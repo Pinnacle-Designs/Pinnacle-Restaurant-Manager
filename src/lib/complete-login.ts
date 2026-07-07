@@ -15,6 +15,8 @@ import { devDemoLoginEnabled, isDemoAccountEmail, OWNER_DEMO_EMAIL } from "@/lib
 import type { SessionUser } from "@/lib/session";
 import { privateJsonResponse } from "@/lib/secure-response";
 import { clearWorkspaceCookieOptions } from "@/lib/workspace-cookie";
+import { isProCleanAccountEmail } from "@/lib/pro-clean-email";
+import { completeProCleanLogin } from "@/lib/pro-clean-login";
 
 interface CompleteLoginOptions {
   request: NextRequest;
@@ -29,6 +31,10 @@ export async function completeUserLogin({
   email,
   forEmbed = false,
 }: CompleteLoginOptions) {
+  if (isProCleanAccountEmail(email)) {
+    return completeProCleanLogin({ request, user, email, forEmbed });
+  }
+
   let workspace = null;
   let workspaceError: string | undefined;
   let redirectTo: string | undefined;

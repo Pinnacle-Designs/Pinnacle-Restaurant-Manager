@@ -16,10 +16,11 @@ const PLAN_DEMO_PREFIX = "Plan Demo -";
 export { isProCleanAccountEmail };
 
 /** Fresh DB location for pro-clean — never trust session/cookies alone. */
-export async function getProCleanLocationIdForUser(
+export async function resolveProCleanLocationId(
   user: { id: string; email: string } | null | undefined
 ): Promise<string | null> {
   if (!user || !isProCleanAccountEmail(user.email)) return null;
+
   const row = await prisma.user.findUnique({
     where: { id: user.id },
     select: {
@@ -27,8 +28,24 @@ export async function getProCleanLocationIdForUser(
       location: { select: { id: true, active: true, name: true } },
     },
   });
-  if (!row?.locationId || !row.location?.active) return null;
-  return row.locationId;
+
+  if (
+    row?.locationId &&
+    row.location?.active &&
+    !(await locationNeedsCleanWorkspace(row.locationId, DEFAULT_RESTAURANT))
+  ) {
+    return row.locationId;
+  }
+
+  const ensured = await ensureProCleanAccount({ resetPassword: false });
+  return ensured.locationId ?? null;
+}
+
+/** @deprecated Use resolveProCleanLocationId — validates workspace, not just cookie/session. */
+export async function getProCleanLocationIdForUser(
+  user: { id: string; email: string } | null | undefined
+): Promise<string | null> {
+  return resolveProCleanLocationId(user);
 }
 
 /** True when the location is a demo workspace or already has seeded restaurant data. */
