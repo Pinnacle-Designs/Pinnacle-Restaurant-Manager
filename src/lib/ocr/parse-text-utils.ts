@@ -5,14 +5,59 @@ export function parseMoney(value: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+const TOTAL_LABELS: Array<{ pattern: RegExp; weight: number }> = [
+  { pattern: /(?:total\s+invoice|invoice\s+total)/i, weight: 100 },
+  { pattern: /(?:grand\s+total|order\s+total)/i, weight: 90 },
+  { pattern: /(?:amount\s+due|balance\s+due|total\s+due)/i, weight: 80 },
+  { pattern: /(?:sub\s*total|subtotal)/i, weight: 70 },
+  { pattern: /(?:total|net\s+amount)/i, weight: 50 },
+];
+
+function amountsNearLabel(text: string, label: RegExp): number[] {
+  const amounts: number[] = [];
+  const re = new RegExp(
+    `${label.source}[^\\d$]{0,24}\\$?\\s*([\\d,]+\\.\\d{2})`,
+    label.flags.includes("i") ? "gi" : "g"
+  );
+  for (const match of text.matchAll(re)) {
+    const value = parseMoney(match[1]!);
+    if (value > 0 && value < 250_000) amounts.push(value);
+  }
+  return amounts;
+}
+
 export function extractTotalAmount(text: string): number {
   const lines = text.split(/\r?\n/);
-  for (const line of lines) {
-    if (/^(?:total|amount\s+due|balance\s+due|grand\s+total|invoice\s+total)/i.test(line.trim())) {
+
+  for (const { pattern, weight } of TOTAL_LABELS) {
+    for (const line of lines) {
+      if (!pattern.test(line)) continue;
       const match = line.match(/([\d,]+\.\d{2})/);
-      if (match) return parseMoney(match[1]!);
+      if (match) {
+        const value = parseMoney(match[1]!);
+        if (value > 0) return value;
+      }
     }
   }
+
+  let best = 0;
+  let bestWeight = 0;
+  for (const { pattern, weight } of TOTAL_LABELS) {
+    for (const value of amountsNearLabel(text, pattern)) {
+      if (weight > bestWeight || (weight === bestWeight && value > best)) {
+        best = value;
+        bestWeight = weight;
+      }
+    }
+  }
+  if (best > 0) return best;
+
+  const footerStart = Math.max(0, Math.floor(lines.length * 0.65));
+  const footerText = lines.slice(footerStart).join("\n");
+  const footerAmounts = [...footerText.matchAll(/(?:^|\s|\$)([\d,]+\.\d{2})(?:\s|$)/gm)]
+    .map((m) => parseMoney(m[1]!))
+    .filter((n) => n > 0 && n < 250_000);
+  if (footerAmounts.length) return Math.max(...footerAmounts);
 
   const amounts = [...text.matchAll(/(?:^|\s|\$)([\d,]+\.\d{2})(?:\s|$)/gm)]
     .map((m) => parseMoney(m[1]!))
@@ -22,6 +67,15 @@ export function extractTotalAmount(text: string): number {
 }
 
 export function extractDocumentDate(text: string): string {
+  const labeled = text.match(
+    /(?:invoice\s+date|order\s+date|date)[:\s]+(\d{1,2})[/-](\d{1,2})[/-]((?:20)?\d{2})/i
+  );
+  if (labeled) {
+    let year = labeled[3]!;
+    if (year.length === 2) year = `20${year}`;
+    return `${year}-${labeled[1]!.padStart(2, "0")}-${labeled[2]!.padStart(2, "0")}`;
+  }
+
   const iso = text.match(/\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/);
   if (iso) {
     return `${iso[1]}-${iso[2]!.padStart(2, "0")}-${iso[3]!.padStart(2, "0")}`;
@@ -38,11 +92,23 @@ export function extractDocumentDate(text: string): string {
 }
 
 export function extractInvoiceNumber(text: string): string {
-  const match = text.match(
-    /(?:invoice\s*(?:#|no\.?|number)?|inv\.?\s*#?)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{2,})/i
-  );
-  return match?.[1]?.trim() ?? "";
+  const patterns = [
+    /(?:invoice\s*(?:#|no\.?|number)?|inv\.?\s*#?)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{2,})/i,
+    /\binvoice\s+(\d{4,})\b/i,
+    /\bour\s+order\s+(?:#|no\.?|number)?\s*[:#]?\s*(\d{4,})/i,
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) return match[1].trim();
+  }
+  return "";
 }
+
+const COMPANY_SUFFIX =
+  /\b(?:Ltd\.?|Limited|LLC|L\.L\.C\.|Inc\.?|Incorporated|Corp\.?|Corporation|Co\.|Company|Manufacturers?|Distributors?|Wholesale|Foods?|Produce|Supply|Services?)\b/i;
+
+const SKIP_LINE =
+  /^(?:invoice|receipt|bill\s*to|ship\s*to|sold\s*to|deliver\s*to|date|page\s+\d|tel|phone|fax|www\.|http|route|customer|terms|purchase\s+order|salesperson|order\s+date|item\s+number|article|qty|quantity|extended|unit\s+price|package|special\s+instructions|authorization|paid\s+amount|amount\s+due|subtotal|tax|total|all\s+claims|all\s+prices|customer\s+original)/i;
 
 export function extractVendorName(text: string): string {
   const lines = text
@@ -50,23 +116,39 @@ export function extractVendorName(text: string): string {
     .map((l) => l.trim())
     .filter((l) => l.length > 1);
 
-  const skip =
-    /^(invoice|receipt|bill\s*to|ship\s*to|sold\s*to|date|page\s+\d|tel|phone|fax|www\.|http)/i;
-
-  for (const line of lines.slice(0, 10)) {
-    if (line.length > 60 || skip.test(line) || /^[\d$.,\s]+$/.test(line)) continue;
+  for (const line of lines.slice(0, 20)) {
+    if (line.length > 80 || SKIP_LINE.test(line) || /^[\d$.,\s]+$/.test(line)) continue;
     if (/^[^a-zA-Z]*$/.test(line)) continue;
-    return line;
+    if (COMPANY_SUFFIX.test(line)) return line.replace(/\s{2,}/g, " ").trim();
   }
 
-  return "";
+  for (const line of lines.slice(0, 20)) {
+    if (line.length > 80 || SKIP_LINE.test(line) || /^[\d$.,\s]+$/.test(line)) continue;
+    if (/^[^a-zA-Z]*$/.test(line)) continue;
+    if (/\b(?:street|st\.|avenue|ave\.|road|rd\.|boulevard|blvd\.|drive|dr\.|suite|ste\.)\b/i.test(line)) {
+      continue;
+    }
+    if (line.length >= 4 && line.length <= 60) return line.replace(/\s{2,}/g, " ").trim();
+  }
+
+  const inline = text.match(
+    new RegExp(
+      `([A-Z][A-Za-z0-9&'.\\- ]{2,60}${COMPANY_SUFFIX.source.slice(1, -2)})\\.?`,
+      "i"
+    )
+  );
+  return inline?.[1]?.replace(/\s{2,}/g, " ").trim() ?? "";
 }
 
+/** Normalize OCR text while preserving line breaks (needed for line-item parsing). */
 export function normalizeOcrText(text: string): string {
   return text
     .replace(/\u2018|\u2019/g, "'")
     .replace(/\u201c|\u201d/g, '"')
     .replace(/[|]/g, "I")
-    .replace(/\s+/g, " ")
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n")
     .trim();
 }

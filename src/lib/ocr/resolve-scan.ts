@@ -3,7 +3,11 @@ import { analyzeInvoice as analyzeInvoiceWithAi } from "@/lib/ai/analyze-invoice
 import type { ReceiptData } from "@/lib/ai";
 import { analyzeReceipt as analyzeReceiptWithAi } from "@/lib/ai";
 import type { OcrSource } from "./capabilities";
-import { hasUsefulInvoiceData, parseInvoiceFromText } from "./parse-invoice-text";
+import {
+  hasUsefulInvoiceData,
+  mergeInvoiceData,
+  parseInvoiceFromText,
+} from "./parse-invoice-text";
 import { hasUsefulReceiptData, parseReceiptFromText } from "./parse-receipt-text";
 
 function emptyInvoice(today = new Date().toISOString().split("T")[0]!): InvoiceData {
@@ -50,37 +54,43 @@ async function resolveFromText(
   return { receipt, useful: hasUsefulReceiptData(receipt) };
 }
 
+function pickInvoiceSource(ai: InvoiceData | null, merged: InvoiceData): OcrSource {
+  if (!ai) return "local";
+  const aiUseful = hasUsefulInvoiceData(ai);
+  const mergedUseful = hasUsefulInvoiceData(merged);
+  if (!mergedUseful) return aiUseful ? "ai" : "none";
+  if (aiUseful && merged.lines.length <= ai.lines.length) return "ai";
+  if (aiUseful && ai.lines.length > 0) return "ai";
+  return "local";
+}
+
 export async function resolveInvoiceScan(
   imageBase64: string | string[],
   options: { panoramic?: boolean; multiPage?: boolean; pageCount?: number },
   ocrText?: string | null
 ): Promise<{ invoice: InvoiceData; source: OcrSource }> {
+  const clientText = ocrText?.trim() || null;
+  const serverText = clientText ? null : await extractServerText(imageBase64);
+  const text = clientText || serverText || "";
+
+  let ai: InvoiceData | null = null;
   if (process.env.OPENAI_API_KEY?.trim()) {
-    const ai = await analyzeInvoiceWithAi(imageBase64, options);
-    if (hasUsefulInvoiceData(ai)) {
-      return { invoice: ai, source: "ai" };
-    }
+    ai = await analyzeInvoiceWithAi(imageBase64, options, text || undefined);
   }
 
-  const clientText = ocrText?.trim();
-  if (clientText) {
-    const parsed = await resolveFromText(clientText, "invoice");
+  const local = text ? parseInvoiceFromText(text) : emptyInvoice();
+
+  if (ai) {
+    const merged = mergeInvoiceData(ai, local);
+    return { invoice: merged, source: pickInvoiceSource(ai, merged) };
+  }
+
+  if (text) {
+    const parsed = await resolveFromText(text, "invoice");
     if (parsed.useful && parsed.invoice) {
       return { invoice: parsed.invoice, source: "local" };
     }
-  }
-
-  const serverText = await extractServerText(imageBase64);
-  if (serverText) {
-    const parsed = await resolveFromText(serverText, "invoice");
-    if (parsed.useful && parsed.invoice) {
-      return { invoice: parsed.invoice, source: "local" };
-    }
-  }
-
-  if (clientText || serverText) {
-    const best = parseInvoiceFromText(clientText || serverText || "");
-    return { invoice: best, source: "local" };
+    return { invoice: local, source: hasUsefulInvoiceData(local) ? "local" : "none" };
   }
 
   return { invoice: emptyInvoice(), source: "none" };

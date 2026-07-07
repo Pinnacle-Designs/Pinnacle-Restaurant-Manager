@@ -8,60 +8,235 @@ import {
   parseMoney,
 } from "./parse-text-utils";
 
-function parseLineItems(text: string): InvoiceLineData[] {
+const ITEM_CODE = /^([A-Z]{2,6}\d{2,4})\b/;
+const SKIP_LINE =
+  /^(?:total|subtotal|sub\s*total|tax|invoice|ship|bill|balance|amount|page\s+\d|route|customer|terms|purchase|salesperson|order\s+date|our\s+order|item\s+number|article|qty|quantity|extended|unit\s+price|package|special|authorization|paid|minimum\s+order|all\s+claims|all\s+prices|customer\s+original)/i;
+const PACKAGE_PATTERN =
+  /\b(\d+\s*#?\/?\s*(?:bag|case|cas|cs|lb|lbs|oz|gal|ct|pk|box|ea|each)|(?:case|cas|cs|each|ea|lb|lbs))\b/i;
+
+function expandOcrLines(text: string): string[] {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length > 3) return lines;
+
+  const split = text.split(/(?=\b[A-Z]{2,6}\d{2,4}\b)/).map((l) => l.trim()).filter(Boolean);
+  return split.length > lines.length ? split : lines;
+}
+
+function parseQtyFromLine(beforePrices: string, description: string, sku?: string): number {
+  let segment = beforePrices;
+  if (sku) segment = segment.replace(sku, "");
+  segment = segment.replace(description, "");
+  segment = segment
+    .replace(/\d+\s*#\/\w+/gi, " ")
+    .replace(/\d+\s*\/\s*\d+\s*#/gi, " ")
+    .replace(/\b\d+\s*CT\b/gi, " ")
+    .replace(/\b\d+\/\d+#/gi, " ");
+
+  const pair = segment.match(
+    /(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(?:EACH|EA|CASE|CAS|CS|LB|LBS|BAG|PK|BOX|\d+(?:\s*\/\s*\d+)?\s*#)/i
+  );
+  if (pair) {
+    const shipped = parseFloat(pair[2]!);
+    const ordered = parseFloat(pair[1]!);
+    if (shipped > 0 && shipped <= 9999) return shipped;
+    if (ordered > 0 && ordered <= 9999) return ordered;
+  }
+
+  const single = segment.match(
+    /(\d+(?:\.\d+)?)\s+(?:EACH|EA|CASE|CAS|CS|LB|LBS|BAG|PK|BOX)\b/i
+  );
+  if (single) {
+    const qty = parseFloat(single[1]!);
+    if (qty > 0 && qty <= 9999) return qty;
+  }
+
+  const nums = [...segment.matchAll(/\b(\d+(?:\.\d+)?)\b/g)]
+    .map((m) => parseFloat(m[1]!))
+    .filter((n) => Number.isFinite(n) && n > 0 && n <= 9999);
+  return nums[0] ?? 1;
+}
+
+function parseUnitFromLine(line: string): string {
+  const unitToken = line.match(
+    /\b(CASE|CAS|CS|EACH|EA|LB|LBS|BAG|PK|BOX|GAL|OZ)\b/i
+  );
+  if (unitToken) {
+    const raw = unitToken[1]!.toLowerCase();
+    if (/case|cas|cs/.test(raw)) return "case";
+    if (/lb|lbs/.test(raw)) return "lb";
+    if (/bag/.test(raw)) return "bag";
+    if (/ea|each/.test(raw)) return "each";
+    return raw;
+  }
+
+  const pkg = line.match(PACKAGE_PATTERN);
+  if (!pkg) return "each";
+  const raw = pkg[0]!.toLowerCase();
+  if (/case|cas|cs/.test(raw)) return "case";
+  if (/lb|lbs/.test(raw)) return "lb";
+  if (/bag/.test(raw)) return "bag";
+  if (/ea|each/.test(raw)) return "each";
+  return "each";
+}
+
+function parseLineFromMoneyColumns(line: string): InvoiceLineData | null {
+  if (SKIP_LINE.test(line)) return null;
+  if (line.length < 8) return null;
+
+  const moneyMatches = [...line.matchAll(/([\d,]+\.\d{2})/g)];
+  if (!moneyMatches.length) return null;
+
+  const priceMatches =
+    moneyMatches.length >= 2
+      ? moneyMatches.slice(-2)
+      : moneyMatches.slice(-1);
+
+  let lineTotal = parseMoney(priceMatches[priceMatches.length - 1]![1]!);
+  let unitPrice =
+    priceMatches.length >= 2
+      ? parseMoney(priceMatches[0]![1]!)
+      : lineTotal;
+
+  if (lineTotal <= 0 || lineTotal > 50_000) return null;
+  if (unitPrice <= 0 || unitPrice > 50_000) unitPrice = lineTotal;
+  if (unitPrice > lineTotal && lineTotal > 0) {
+    [unitPrice, lineTotal] = [lineTotal, unitPrice];
+  }
+
+  const priceStart = priceMatches[0]!.index ?? line.length;
+  const beforePrices = line.slice(0, priceStart).trim();
+  const skuMatch = beforePrices.match(ITEM_CODE);
+  const sku = skuMatch?.[1];
+  const qty = parseQtyFromLine(beforePrices, "", sku);
+
+  let description = beforePrices;
+  if (sku) description = description.replace(ITEM_CODE, "").trim();
+  description = description
+    .replace(
+      /(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(?:EACH|EA|CASE|CAS|CS|LB|LBS|BAG|PK|BOX|\d+(?:\s*\/\s*\d+)?\s*#(?:\/\w+)?)/gi,
+      " "
+    )
+    .replace(PACKAGE_PATTERN, " ")
+    .replace(/\b\d+\s*CT\b/gi, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  if (description.length < 2) return null;
+
+  const unit = parseUnitFromLine(line);
+
+  if (qty > 0 && unitPrice > 0 && lineTotal > 0) {
+    const expected = unitPrice * qty;
+    if (Math.abs(expected - lineTotal) > Math.max(0.5, lineTotal * 0.05)) {
+      unitPrice = lineTotal / qty;
+    }
+  }
+
+  return {
+    description,
+    qty: qty || 1,
+    unit,
+    unitPrice,
+    lineTotal,
+    sku,
+  };
+}
+
+function parseLineItems(text: string): InvoiceLineData[] {
+  const rows = expandOcrLines(text);
   const items: InvoiceLineData[] = [];
+  const seen = new Set<string>();
 
-  for (const line of lines) {
-    if (/^(total|subtotal|tax|invoice|ship|bill|balance|amount|page\s+\d)/i.test(line)) {
-      continue;
-    }
+  for (const line of rows) {
+    const item = parseLineFromMoneyColumns(line);
+    if (!item) continue;
 
-    const priceMatch = line.match(/([\d,]+\.\d{2})\s*$/);
-    if (!priceMatch) continue;
+    const key = `${item.sku ?? ""}|${item.description.slice(0, 40)}|${item.lineTotal}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
 
-    const lineTotal = parseMoney(priceMatch[1]!);
-    if (lineTotal <= 0 || lineTotal > 50_000) continue;
-
-    let rest = line.slice(0, line.length - priceMatch[0].length).trim();
-    let qty = 1;
-    let unit = "each";
-
-    const qtyUnitMatch = rest.match(
-      /(\d+(?:\.\d+)?)\s*(case|cs|cases|ea|each|lb|lbs|oz|gal|ct|pk|box)\.?\s*$/i
-    );
-    if (qtyUnitMatch) {
-      qty = parseFloat(qtyUnitMatch[1]!);
-      unit = qtyUnitMatch[2]!.toLowerCase().replace(/^cs$|^cases$|^case$/, "case");
-      rest = rest.slice(0, rest.length - qtyUnitMatch[0].length).trim();
-    }
-
-    const unitPriceMatch = rest.match(/([\d,]+\.\d{2,4})\s*$/);
-    let unitPrice = qty > 0 ? lineTotal / qty : lineTotal;
-    if (unitPriceMatch) {
-      unitPrice = parseMoney(unitPriceMatch[1]!);
-      rest = rest.slice(0, rest.length - unitPriceMatch[0].length).trim();
-    }
-
-    const description = rest.replace(/\s{2,}/g, " ").trim();
-    if (description.length < 2) continue;
-
-    items.push({
-      description,
-      qty: qty || 1,
-      unit,
-      unitPrice,
-      lineTotal,
-    });
+    items.push(item);
   }
 
   return items.slice(0, 60);
 }
 
+function reconcileAmount(amount: number, lines: InvoiceLineData[]): number {
+  if (!lines.length) return amount;
+  const lineSum = lines.reduce((sum, l) => sum + l.lineTotal, 0);
+  if (lineSum <= 0) return amount;
+  if (amount <= 0) return lineSum;
+  if (Math.abs(amount - lineSum) <= Math.max(2, lineSum * 0.03)) return amount;
+  if (amount < lineSum * 0.5) return lineSum;
+  return amount;
+}
+
+function scoreInvoiceData(data: InvoiceData): number {
+  let score = 0;
+  const vendor = data.vendor?.trim() ?? "";
+  if (vendor && !/^unknown/i.test(vendor)) score += 4;
+  score += Math.min(data.lines.length, 30) * 3;
+  if (data.invoiceNumber) score += 2;
+  if (data.amount > 0) score += 1;
+  if (data.lines.length > 0 && data.amount > 0) {
+    const sum = data.lines.reduce((s, l) => s + l.lineTotal, 0);
+    if (Math.abs(sum - data.amount) <= Math.max(2, data.amount * 0.03)) score += 4;
+  }
+  return score;
+}
+
+export function mergeInvoiceData(...sources: InvoiceData[]): InvoiceData {
+  const usable = sources.filter(Boolean);
+  if (!usable.length) {
+    return {
+      vendor: "",
+      invoiceNumber: "",
+      amount: 0,
+      invoiceDate: new Date().toISOString().split("T")[0]!,
+      lines: [],
+    };
+  }
+  if (usable.length === 1) return usable[0]!;
+
+  const ranked = [...usable].sort((a, b) => scoreInvoiceData(b) - scoreInvoiceData(a));
+  const best = ranked[0]!;
+
+  const vendor =
+    usable
+      .map((s) => s.vendor?.trim())
+      .find((v) => v && !/^unknown/i.test(v)) ?? best.vendor;
+
+  const invoiceNumber =
+    usable.map((s) => s.invoiceNumber?.trim()).find(Boolean) ?? best.invoiceNumber;
+
+  const lines = usable.reduce(
+    (longest, s) => (s.lines.length > longest.length ? s.lines : longest),
+    [] as InvoiceLineData[]
+  );
+
+  const amountCandidates = usable.map((s) => s.amount).filter((a) => a > 0);
+  let amount = amountCandidates.length ? Math.max(...amountCandidates) : best.amount;
+  if (lines.length > 0 && amountCandidates.length > 0) {
+    const lineSum = lines.reduce((s, l) => s + l.lineTotal, 0);
+    amount = amountCandidates.reduce((closest, candidate) =>
+      Math.abs(candidate - lineSum) < Math.abs(closest - lineSum) ? candidate : closest
+    );
+    amount = reconcileAmount(amount, lines);
+  } else if (lines.length > 0) {
+    amount = lines.reduce((s, l) => s + l.lineTotal, 0);
+  }
+
+  const invoiceDate =
+    usable.map((s) => s.invoiceDate).find((d) => d && d !== new Date().toISOString().split("T")[0]) ??
+    best.invoiceDate;
+
+  return { vendor, invoiceNumber, amount, invoiceDate, lines };
+}
+
 export function parseInvoiceFromText(rawText: string): InvoiceData {
   const text = normalizeOcrText(rawText);
   const lines = parseLineItems(text);
-  const amount = extractTotalAmount(text) || lines.reduce((sum, l) => sum + l.lineTotal, 0);
+  const amount = reconcileAmount(extractTotalAmount(text), lines);
 
   return {
     vendor: extractVendorName(text),
@@ -73,5 +248,10 @@ export function parseInvoiceFromText(rawText: string): InvoiceData {
 }
 
 export function hasUsefulInvoiceData(data: InvoiceData): boolean {
-  return Boolean(data.vendor?.trim()) || data.lines.length > 0 || data.amount > 0;
+  const vendor = data.vendor?.trim() ?? "";
+  const hasVendor = Boolean(vendor && !/^unknown/i.test(vendor));
+  if (hasVendor && data.lines.length > 0) return true;
+  if (hasVendor && data.amount > 0 && data.invoiceNumber) return true;
+  if (data.lines.length >= 2) return true;
+  return false;
 }

@@ -59,7 +59,8 @@ function parseInvoiceJson(parsed: Record<string, unknown>, today: string): Invoi
 
 export async function analyzeInvoice(
   imageBase64: string | string[],
-  options?: { panoramic?: boolean; multiPage?: boolean; pageCount?: number }
+  options?: { panoramic?: boolean; multiPage?: boolean; pageCount?: number },
+  ocrText?: string
 ): Promise<InvoiceData> {
   const images = Array.isArray(imageBase64) ? imageBase64 : [imageBase64];
   const multiPage = options?.multiPage ?? images.length > 1;
@@ -89,6 +90,10 @@ export async function analyzeInvoice(
       pageCount,
     })} Extract data for a restaurant accounts payable record.`;
 
+    const ocrHint = ocrText?.trim()
+      ? `\n\nOn-device OCR text (may contain errors — prefer the image, use OCR to fill gaps):\n${ocrText.trim().slice(0, 12_000)}`
+      : "";
+
     const content: Array<
       | { type: "text"; text: string }
       | { type: "image_url"; image_url: { url: string } }
@@ -98,11 +103,13 @@ export async function analyzeInvoice(
         text: `${pageHint} Return JSON with:
 - vendor (supplier name)
 - invoiceNumber (invoice or PO number if visible)
-- amount (invoice total as number, including tax)
+- amount (invoice total as number — use "Total Invoice" / "Amount Due" / subtotal+tax, NOT unit prices)
 - invoiceDate (YYYY-MM-DD)
 - lines: array of { description, qty (number), unit (string like lbs/case/each), unitPrice (number), lineTotal (number), sku (optional), catchWeightBilled (optional number — actual weight in lbs when sold by case/box, e.g. brisket 42.5 lbs), catchWeightUnit (optional, default lbs) }
 
-Read crinkled or stained paper carefully. For meat/seafood sold by case with a billed weight, capture catchWeightBilled separately from case qty. Use line totals that match qty * unitPrice when possible.`,
+Food distributor invoices often use wide tables with columns: item code, description, qty ordered, qty shipped, package, unit price, extended price. Extract EVERY product row. lineTotal must be the extended price column (qty × unit price), not the unit price alone.
+
+Read crinkled, watermarked, or stained paper carefully. For meat/seafood sold by case with a billed weight, capture catchWeightBilled separately from case qty.${ocrHint}`,
       },
       ...images.map((b64) => ({
         type: "image_url" as const,
@@ -111,9 +118,9 @@ Read crinkled or stained paper carefully. For meat/seafood sold by case with a b
     ];
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       messages: [{ role: "user", content }],
-      max_tokens: multiPage ? 2000 : panoramic ? 1600 : 1200,
+      max_tokens: multiPage ? 4096 : panoramic ? 3000 : 2500,
       response_format: { type: "json_object" },
     });
 

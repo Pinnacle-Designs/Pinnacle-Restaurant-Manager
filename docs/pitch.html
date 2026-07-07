@@ -29,7 +29,7 @@
 
   <header class="nav" id="site-nav"></header>
 
-  <main>
+  <main id="top">
     <section class="pitch-hero">
       <div class="container">
         <p class="eyebrow">Partnership overview</p>
@@ -140,7 +140,7 @@
 
   <script>
     (function () {
-      var base = (window.PINNACLE_DOCS_BASE || "./").replace(/\/?$/, "/");
+      var base = (window.PINNACLE_DOCS_BASE || (location.pathname.indexOf("/docs") === 0 ? "/docs/" : "./")).replace(/\/?$/, "/");
 
       function loadScript(src) {
         return new Promise(function (resolve, reject) {
@@ -152,12 +152,13 @@
         });
       }
 
+      loadScript(base + "back-to-top.js").catch(function () {
+        console.warn("Could not load back-to-top.js");
+      });
+
       loadScript(base + "config.js")
         .then(function () {
           return loadScript(base + "site-nav.js");
-        })
-        .then(function () {
-          return loadScript(base + "back-to-top.js");
         })
         .then(function () {
           return loadScript(base + "docs-app-url.js");

@@ -17,9 +17,16 @@
 
   document.body.appendChild(btn);
 
-  function scrollTarget() {
-    return document.getElementById("top") || document.querySelector("main") || document.documentElement;
+  function scrollToTop() {
+    var prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+    });
   }
+
+  btn.addEventListener("click", scrollToTop);
 
   function updateVisibility() {
     var show = window.scrollY > SCROLL_THRESHOLD;
@@ -27,15 +34,6 @@
     btn.setAttribute("aria-hidden", show ? "false" : "true");
     btn.tabIndex = show ? 0 : -1;
   }
-
-  btn.addEventListener("click", function () {
-    var target = scrollTarget();
-    var prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    target.scrollIntoView({
-      behavior: prefersReducedMotion ? "auto" : "smooth",
-      block: "start",
-    });
-  });
 
   window.addEventListener("scroll", updateVisibility, { passive: true });
   updateVisibility();
