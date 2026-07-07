@@ -39,20 +39,25 @@ export function isWeakOcrText(text: string, kind: OcrTextKind = "generic"): bool
   return scoreOcrText(trimmed, kind) < 25;
 }
 
-export function mergeOcrTextPassages(...passages: Array<string | null | undefined>): string {
-  const parts = passages.map((p) => p?.trim()).filter(Boolean) as string[];
-  if (!parts.length) return "";
-  if (parts.length === 1) return parts[0]!;
-
-  const seen = new Set<string>();
-  const lines: string[] = [];
-  for (const part of parts) {
-    for (const line of part.split(/\r?\n/)) {
-      const key = line.trim().toLowerCase();
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      lines.push(line.trim());
+export function pickBestOcrTextPassage(
+  kind: OcrTextKind,
+  ...passages: Array<string | null | undefined>
+): string {
+  let best = "";
+  let bestScore = 0;
+  for (const passage of passages) {
+    const trimmed = passage?.trim();
+    if (!trimmed) continue;
+    const score = scoreOcrText(trimmed, kind);
+    if (score > bestScore) {
+      bestScore = score;
+      best = trimmed;
     }
   }
-  return lines.join("\n");
+  return best;
+}
+
+/** @deprecated Prefer pickBestOcrTextPassage — merging pollutes line order. */
+export function mergeOcrTextPassages(...passages: Array<string | null | undefined>): string {
+  return pickBestOcrTextPassage("generic", ...passages);
 }

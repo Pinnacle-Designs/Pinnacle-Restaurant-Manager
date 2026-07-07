@@ -4,7 +4,7 @@ import type { ReceiptData } from "@/lib/ai";
 import { analyzeReceipt as analyzeReceiptWithAi } from "@/lib/ai";
 import type { OcrSource } from "./capabilities";
 import { prepareOcrTextForParsing } from "./ocr-corrections";
-import { isWeakOcrText, mergeOcrTextPassages } from "./ocr-text-score";
+import { isWeakOcrText, pickBestOcrTextPassage } from "./ocr-text-score";
 import {
   hasUsefulInvoiceData,
   mergeInvoiceData,
@@ -73,7 +73,7 @@ async function resolveOcrText(
       ? await extractServerText(imageBase64, kind)
       : null;
 
-  return mergeOcrTextPassages(clientText, serverText);
+  return pickBestOcrTextPassage(kind, clientText, serverText);
 }
 
 function pickInvoiceSource(
@@ -159,15 +159,13 @@ export async function resolveInvoiceScan(
       };
 
   const preparedText = text ? prepareOcrTextForParsing(text, memoryCtx) : "";
-  const parseCtx = {
-    itemCodePattern: memoryCtx.layoutHints.itemCodePattern,
-    totalLabel: memoryCtx.layoutHints.totalLabel ?? "Total Invoice",
-    skuHints: memoryCtx.skuHints,
-  };
-  const localDraft = mergeInvoiceData(
-    preparedText ? parseInvoiceFromText(preparedText, parseCtx) : emptyInvoice(),
-    text ? parseInvoiceFromText(text, parseCtx) : emptyInvoice()
-  );
+  const localDraft = preparedText
+    ? parseInvoiceFromText(preparedText, {
+        itemCodePattern: memoryCtx.layoutHints.itemCodePattern,
+        totalLabel: memoryCtx.layoutHints.totalLabel ?? "Total Invoice",
+        skuHints: memoryCtx.skuHints,
+      })
+    : emptyInvoice();
 
   let ai: InvoiceData | null = null;
   if (aiOcrEnabled()) {
@@ -239,10 +237,7 @@ export async function resolveReceiptScan(
       };
 
   const preparedText = text ? prepareOcrTextForParsing(text, memoryCtx) : "";
-  const localDraft = mergeReceiptData(
-    preparedText ? parseReceiptFromText(preparedText) : emptyReceipt(),
-    text ? parseReceiptFromText(text) : emptyReceipt()
-  );
+  const localDraft = preparedText ? parseReceiptFromText(preparedText) : emptyReceipt();
 
   let ai: ReceiptData | null = null;
   if (aiOcrEnabled()) {

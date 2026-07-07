@@ -31,37 +31,22 @@ export function fixCommonOcrErrors(text: string): string {
   return next;
 }
 
-function normalizeAliasKey(value: string): string {
-  return value.toLowerCase().replace(/\s+/g, " ").trim();
-}
-
 /** Apply learned vendor aliases to raw OCR text before parsing. */
 export function applyAliasesToOcrText(text: string, ctx?: Pick<VendorOcrContext, "aliases" | "displayName">): string {
-  if (!ctx?.aliases?.length && !ctx?.displayName) return text;
+  if (!ctx?.aliases?.length) return text;
 
   let next = text;
   for (const alias of ctx.aliases.filter((a) => a.field === "vendor")) {
-    if (!alias.ocrValue || alias.ocrValue.length < 3) continue;
+    if (!alias.ocrValue || alias.ocrValue.length < 4) continue;
     const re = new RegExp(alias.ocrValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
     next = next.replace(re, alias.correctedValue);
   }
 
   for (const alias of ctx.aliases.filter((a) => a.field === "description")) {
     const ocr = alias.ocrValue.includes("|") ? alias.ocrValue.split("|")[1] : alias.ocrValue;
-    if (!ocr || ocr.length < 4) continue;
+    if (!ocr || ocr.length < 5) continue;
     const re = new RegExp(ocr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
     next = next.replace(re, alias.correctedValue);
-  }
-
-  if (ctx.displayName) {
-    const key = normalizeAliasKey(ctx.displayName);
-    const firstWord = key.split(" ")[0];
-    if (firstWord && firstWord.length >= 4) {
-      const garbled = new RegExp(`\\b${firstWord.slice(0, 4)}[a-z0-9]{0,8}\\b`, "i");
-      if (garbled.test(next) && !next.toLowerCase().includes(key.slice(0, 8))) {
-        next = next.replace(garbled, ctx.displayName.split(" ")[0]!);
-      }
-    }
   }
 
   return next;

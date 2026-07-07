@@ -2,9 +2,8 @@
 
 import type { Worker } from "tesseract.js";
 import { getBrowserTesseractOptions, type OcrProgressHandler } from "./tesseract-options";
-import { segmentImageFileForOcr } from "./image-preprocess";
+import { preprocessImageFileForOcr } from "./image-preprocess";
 import { recognizeWithBestPass } from "./run-tesseract";
-import { mergeOcrTextPassages } from "./ocr-text-score";
 import type { OcrTextKind } from "./ocr-text-score";
 
 let workerPromise: Promise<Worker> | null = null;
@@ -33,7 +32,7 @@ async function getOcrWorker(onProgress?: OcrProgressHandler): Promise<Worker> {
   return workerPromise;
 }
 
-/** Run OCR in the browser — multiple image variants and layout passes. */
+/** Run OCR — one preprocessed image, pick best layout pass (no noisy merging). */
 export async function extractTextFromImageFile(
   file: File,
   onProgress?: OcrProgressHandler,
@@ -42,23 +41,14 @@ export async function extractTextFromImageFile(
   onProgress?.("Enhancing photo for text recognition…");
   const worker = await getOcrWorker(onProgress);
 
-  let variants: Blob[];
+  let input: Blob | File = file;
   try {
-    variants = await segmentImageFileForOcr(file);
+    input = await preprocessImageFileForOcr(file);
   } catch {
-    variants = [file];
+    /* use original */
   }
 
-  const passages: string[] = [];
-  for (let i = 0; i < variants.length; i += 1) {
-    if (variants.length > 1) {
-      onProgress?.(`Reading section ${i + 1} of ${variants.length}…`);
-    }
-    const text = await recognizeWithBestPass(worker, variants[i]!, kind, onProgress);
-    if (text) passages.push(text);
-  }
-
-  return mergeOcrTextPassages(...passages);
+  return recognizeWithBestPass(worker, input, kind, onProgress);
 }
 
 /** Attach recognized text to a scan upload when not already present. */

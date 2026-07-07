@@ -1,9 +1,8 @@
 import { getServerTesseractOptions } from "./tesseract-options";
 import { recognizeWithBestPass } from "./run-tesseract";
 import type { OcrTextKind } from "./ocr-text-score";
-import { mergeOcrTextPassages } from "./ocr-text-score";
 
-/** Server-side OCR with multi-pass layout detection. */
+/** Server-side OCR with best-pass selection. */
 export async function extractTextFromImageBuffer(
   buffer: Buffer,
   kind: OcrTextKind = "generic"
@@ -25,11 +24,11 @@ export async function extractTextFromBase64Images(
   const list = Array.isArray(images) ? images : [images];
   const parts: string[] = [];
 
-  for (const b64 of list.slice(0, 6)) {
+  for (const b64 of list.slice(0, 3)) {
     const buffer = Buffer.from(b64, "base64");
     const text = (await extractTextFromImageBuffer(buffer, kind)).trim();
     if (text) parts.push(text);
   }
 
-  return mergeOcrTextPassages(...parts);
+  return parts.join("\n\n");
 }

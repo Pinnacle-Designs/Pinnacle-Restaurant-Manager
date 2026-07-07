@@ -36,15 +36,12 @@ function itemCodeRegex(ctx?: InvoiceParseContext): RegExp {
 }
 
 function expandOcrLines(text: string, itemCode: RegExp): string[] {
-  const normalized = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const joined = joinWrappedLineRows(normalized, itemCode);
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const joined = joinWrappedLineRows(lines, itemCode);
   if (joined.length > 3) return joined;
 
-  const splitPattern = /\b(?=[A-Z]{2,6}\d{2,4}\b)/;
-  const split = text.split(splitPattern).map((l) => l.trim()).filter(Boolean);
-  if (split.length > joined.length) return joinWrappedLineRows(split, itemCode);
-
-  return joined.length > 0 ? joined : normalized;
+  const split = text.split(/\b(?=[A-Z]{2,6}\d{2,4}\b)/).map((l) => l.trim()).filter(Boolean);
+  return split.length > joined.length ? joinWrappedLineRows(split, itemCode) : joined;
 }
 
 function joinWrappedLineRows(rows: string[], itemCode: RegExp): string[] {
@@ -60,14 +57,9 @@ function joinWrappedLineRows(rows: string[], itemCode: RegExp): string[] {
     const bufferHasMoney = /[\d,]+\.\d{2}/.test(buffer);
     const rowHasMoney = /[\d,]+\.\d{2}/.test(row);
     const bufferHasSku = itemCode.test(buffer) || ALT_ITEM_CODE.test(buffer);
-    const rowHasSku = itemCode.test(row) || ALT_ITEM_CODE.test(row);
 
+    // Only stitch SKU/description line to its price line — never merge headers.
     if (bufferHasSku && !bufferHasMoney && rowHasMoney) {
-      buffer = `${buffer} ${row}`;
-      continue;
-    }
-
-    if (!bufferHasMoney && !rowHasMoney && !rowHasSku && row.length < 55) {
       buffer = `${buffer} ${row}`;
       continue;
     }
@@ -78,33 +70,6 @@ function joinWrappedLineRows(rows: string[], itemCode: RegExp): string[] {
 
   if (buffer) joined.push(buffer);
   return joined;
-}
-
-function mergeLineLists(...lists: InvoiceLineData[][]): InvoiceLineData[] {
-  const byKey = new Map<string, InvoiceLineData>();
-
-  for (const lines of lists) {
-    for (const line of lines) {
-      const key = line.sku
-        ? line.sku.toUpperCase()
-        : `${line.description.slice(0, 40).toLowerCase()}|${line.lineTotal.toFixed(2)}`;
-      const existing = byKey.get(key);
-      if (!existing || scoreLine(existing) < scoreLine(line)) {
-        byKey.set(key, line);
-      }
-    }
-  }
-
-  return [...byKey.values()].slice(0, 60);
-}
-
-function scoreLine(line: InvoiceLineData): number {
-  let score = 0;
-  if (line.sku) score += 3;
-  if (line.description.length >= 4) score += 2;
-  if (line.lineTotal > 0) score += 2;
-  if (line.qty > 0) score += 1;
-  return score;
 }
 
 function parseCatchWeight(line: string): { billed?: number; unit?: string } {
@@ -226,8 +191,8 @@ function parseLineFromMoneyColumns(
   const moneyMatches = [...line.matchAll(/([\d,]+\.\d{2})/g)];
   if (!moneyMatches.length) return null;
 
-  const priceMatches =
-    moneyMatches.length >= 2 ? moneyMatches.slice(-2) : moneyMatches.slice(-1);
+  // Skip qty columns (e.g. 6.00 6.00) — use last two money values as unit + extended.
+  const priceMatches = moneyMatches.length >= 2 ? moneyMatches.slice(-2) : moneyMatches.slice(-1);
 
   let lineTotal = parseMoney(priceMatches[priceMatches.length - 1]![1]!);
   let unitPrice =
@@ -287,26 +252,20 @@ function parseLineFromMoneyColumns(
 
 function parseLineItems(text: string, ctx?: InvoiceParseContext): InvoiceLineData[] {
   const itemCode = itemCodeRegex(ctx);
-  const rowSets = [
-    expandOcrLines(text, itemCode),
-    text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean),
-  ];
+  const rows = expandOcrLines(text, itemCode);
+  const items: InvoiceLineData[] = [];
+  const seen = new Set<string>();
 
-  const parsedSets = rowSets.map((rows) => {
-    const items: InvoiceLineData[] = [];
-    const seen = new Set<string>();
-    for (const line of rows) {
-      const item = parseLineFromMoneyColumns(line, itemCode, ctx?.skuHints);
-      if (!item) continue;
-      const key = `${item.sku ?? ""}|${item.description.slice(0, 40)}|${item.lineTotal}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      items.push(item);
-    }
-    return items;
-  });
+  for (const line of rows) {
+    const item = parseLineFromMoneyColumns(line, itemCode, ctx?.skuHints);
+    if (!item) continue;
+    const key = `${item.sku ?? ""}|${item.description.slice(0, 40)}|${item.lineTotal}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push(item);
+  }
 
-  return mergeLineLists(...parsedSets);
+  return items.slice(0, 60);
 }
 
 function reconcileAmount(amount: number, lines: InvoiceLineData[]): number {
@@ -357,9 +316,12 @@ export function mergeInvoiceData(...sources: InvoiceData[]): InvoiceData {
   const invoiceNumber =
     usable.map((s) => s.invoiceNumber?.trim()).find(Boolean) ?? best.invoiceNumber;
 
-  const lines = mergeLineLists(
-    ...usable.map((s) => s.lines)
-  );
+  const lines = best.lines.length > 0
+    ? best.lines
+    : usable.reduce(
+        (longest, s) => (s.lines.length > longest.length ? s.lines : longest),
+        [] as InvoiceLineData[]
+      );
 
   const amountCandidates = usable.map((s) => s.amount).filter((a) => a > 0);
   let amount = amountCandidates.length ? Math.max(...amountCandidates) : best.amount;
