@@ -8,7 +8,13 @@ import {
   mergeInvoiceData,
   parseInvoiceFromText,
 } from "./parse-invoice-text";
-import { hasUsefulReceiptData, parseReceiptFromText } from "./parse-receipt-text";
+import { hasUsefulReceiptData, mergeReceiptData, parseReceiptFromText } from "./parse-receipt-text";
+import {
+  applyVendorMemoryToInvoice,
+  applyVendorMemoryToReceipt,
+  buildVendorOcrContext,
+  guessVendorFromMemory,
+} from "./vendor-memory";
 
 function emptyInvoice(today = new Date().toISOString().split("T")[0]!): InvoiceData {
   return {
@@ -66,68 +72,152 @@ function pickInvoiceSource(ai: InvoiceData | null, merged: InvoiceData): OcrSour
 
 export async function resolveInvoiceScan(
   imageBase64: string | string[],
-  options: { panoramic?: boolean; multiPage?: boolean; pageCount?: number },
+  options: {
+    panoramic?: boolean;
+    multiPage?: boolean;
+    pageCount?: number;
+    locationId?: string;
+  },
   ocrText?: string | null
-): Promise<{ invoice: InvoiceData; source: OcrSource }> {
+): Promise<{ invoice: InvoiceData; source: OcrSource; memoryApplied: boolean; memoryScanCount: number }> {
+  const locationId = options.locationId;
   const clientText = ocrText?.trim() || null;
   const serverText = clientText ? null : await extractServerText(imageBase64);
   const text = clientText || serverText || "";
 
+  const localDraft = text ? parseInvoiceFromText(text) : emptyInvoice();
+  let vendorHint = localDraft.vendor?.trim() || "";
+
+  if (locationId && vendorHint) {
+    const guessed = await guessVendorFromMemory(locationId, vendorHint);
+    if (guessed) vendorHint = guessed;
+  }
+
+  let memoryCtx = locationId
+    ? await buildVendorOcrContext(locationId, vendorHint || undefined)
+    : {
+        scanCount: 0,
+        aliases: [],
+        skuHints: [],
+        topVendors: [],
+        promptBlock: "",
+      };
+
   let ai: InvoiceData | null = null;
   if (process.env.OPENAI_API_KEY?.trim()) {
-    ai = await analyzeInvoiceWithAi(imageBase64, options, text || undefined);
+    ai = await analyzeInvoiceWithAi(
+      imageBase64,
+      options,
+      text || undefined,
+      memoryCtx.promptBlock || undefined
+    );
   }
 
-  const local = text ? parseInvoiceFromText(text) : emptyInvoice();
+  let merged = ai ? mergeInvoiceData(ai, localDraft) : localDraft;
 
-  if (ai) {
-    const merged = mergeInvoiceData(ai, local);
-    return { invoice: merged, source: pickInvoiceSource(ai, merged) };
-  }
-
-  if (text) {
-    const parsed = await resolveFromText(text, "invoice");
-    if (parsed.useful && parsed.invoice) {
-      return { invoice: parsed.invoice, source: "local" };
+  if (locationId) {
+    const refinedHint = merged.vendor?.trim() || vendorHint;
+    if (refinedHint && refinedHint !== vendorHint) {
+      memoryCtx = await buildVendorOcrContext(locationId, refinedHint);
     }
-    return { invoice: local, source: hasUsefulInvoiceData(local) ? "local" : "none" };
+    const before = JSON.stringify(merged);
+    merged = applyVendorMemoryToInvoice(merged, memoryCtx);
+    const memoryApplied = before !== JSON.stringify(merged);
+
+    return {
+      invoice: merged,
+      source: pickInvoiceSource(ai, merged),
+      memoryApplied,
+      memoryScanCount: memoryCtx.scanCount,
+    };
   }
 
-  return { invoice: emptyInvoice(), source: "none" };
+  return {
+    invoice: merged,
+    source: ai ? pickInvoiceSource(ai, merged) : text && hasUsefulInvoiceData(localDraft) ? "local" : "none",
+    memoryApplied: false,
+    memoryScanCount: 0,
+  };
+}
+
+function pickReceiptSource(ai: ReceiptData | null, merged: ReceiptData): OcrSource {
+  if (!ai) return "local";
+  if (hasUsefulReceiptData(ai) && hasUsefulReceiptData(merged)) return "ai";
+  if (hasUsefulReceiptData(ai)) return "ai";
+  if (hasUsefulReceiptData(merged)) return "local";
+  return "none";
 }
 
 export async function resolveReceiptScan(
   imageBase64: string | string[],
-  options: { panoramic?: boolean; multiPage?: boolean; pageCount?: number },
+  options: {
+    panoramic?: boolean;
+    multiPage?: boolean;
+    pageCount?: number;
+    locationId?: string;
+  },
   ocrText?: string | null
-): Promise<{ receipt: ReceiptData; source: OcrSource }> {
+): Promise<{ receipt: ReceiptData; source: OcrSource; memoryApplied: boolean; memoryScanCount: number }> {
+  const locationId = options.locationId;
+  const clientText = ocrText?.trim() || null;
+  const serverText = clientText ? null : await extractServerText(imageBase64);
+  const text = clientText || serverText || "";
+
+  const localDraft = text ? parseReceiptFromText(text) : emptyReceipt();
+  let vendorHint = localDraft.vendor?.trim() || "";
+
+  if (locationId && vendorHint) {
+    const guessed = await guessVendorFromMemory(locationId, vendorHint);
+    if (guessed) vendorHint = guessed;
+  }
+
+  let memoryCtx = locationId
+    ? await buildVendorOcrContext(locationId, vendorHint || undefined)
+    : {
+        scanCount: 0,
+        aliases: [],
+        skuHints: [],
+        topVendors: [],
+        promptBlock: "",
+      };
+
+  let ai: ReceiptData | null = null;
   if (process.env.OPENAI_API_KEY?.trim()) {
-    const ai = await analyzeReceiptWithAi(imageBase64, options);
-    if (hasUsefulReceiptData(ai)) {
-      return { receipt: ai, source: "ai" };
+    ai = await analyzeReceiptWithAi(
+      imageBase64,
+      options,
+      text || undefined,
+      memoryCtx.promptBlock || undefined
+    );
+  }
+
+  let merged = ai ? mergeReceiptData(ai, localDraft) : localDraft;
+
+  if (locationId) {
+    const refinedHint = merged.vendor?.trim() || vendorHint;
+    if (refinedHint && refinedHint !== vendorHint) {
+      memoryCtx = await buildVendorOcrContext(locationId, refinedHint);
     }
+    const before = JSON.stringify(merged);
+    merged = applyVendorMemoryToReceipt(merged, memoryCtx);
+    const memoryApplied = before !== JSON.stringify(merged);
+
+    return {
+      receipt: merged,
+      source: pickReceiptSource(ai, merged),
+      memoryApplied,
+      memoryScanCount: memoryCtx.scanCount,
+    };
   }
 
-  const clientText = ocrText?.trim();
-  if (clientText) {
-    const parsed = await resolveFromText(clientText, "receipt");
-    if (parsed.useful && parsed.receipt) {
-      return { receipt: parsed.receipt, source: "local" };
-    }
-  }
-
-  const serverText = await extractServerText(imageBase64);
-  if (serverText) {
-    const parsed = await resolveFromText(serverText, "receipt");
-    if (parsed.useful && parsed.receipt) {
-      return { receipt: parsed.receipt, source: "local" };
-    }
-  }
-
-  if (clientText || serverText) {
-    const best = parseReceiptFromText(clientText || serverText || "");
-    return { receipt: best, source: "local" };
-  }
-
-  return { receipt: emptyReceipt(), source: "none" };
+  return {
+    receipt: merged,
+    source: ai
+      ? pickReceiptSource(ai, merged)
+      : text && hasUsefulReceiptData(localDraft)
+        ? "local"
+        : "none",
+    memoryApplied: false,
+    memoryScanCount: 0,
+  };
 }

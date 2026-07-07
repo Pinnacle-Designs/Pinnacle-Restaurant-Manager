@@ -45,23 +45,41 @@ const EXPENSE_CATEGORIES = [
   "Other",
 ];
 
+function normalizeReceiptData(raw: ReceiptData | null | undefined): ReceiptData {
+  const today = new Date().toISOString().split("T")[0]!;
+  return {
+    description: String(raw?.description ?? "Receipt expense"),
+    amount: Number(raw?.amount) || 0,
+    category: String(raw?.category ?? "Food & Supplies"),
+    date: String(raw?.date ?? today),
+    vendor: String(raw?.vendor ?? ""),
+    items: Array.isArray(raw?.items) ? raw.items.map(String) : [],
+  };
+}
+
 export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
   const scan = useDocumentQuickScan();
   const [scanning, setScanning] = useState(false);
   const [saving, setSaving] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  const [originalScan, setOriginalScan] = useState<ReceiptData | null>(null);
   const [pageCountScanned, setPageCountScanned] = useState(1);
   const [wasPanoramic, setWasPanoramic] = useState(false);
   const [ocrSource, setOcrSource] = useState<OcrSource | null>(null);
+  const [memoryApplied, setMemoryApplied] = useState(false);
+  const [memoryScanCount, setMemoryScanCount] = useState(0);
   const [ocrProgress, setOcrProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const resetAll = () => {
     scan.clear();
     setReceiptData(null);
+    setOriginalScan(null);
     setPageCountScanned(1);
     setWasPanoramic(false);
     setOcrSource(null);
+    setMemoryApplied(false);
+    setMemoryScanCount(0);
     setOcrProgress(null);
     setError(null);
   };
@@ -78,11 +96,17 @@ export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
         pageCount?: number;
         panoramic?: boolean;
         ocrSource?: OcrSource;
+        memoryApplied?: boolean;
+        memoryScanCount?: number;
       }>("/api/receipts/scan", formData, "POST", {
         onOcrProgress: setOcrProgress,
       });
-      setReceiptData(data.receipt);
+      const normalized = normalizeReceiptData(data.receipt);
+      setOriginalScan(normalized);
+      setReceiptData(normalized);
       setOcrSource(data.ocrSource ?? null);
+      setMemoryApplied(Boolean(data.memoryApplied));
+      setMemoryScanCount(data.memoryScanCount ?? 0);
       setPageCountScanned(data.pageCount ?? scan.getPageCount());
       setWasPanoramic(Boolean(data.panoramic));
     } catch (err) {
@@ -105,6 +129,9 @@ export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
         amount: String(receiptData.amount),
         category: receiptData.category,
         date: receiptData.date,
+        vendor: receiptData.vendor,
+        ...(originalScan ? { originalScan: JSON.stringify(originalScan) } : {}),
+        ...(ocrSource ? { ocrSource } : {}),
       });
       if (saveFile && !formData.has("file")) formData.append("file", saveFile);
 
@@ -133,7 +160,7 @@ export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
           </div>
           <p className="mt-1 text-sm text-slate-500">
             Single page, multi-page scans, or one continuous panoramic photo for long receipts and
-            reports.
+            reports. Saves learn vendor names and categories for faster scans next time.
           </p>
         </div>
         <DocumentScanModeToggle mode={scan.scanMode} onChange={scan.switchMode} accent="green" />
@@ -166,10 +193,13 @@ export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
           </>
         ) : (
           <ExtractedForm
+            scan={scan}
             receiptData={receiptData}
             pageCountScanned={pageCountScanned}
             wasPanoramic={wasPanoramic || scan.scanMode === "panorama"}
             ocrSource={ocrSource}
+            memoryApplied={memoryApplied}
+            memoryScanCount={memoryScanCount}
             saving={saving}
             onChange={setReceiptData}
             onClear={resetAll}
@@ -184,24 +214,32 @@ export function ReceiptScanner({ onExpenseCreated }: ReceiptScannerProps) {
 }
 
 function ExtractedForm({
+  scan,
   receiptData,
   pageCountScanned,
   wasPanoramic,
   ocrSource,
+  memoryApplied,
+  memoryScanCount,
   saving,
   onChange,
   onClear,
   onSave,
 }: {
+  scan: ReturnType<typeof useDocumentQuickScan>;
   receiptData: ReceiptData;
   pageCountScanned: number;
   wasPanoramic: boolean;
   ocrSource: OcrSource | null;
+  memoryApplied: boolean;
+  memoryScanCount: number;
   saving: boolean;
   onChange: (data: ReceiptData) => void;
   onClear: () => void;
   onSave: () => void;
 }) {
+  const previewSrc = scan.preview ?? scan.stitched?.dataUrl ?? scan.pages[0]?.dataUrl ?? null;
+
   return (
     <div className="space-y-4 rounded-lg border border-green-200 bg-green-50 p-4">
       <div className="flex flex-wrap items-center gap-2 text-green-700">
@@ -216,7 +254,30 @@ function ExtractedForm({
           </Badge>
         )}
       </div>
-      <ScanOcrNotice source={ocrSource} />
+
+      {previewSrc && (
+        <div className="overflow-hidden rounded-lg border border-green-200 bg-white">
+          <img
+            src={previewSrc}
+            alt="Scanned receipt"
+            className="mx-auto max-h-40 w-full object-contain"
+          />
+        </div>
+      )}
+
+      <ScanOcrNotice
+        source={ocrSource}
+        memoryApplied={memoryApplied}
+        memoryScanCount={memoryScanCount}
+      />
+
+      <FormField label="Vendor / store">
+        <Input
+          value={receiptData.vendor}
+          placeholder="Store or supplier name"
+          onChange={(e) => onChange({ ...receiptData, vendor: e.target.value })}
+        />
+      </FormField>
       <FormField label="Description">
         <Input
           value={receiptData.description}

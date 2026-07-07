@@ -6,6 +6,8 @@ import { getRequestPlan } from "@/lib/plan-api";
 import { persistUploadFile, uploadErrorMessage } from "@/lib/persist-upload";
 import { resolveReceiptScan } from "@/lib/ocr/resolve-scan";
 import { buildScanOcrMeta } from "@/lib/ocr/scan-response";
+import { recordReceiptScanLearning } from "@/lib/ocr/vendor-memory";
+import type { ReceiptData } from "@/lib/ai";
 import {
   GROWTH_OCR_MONTHLY_LIMIT,
   PLAN_BY_ID,
@@ -63,6 +65,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const locationId = await getLocationIdFromRequest(request);
     const formData = await request.formData();
     const parsed = parseScanFormData(formData);
 
@@ -78,9 +81,9 @@ export async function POST(request: NextRequest) {
     const base64Images = await filesToBase64(parsed.files);
     const vision = visionScanFromParsed(parsed);
     const ocrText = readOcrTextFromForm(formData);
-    const { receipt, source } = await resolveReceiptScan(
+    const { receipt, source, memoryApplied, memoryScanCount } = await resolveReceiptScan(
       base64Input(base64Images),
-      vision,
+      { ...vision, locationId },
       ocrText
     );
 
@@ -88,7 +91,7 @@ export async function POST(request: NextRequest) {
       receipt,
       pageCount: parsed.pageCount,
       panoramic: vision.panoramic || parsed.stitchedMulti,
-      ...buildScanOcrMeta(source),
+      ...buildScanOcrMeta(source, { memoryApplied, memoryScanCount }),
     });
   } catch (error) {
     console.error("Receipt scan error:", error);
@@ -109,8 +112,11 @@ export async function PUT(request: NextRequest) {
     const amount = parseFloat(formData.get("amount") as string);
     const category = formData.get("category") as string;
     const date = formData.get("date") as string;
+    const vendor = (formData.get("vendor") as string) || "";
     const pageCount = parsed.pageCount;
     const panoramic = parsed.panoramic;
+    const ocrSource = (formData.get("ocrSource") as string) || null;
+    const originalScanJson = formData.get("originalScan") as string | null;
 
     let receiptUrl: string | null = null;
 
@@ -145,6 +151,28 @@ export async function PUT(request: NextRequest) {
         receiptUrl,
       },
     });
+
+    if (originalScanJson) {
+      try {
+        const original = JSON.parse(originalScanJson) as ReceiptData;
+        const corrected: ReceiptData = {
+          description,
+          amount,
+          category,
+          date: date || new Date().toISOString().split("T")[0]!,
+          vendor: vendor || original.vendor,
+          items: original.items ?? [],
+        };
+        await recordReceiptScanLearning(locationId, {
+          original,
+          corrected,
+          ocrSource,
+          expenseId: expense.id,
+        });
+      } catch (learnErr) {
+        console.warn("Receipt OCR learning skipped:", learnErr);
+      }
+    }
 
     await prisma.activityLog.create({
       data: {

@@ -95,6 +95,7 @@ interface VendorInvoice {
   invoiceDate: string;
   poId: string | null;
   receiptId: string | null;
+  imageUrl?: string | null;
 }
 
 interface VendorCredit {
@@ -878,7 +879,7 @@ export function LoadingDockClient() {
           {tab === "invoices" && (
             <PageSectionShell pageId="loading-dock-invoices">
               <PageSection id="three-way-match" title="Three-way match" defaultOpen>
-                <ThreeWayMatchPanel invoices={invoices} onRefresh={load} />
+                <ThreeWayMatchPanel invoices={invoices} orders={orders} onRefresh={load} />
               </PageSection>
             </PageSectionShell>
           )}

@@ -60,7 +60,8 @@ function parseInvoiceJson(parsed: Record<string, unknown>, today: string): Invoi
 export async function analyzeInvoice(
   imageBase64: string | string[],
   options?: { panoramic?: boolean; multiPage?: boolean; pageCount?: number },
-  ocrText?: string
+  ocrText?: string,
+  vendorMemoryPrompt?: string
 ): Promise<InvoiceData> {
   const images = Array.isArray(imageBase64) ? imageBase64 : [imageBase64];
   const multiPage = options?.multiPage ?? images.length > 1;
@@ -109,7 +110,7 @@ export async function analyzeInvoice(
 
 Food distributor invoices often use wide tables with columns: item code, description, qty ordered, qty shipped, package, unit price, extended price. Extract EVERY product row. lineTotal must be the extended price column (qty × unit price), not the unit price alone.
 
-Read crinkled, watermarked, or stained paper carefully. For meat/seafood sold by case with a billed weight, capture catchWeightBilled separately from case qty.${ocrHint}`,
+Read crinkled, watermarked, or stained paper carefully. For meat/seafood sold by case with a billed weight, capture catchWeightBilled separately from case qty.${ocrHint}${vendorMemoryPrompt ?? ""}`,
       },
       ...images.map((b64) => ({
         type: "image_url" as const,

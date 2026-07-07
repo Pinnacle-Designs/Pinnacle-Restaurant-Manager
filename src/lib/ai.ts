@@ -90,7 +90,9 @@ export interface ReceiptData {
 
 export async function analyzeReceipt(
   imageBase64: string | string[],
-  options?: { panoramic?: boolean; multiPage?: boolean; pageCount?: number }
+  options?: { panoramic?: boolean; multiPage?: boolean; pageCount?: number },
+  ocrText?: string,
+  vendorMemoryPrompt?: string
 ): Promise<ReceiptData> {
   const images = Array.isArray(imageBase64) ? imageBase64 : [imageBase64];
   const multiPage = options?.multiPage ?? images.length > 1;
@@ -117,13 +119,17 @@ export async function analyzeReceipt(
       pageCount,
     })} Return JSON with: description (vendor + brief summary), amount (total as number), category (one of: Food & Supplies, Utilities, Maintenance, Labor, Marketing, Equipment, Insurance, Other), date (YYYY-MM-DD), vendor (store name), items (array of line item strings). Use the total amount including tax.`;
 
+    const ocrHint = ocrText?.trim()
+      ? `\n\nOn-device OCR text (may contain errors — prefer the image, use OCR to fill gaps):\n${ocrText.trim().slice(0, 10_000)}`
+      : "";
+
     const content: Array<
       | { type: "text"; text: string }
       | { type: "image_url"; image_url: { url: string } }
     > = [
       {
         type: "text",
-        text: pageHint,
+        text: `${pageHint} Return JSON with: description (vendor + brief summary), amount (total as number), category (one of: Food & Supplies, Utilities, Maintenance, Labor, Marketing, Equipment, Insurance, Other), date (YYYY-MM-DD), vendor (store name), items (array of line item strings). Use the total amount including tax — not individual line prices.${ocrHint}${vendorMemoryPrompt ?? ""}`,
       },
       ...images.map((b64) => ({
         type: "image_url" as const,
@@ -132,9 +138,9 @@ export async function analyzeReceipt(
     ];
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       messages: [{ role: "user", content }],
-      max_tokens: multiPage ? 1200 : panoramic ? 800 : 500,
+      max_tokens: multiPage ? 2500 : panoramic ? 1800 : 1200,
       response_format: { type: "json_object" },
     });
 

@@ -421,6 +421,8 @@ model Location {
   marketingCampaigns MarketingCampaign[]
   guestReviews     GuestReview[]
   vendorInvoices   VendorInvoice[]
+  vendorOcrProfiles VendorOcrProfile[]
+  scanLearningEvents ScanLearningEvent[]
   inventoryWaste   InventoryWaste[]
   vendorPriceHistory VendorPriceHistory[]
   externalFactors  ExternalFactor[]
@@ -1725,6 +1727,7 @@ model VendorInvoice {
   receipt        GoodsReceipt?       @relation(fields: [receiptId], references: [id], onDelete: SetNull)
   invoiceNumber  String?
   imageUrl       String?
+  ocrSource      String?
   matchStatus    String              @default("PENDING")
   matchNotes     String?
   accountingSyncLocked Boolean @default(false)
@@ -1737,6 +1740,54 @@ model VendorInvoice {
   credits VendorCredit[]
 
   @@index([locationId, matchStatus])
+}
+
+model VendorOcrProfile {
+  id           String   @id @default(cuid())
+  locationId   String
+  location     Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  vendorKey    String
+  displayName  String
+  scanCount    Int      @default(0)
+  successCount Int      @default(0)
+  layoutHints  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  aliases VendorOcrAlias[]
+
+  @@unique([locationId, vendorKey])
+  @@index([locationId, scanCount])
+}
+
+model VendorOcrAlias {
+  id             String           @id @default(cuid())
+  profileId      String
+  profile        VendorOcrProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  field          String
+  ocrValue       String
+  correctedValue String
+  hitCount       Int              @default(1)
+  lastUsedAt     DateTime         @default(now())
+
+  @@unique([profileId, field, ocrValue])
+  @@index([profileId, field])
+}
+
+model ScanLearningEvent {
+  id              String   @id @default(cuid())
+  locationId      String
+  location        Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  entityType      String
+  entityId        String?
+  vendorKey       String?
+  ocrSource       String?
+  correctionCount Int      @default(0)
+  originalJson    String
+  correctedJson   String
+  createdAt       DateTime @default(now())
+
+  @@index([locationId, vendorKey, createdAt])
 }
 
 model VendorInvoiceLine {

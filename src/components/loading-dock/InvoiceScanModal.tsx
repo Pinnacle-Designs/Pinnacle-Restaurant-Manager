@@ -84,9 +84,12 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
   const [scanning, setScanning] = useState(false);
   const [saving, setSaving] = useState(false);
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
+  const [originalScan, setOriginalScan] = useState<InvoiceData | null>(null);
   const [pageCountScanned, setPageCountScanned] = useState(1);
   const [wasPanoramic, setWasPanoramic] = useState(false);
   const [ocrSource, setOcrSource] = useState<OcrSource | null>(null);
+  const [memoryApplied, setMemoryApplied] = useState(false);
+  const [memoryScanCount, setMemoryScanCount] = useState(0);
   const [ocrProgress, setOcrProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -100,11 +103,17 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
         pageCount?: number;
         panoramic?: boolean;
         ocrSource?: OcrSource;
+        memoryApplied?: boolean;
+        memoryScanCount?: number;
       }>("/api/purchasing/invoices/scan", scan.buildScanFormData(), "POST", {
         onOcrProgress: setOcrProgress,
       });
-      setInvoiceData(normalizeInvoiceData(data.invoice));
+      const normalized = normalizeInvoiceData(data.invoice);
+      setOriginalScan(normalized);
+      setInvoiceData(normalized);
       setOcrSource(data.ocrSource ?? null);
+      setMemoryApplied(Boolean(data.memoryApplied));
+      setMemoryScanCount(data.memoryScanCount ?? 0);
       setPageCountScanned(data.pageCount ?? scan.getPageCount());
       setWasPanoramic(Boolean(data.panoramic));
     } catch (err) {
@@ -161,6 +170,8 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
         invoiceDate: invoiceData.invoiceDate,
         invoiceNumber: invoiceData.invoiceNumber,
         lines: JSON.stringify(invoiceData.lines),
+        ...(originalScan ? { originalScan: JSON.stringify(originalScan) } : {}),
+        ...(ocrSource ? { ocrSource } : {}),
         ...(poId ? { poId } : {}),
         ...(receiptId ? { receiptId } : {}),
       });
@@ -229,7 +240,20 @@ export function InvoiceScanModal({ poId, receiptId, onSaved, onClose }: InvoiceS
 
         {invoiceData && (
           <div className="space-y-3">
-            <ScanOcrNotice source={ocrSource} />
+            {(scan.preview || scan.pages[0]?.dataUrl || scan.stitched?.dataUrl) && (
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                <img
+                  src={scan.preview ?? scan.stitched?.dataUrl ?? scan.pages[0]?.dataUrl ?? ""}
+                  alt="Scanned invoice"
+                  className="mx-auto max-h-40 w-full object-contain"
+                />
+              </div>
+            )}
+            <ScanOcrNotice
+              source={ocrSource}
+              memoryApplied={memoryApplied}
+              memoryScanCount={memoryScanCount}
+            />
             {wasPanoramic && pageCountScanned <= 1 && (
               <p className="text-xs font-medium text-orange-700">Panoramic scan</p>
             )}

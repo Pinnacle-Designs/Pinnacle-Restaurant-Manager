@@ -449,6 +449,15 @@ export async function getThreeWayMatchDetail(invoiceId: string, locationId: stri
       invoiceDate: invoice.invoiceDate.toISOString(),
       poId: invoice.poId,
       receiptId: invoice.receiptId,
+      imageUrl: invoice.imageUrl,
+      lines: invoice.lines.map((l) => ({
+        description: l.description,
+        qty: l.qty,
+        unit: l.unit,
+        unitPrice: l.unitPrice,
+        lineTotal: l.lineTotal,
+        sku: l.sku,
+      })),
     },
     po: invoice.po
       ? {
