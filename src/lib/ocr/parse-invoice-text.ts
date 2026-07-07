@@ -207,7 +207,7 @@ function parseDistributorTableRow(
 
   const qty = tail.qtyShipped > 0 ? tail.qtyShipped : tail.qtyOrdered;
   let unitPrice = tail.unitPrice;
-  let lineTotal = tail.lineTotal;
+  const lineTotal = tail.lineTotal;
   const unit = parseUnitFromPackage(tail.packageRaw, line);
 
   if (qty > 0 && unitPrice > 0 && lineTotal > 0) {
