@@ -14,6 +14,11 @@ import { privateJsonResponse } from "@/lib/secure-response";
 import { createMfaPendingToken } from "@/lib/mfa-pending";
 import { requireActiveAccount } from "@/lib/api-auth";
 import { isCrossOriginEmbedRequest } from "@/lib/embed-launch";
+import {
+  ensureProCleanAccount,
+  isProCleanAccountEmail,
+} from "@/lib/pro-clean-account";
+import { LOCATION_COOKIE_NAME } from "@/lib/location";
 
 const LOGIN_FAILURE_DELAY_MS = 250;
 
@@ -31,10 +36,35 @@ export async function GET(request: NextRequest) {
   if (error || !activeUser) {
     return privateJsonResponse({ user: null });
   }
-  const prepared = await prepareAuthSession(activeUser);
+
+  let sessionUser = activeUser;
+  if (isProCleanAccountEmail(activeUser.email)) {
+    const ensured = await ensureProCleanAccount({ resetPassword: false });
+    if (ensured.locationId) {
+      sessionUser = { ...activeUser, locationId: ensured.locationId };
+    }
+  }
+
+  const prepared = await prepareAuthSession(sessionUser);
   const response = privateJsonResponse({ user: prepared.sessionUser });
   const forEmbed = isCrossOriginEmbedRequest(request);
   attachAuthCookies(response, prepared, forEmbed ? { forEmbed: true, secure: true } : undefined);
+  if (!forEmbed && prepared.sessionUser.locationId) {
+    response.cookies.set(LOCATION_COOKIE_NAME, "", {
+      path: "/",
+      maxAge: 0,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    });
+    response.cookies.set(LOCATION_COOKIE_NAME, prepared.sessionUser.locationId, {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    });
+  }
   return response;
 }
 

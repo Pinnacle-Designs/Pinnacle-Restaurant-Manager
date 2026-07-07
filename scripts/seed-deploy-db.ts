@@ -49,6 +49,24 @@ async function main() {
   const proClean = await ensureProCleanAccount({ resetPassword: true });
   console.log(`[db] Pro clean account: ${proClean.email} (created=${proClean.created})`);
 
+  if (proClean.locationId) {
+    const [proMenu, proOrders, proStaff] = await Promise.all([
+      prisma.menuItem.count({ where: { locationId: proClean.locationId } }),
+      prisma.order.count({ where: { locationId: proClean.locationId } }),
+      prisma.staffMember.count({ where: { locationId: proClean.locationId } }),
+    ]);
+    if (proMenu > 0 || proOrders > 0 || proStaff > 0) {
+      throw new Error(
+        `[db] pro-clean workspace must be empty (menu=${proMenu}, orders=${proOrders}, staff=${proStaff})`
+      );
+    }
+    const proLoc = await prisma.location.findUnique({
+      where: { id: proClean.locationId },
+      select: { name: true },
+    });
+    console.log(`[db] Pro clean workspace: ${proLoc?.name} (empty)`);
+  }
+
   const [userCount, menuCount, orderCount, location] = await Promise.all([
     prisma.user.count(),
     prisma.menuItem.count({ where: { locationId: workspace.locationId } }),

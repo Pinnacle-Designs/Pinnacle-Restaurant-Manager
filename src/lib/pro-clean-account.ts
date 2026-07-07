@@ -16,6 +16,22 @@ export function isProCleanAccountEmail(email: string): boolean {
   return email.trim().toLowerCase() === DEFAULT_EMAIL;
 }
 
+/** Fresh DB location for pro-clean — never trust session/cookies alone. */
+export async function getProCleanLocationIdForUser(
+  user: { id: string; email: string } | null | undefined
+): Promise<string | null> {
+  if (!user || !isProCleanAccountEmail(user.email)) return null;
+  const row = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: {
+      locationId: true,
+      location: { select: { id: true, active: true, name: true } },
+    },
+  });
+  if (!row?.locationId || !row.location?.active) return null;
+  return row.locationId;
+}
+
 /** True when the location is a demo workspace or already has seeded restaurant data. */
 async function locationNeedsCleanWorkspace(
   locationId: string,

@@ -6,6 +6,7 @@ import { findSeededDemoLocationId } from "./demo-location";
 import { EMBED_LOCATION_HEADER } from "./embed-constants";
 import { isProductionRuntime } from "./env";
 import { canUserAccessLocation, resolveAuthorizedLocationId } from "./location-access";
+import { getProCleanLocationIdForUser } from "./pro-clean-account";
 import { prisma } from "./prisma";
 import { LOCATION_COOKIE_NAME } from "./location-constants";
 
@@ -40,6 +41,9 @@ async function resolveDemoEmbedLocationId(
 export async function getLocationId(): Promise<string> {
   const { getSessionUser } = await import("./auth");
   const user = await getSessionUser();
+
+  const proCleanLocationId = await getProCleanLocationIdForUser(user);
+  if (proCleanLocationId) return proCleanLocationId;
 
   if (user && isDemoAccountEmail(user.email)) {
     const demoId = await resolveDemoEmbedLocationId(user.email, user.locationId);
@@ -92,6 +96,9 @@ export async function getLocationId(): Promise<string> {
 export async function getLocationIdFromRequest(request: Request): Promise<string> {
   const nextRequest = request as NextRequest;
   const user = await getSessionUserFromRequest(nextRequest);
+
+  const proCleanLocationId = await getProCleanLocationIdForUser(user);
+  if (proCleanLocationId) return proCleanLocationId;
 
   if (user && isDemoAccountEmail(user.email)) {
     const demoId = await resolveDemoEmbedLocationId(user.email, user.locationId);

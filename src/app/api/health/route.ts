@@ -26,14 +26,32 @@ export async function GET() {
 
   let database = false;
   let proCleanAccount = false;
+  let proCleanEmpty = false;
   try {
     await prisma.$queryRaw`SELECT 1`;
     database = true;
     const proClean = await prisma.user.findUnique({
       where: { email: PRO_CLEAN_DEFAULT_EMAIL },
-      select: { active: true, role: true },
+      select: {
+        active: true,
+        role: true,
+        locationId: true,
+        location: { select: { name: true } },
+      },
     });
     proCleanAccount = Boolean(proClean?.active && proClean.role === "OWNER");
+    if (proCleanAccount && proClean?.locationId) {
+      const [menu, orders, staff] = await Promise.all([
+        prisma.menuItem.count({ where: { locationId: proClean.locationId } }),
+        prisma.order.count({ where: { locationId: proClean.locationId } }),
+        prisma.staffMember.count({ where: { locationId: proClean.locationId } }),
+      ]);
+      proCleanEmpty =
+        menu === 0 &&
+        orders === 0 &&
+        staff === 0 &&
+        proClean.location?.name === "Clean Pro Restaurant";
+    }
   } catch {
     database = false;
   }
@@ -48,6 +66,7 @@ export async function GET() {
       checks: {
         database,
         proCleanAccount,
+        proCleanEmpty,
         documentOcr: isDocumentOcrAvailable(),
         ocrAssets,
         aiOcr: isAiOcrConfigured(),

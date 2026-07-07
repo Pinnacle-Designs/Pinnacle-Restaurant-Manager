@@ -43,6 +43,7 @@ export async function completeUserLogin({
       if (ensured.locationId) {
         user.locationId = ensured.locationId;
       }
+      workspace = await resolveUserWorkspace(user);
     } else if (devDemoLoginEnabled() && isDemoAccountEmail(email)) {
       workspace = await setupDemoWorkspace("seeded");
       await prisma.user.update({
@@ -84,6 +85,13 @@ export async function completeUserLogin({
     }
   } else {
     attachAuthCookies(response, prepared);
+    response.cookies.set(LOCATION_COOKIE_NAME, "", {
+      path: "/",
+      maxAge: 0,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    });
     if (locationId) {
       response.cookies.set(LOCATION_COOKIE_NAME, locationId, {
         path: "/",
