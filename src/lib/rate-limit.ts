@@ -8,12 +8,29 @@ const ratelimitCache = new Map<string, Ratelimit>();
 
 let redis: Redis | null = null;
 
-function getRedis(): Redis | null {
-  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+/** Vercel's Upstash integration may inject KV_* names instead of UPSTASH_REDIS_*. */
+export function getUpstashRedisCredentials(): { url: string; token: string } | null {
+  const url =
+    process.env.UPSTASH_REDIS_REST_URL?.trim() ||
+    process.env.KV_REST_API_URL?.trim() ||
+    "";
+  const token =
+    process.env.UPSTASH_REDIS_REST_TOKEN?.trim() ||
+    process.env.KV_REST_API_TOKEN?.trim() ||
+    "";
   if (!url || !token) return null;
+  return { url, token };
+}
+
+export function isDistributedRateLimitConfigured(): boolean {
+  return getUpstashRedisCredentials() !== null;
+}
+
+function getRedis(): Redis | null {
+  const creds = getUpstashRedisCredentials();
+  if (!creds) return null;
   if (!redis) {
-    redis = new Redis({ url, token });
+    redis = new Redis({ url: creds.url, token: creds.token });
   }
   return redis;
 }

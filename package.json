@@ -26,6 +26,7 @@
     "stripe:setup": "tsx scripts/setup-stripe-billing.ts --write-env",
     "stripe:setup:live": "tsx scripts/setup-stripe-billing.ts --live --webhook --write-env",
     "vercel:env:push": "node scripts/push-vercel-env.mjs",
+    "setup:upstash": "node scripts/setup-upstash-vercel.mjs",
     "production:checklist": "tsx scripts/production-checklist.ts --write-env",
     "production:verify": "tsx scripts/verify-production-readiness.ts",
     "create:pro-account": "tsx scripts/create-pro-account.ts",

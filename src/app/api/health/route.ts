@@ -3,6 +3,7 @@ import { join } from "path";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isAiOcrConfigured, isDocumentOcrAvailable } from "@/lib/ocr/capabilities";
+import { isDistributedRateLimitConfigured } from "@/lib/rate-limit";
 import { PRO_CLEAN_DEFAULT_EMAIL } from "@/lib/pro-clean-account";
 
 export const runtime = "nodejs";
@@ -73,6 +74,7 @@ export async function GET() {
         documentOcr: isDocumentOcrAvailable(),
         ocrAssets,
         aiOcr: isAiOcrConfigured(),
+        rateLimitRedis: isDistributedRateLimitConfigured(),
       },
     },
     {
