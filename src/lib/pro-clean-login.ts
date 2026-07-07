@@ -7,9 +7,12 @@ import { privateJsonResponse } from "@/lib/secure-response";
 import { clearWorkspaceCookieOptions } from "@/lib/workspace-cookie";
 import type { SessionUser } from "@/lib/session";
 import { ensureProCleanAccount } from "@/lib/pro-clean-account";
-import { isProCleanAccountEmail } from "@/lib/pro-clean-email";
+import {
+  isProCleanAccountEmail,
+  PRO_CLEAN_LOGIN_PATH,
+} from "@/lib/pro-clean-email";
 
-export const PRO_CLEAN_LOGIN_PATH = "/login/pro";
+export { PRO_CLEAN_LOGIN_PATH };
 
 export function proCleanLoginRequiredResponse() {
   return privateJsonResponse(

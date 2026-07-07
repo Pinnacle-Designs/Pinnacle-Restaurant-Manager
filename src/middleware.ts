@@ -25,14 +25,17 @@ import {
   isMfaSetupAllowedPath,
   ownerMfaRequired,
 } from "@/lib/mfa-policy";
-import { isProCleanAccountEmail } from "@/lib/pro-clean-email";
-import { PRO_CLEAN_LOGIN_PATH } from "@/lib/pro-clean-login";
+import {
+  isProCleanAccountEmail,
+  PRO_CLEAN_LOGIN_PATH,
+} from "@/lib/pro-clean-email";
 
 const PUBLIC_PATHS = [
   "/",
   "/demo",
   "/embed",
   "/login",
+  "/login/pro",
   "/signup",
   "/forgot-password",
   "/reset-password",
