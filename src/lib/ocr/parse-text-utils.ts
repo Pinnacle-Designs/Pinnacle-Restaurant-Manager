@@ -29,7 +29,7 @@ function amountsNearLabel(text: string, label: RegExp): number[] {
 export function extractTotalAmount(text: string): number {
   const lines = text.split(/\r?\n/);
 
-  for (const { pattern, weight } of TOTAL_LABELS) {
+  for (const { pattern } of TOTAL_LABELS) {
     for (const line of lines) {
       if (!pattern.test(line)) continue;
       const match = line.match(/([\d,]+\.\d{2})/);

@@ -207,7 +207,7 @@ function applyVendorAlias(vendor: string, aliases: VendorOcrContext["aliases"]):
 }
 
 function applyLineMemory(line: InvoiceLineData, ctx: VendorOcrContext): InvoiceLineData {
-  let next = { ...line };
+  const next = { ...line };
 
   if (line.sku) {
     const skuKey = line.sku.toUpperCase();

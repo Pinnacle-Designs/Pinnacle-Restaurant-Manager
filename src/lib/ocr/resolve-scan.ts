@@ -48,18 +48,6 @@ async function extractServerText(imageBase64: string | string[]): Promise<string
   }
 }
 
-async function resolveFromText(
-  text: string,
-  kind: "invoice" | "receipt"
-): Promise<{ invoice?: InvoiceData; receipt?: ReceiptData; useful: boolean }> {
-  if (kind === "invoice") {
-    const invoice = parseInvoiceFromText(text);
-    return { invoice, useful: hasUsefulInvoiceData(invoice) };
-  }
-  const receipt = parseReceiptFromText(text);
-  return { receipt, useful: hasUsefulReceiptData(receipt) };
-}
-
 function pickInvoiceSource(ai: InvoiceData | null, merged: InvoiceData): OcrSource {
   if (!ai) return "local";
   const aiUseful = hasUsefulInvoiceData(ai);
