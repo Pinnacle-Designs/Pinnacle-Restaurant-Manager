@@ -124,7 +124,91 @@
       font-size: 11px; font-weight: 800; text-transform: uppercase;
       letter-spacing: 0.06em; color: var(--accent); padding-top: 2px;
     }
-    .cover-logo { width: 200px; height: auto; margin-bottom: 24px; }
+    .cover-logo { width: 200px; height: auto; margin-bottom: 20px; }
+    .cover-split {
+      display: grid;
+      grid-template-columns: 0.95fr 1.05fr;
+      gap: 28px;
+      align-items: center;
+      flex: 1;
+      margin-top: 8px;
+    }
+    .cover-copy { display: flex; flex-direction: column; justify-content: center; }
+    .cover-hero { position: relative; min-height: 360px; }
+    .cover-hero-glow {
+      position: absolute; inset: 8% 4% 8% 10%;
+      background: radial-gradient(circle at 40% 40%, rgba(234, 88, 12, 0.35), transparent 62%);
+      filter: blur(18px); pointer-events: none;
+    }
+    .browser-frame {
+      position: relative; z-index: 2;
+      border-radius: 12px; overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.14);
+      box-shadow: 0 24px 60px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06);
+      background: #0f172a;
+    }
+    .browser-frame img { width: 100%; display: block; border: none; }
+    .float-card {
+      position: absolute; z-index: 3;
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px; padding: 10px 12px;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.35);
+      font-size: 10px; color: #e2e8f0;
+      backdrop-filter: blur(8px);
+    }
+    .float-card strong { display: block; font-size: 11px; color: #fff; margin-bottom: 4px; }
+    .float-card.pos { right: -8px; top: 18%; width: 148px; }
+    .float-card.invoice { left: -10px; bottom: 12%; width: 156px; }
+    .float-card .mini-row {
+      display: flex; justify-content: space-between; gap: 8px;
+      padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .float-card .mini-row:last-child { border: none; font-weight: 700; color: #fdba74; }
+    .analytics-suite {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    }
+    .analytics-module {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px; padding: 10px 8px; text-align: center;
+      font-size: 10px; color: #cbd5e1;
+    }
+    .analytics-module strong { display: block; color: #fff; font-size: 11px; margin-bottom: 2px; }
+    .analytics-module.hot {
+      background: rgba(234, 88, 12, 0.18);
+      border-color: rgba(253, 186, 116, 0.35);
+    }
+    .menu-channel-row {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;
+    }
+    .menu-channel {
+      padding: 5px 10px; border-radius: 999px; font-size: 10px; font-weight: 700;
+      background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa;
+    }
+    .menu-matrix {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+    }
+    .menu-matrix div {
+      border-radius: 8px; padding: 10px 8px; text-align: center;
+      font-size: 10px; line-height: 1.35;
+    }
+    .platform-map {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px;
+    }
+    .platform-node {
+      border-radius: 12px; padding: 16px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .platform-node h3 { color: #fff; font-size: 14px; margin-bottom: 6px; }
+    .platform-node p { font-size: 12px; color: #cbd5e1; line-height: 1.4; }
+    .platform-hub {
+      grid-column: 1 / -1; text-align: center; padding: 12px;
+      border-radius: 999px; background: rgba(234, 88, 12, 0.2);
+      border: 1px solid rgba(253, 186, 116, 0.35);
+      font-size: 12px; font-weight: 700; color: #fdba74;
+    }
     .tagline {
       display: inline-block; margin-top: 16px; padding: 7px 14px;
       border-radius: 999px; background: var(--accent-soft); color: var(--accent);
@@ -210,14 +294,20 @@
     /* Team */
     .team-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 16px; }
     .team-card { text-align: center; padding: 18px 14px; }
-    .team-avatar {
-      width: 72px; height: 72px; border-radius: 50%; margin: 0 auto 10px;
-      background: linear-gradient(135deg, #ea580c, #f97316);
-      color: #fff; font-size: 22px; font-weight: 800;
-      display: flex; align-items: center; justify-content: center;
+    .team-photo {
+      width: 88px; height: 88px; border-radius: 50%; margin: 0 auto 12px;
+      object-fit: cover; object-position: center top;
+      border: 3px solid #fff; box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
     }
-    .team-role { font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+    .team-name { font-size: 17px; font-weight: 800; color: var(--ink); margin-bottom: 2px; }
+    .team-role { font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
     .team-card p { font-size: 12px; color: var(--muted); line-height: 1.45; }
+    .team-creds {
+      margin-top: 8px; padding-left: 1rem; text-align: left;
+      font-size: 11px; color: var(--muted);
+    }
+    .team-creds li { margin: 3px 0; }
+    .team-card.wide { grid-column: span 1; }
 
     /* Ask slide */
     .ask-amount {
@@ -248,7 +338,9 @@
       .slide { box-shadow: none; border-radius: 0; margin: 0; min-height: 100vh; }
     }
     @media (max-width: 800px) {
-      .grid-2, .grid-3, .grid-4, .stat-row, .split, .team-grid, .visual-grid, .milestone-row { grid-template-columns: 1fr; }
+      .grid-2, .grid-3, .grid-4, .stat-row, .split, .team-grid, .visual-grid, .milestone-row, .cover-split, .platform-map { grid-template-columns: 1fr; }
+      .cover-hero { min-height: 280px; margin-top: 16px; }
+      .float-card { position: static; width: auto !important; margin-top: 10px; }
       .slide { padding: 28px 24px; }
       h1 { font-size: 30px; }
       h2 { font-size: 22px; }
@@ -257,7 +349,7 @@
 </head>
 <body>
   <div class="toolbar">
-    <span>Confidential — Pinnacle Designs LLC · Update team names/photos before sending</span>
+    <span>Confidential — Pinnacle Designs LLC · Investor deck · March 2026</span>
     <button type="button" onclick="window.print()">Save as PDF</button>
   </div>
 
@@ -266,10 +358,32 @@
     <!-- 01 Cover -->
     <section class="slide dark">
       <span class="slide-num">01</span>
-      <img class="cover-logo" src="../docs/assets/logo-nav.svg" alt="Pinnacle Restaurant Manager" width="200" height="40" />
-      <h1>Run your restaurant.<br />Know your numbers.</h1>
-      <p class="lead">AI-powered operations for independent restaurants — POS, kitchen, menu engineering, payroll, purchasing, and a 12-tab analytics suite in one platform.</p>
-      <span class="tagline">Seed round · $79–$449/location/mo · Self-serve signup · Live embedded demo</span>
+      <div class="cover-split">
+        <div class="cover-copy">
+          <img class="cover-logo" src="../docs/assets/logo-nav.svg" alt="Pinnacle Restaurant Manager" width="200" height="40" />
+          <h1>Run your restaurant.<br />Know your numbers.</h1>
+          <p class="lead">AI-powered operations for independent restaurants — POS, kitchen, menu engineering, payroll, purchasing, and a 12-tab analytics suite in one platform.</p>
+          <span class="tagline">Seed round · $750K · $79–$449/location/mo · Live embedded demo</span>
+        </div>
+        <div class="cover-hero">
+          <div class="cover-hero-glow"></div>
+          <div class="browser-frame">
+            <img src="../docs/assets/command-center-live.png" alt="Pinnacle AI Command Center answering a profit question from live restaurant data" />
+          </div>
+          <div class="float-card pos">
+            <strong>POS · Table 12</strong>
+            <div class="mini-row"><span>Brisket ×2</span><span>$38.00</span></div>
+            <div class="mini-row"><span>Mac &amp; Cheese</span><span>$7.50</span></div>
+            <div class="mini-row"><span>Total</span><span>$51.50</span></div>
+          </div>
+          <div class="float-card invoice">
+            <strong>Invoice OCR · matched</strong>
+            <div class="mini-row"><span>FENBA01</span><span>$58.20</span></div>
+            <div class="mini-row"><span>BROBU10</span><span>$101.85</span></div>
+            <div class="mini-row"><span>3-way PO</span><span>✓</span></div>
+          </div>
+        </div>
+      </div>
       <p class="footer-note">Pinnacle Designs LLC · pinnacle-resturant-manager.vercel.app · Demo: owner@pinnacle.com / demo1234</p>
     </section>
 
@@ -337,8 +451,14 @@
           </div>
         </div>
         <div>
-          <img class="product-shot" src="../docs/assets/command-center-live.png" alt="AI Command Center dashboard showing sales, profit, labor, and actionable insights" />
-          <p class="visual-caption" style="color:#94a3b8">Live product — AI Command Center answers profit questions from real operational data</p>
+          <div class="platform-map">
+            <div class="platform-hub">One login · one data model · every workflow connected</div>
+            <div class="platform-node"><h3>Serve &amp; sell</h3><p>POS, KDS, tableside QR, split checks, Square/Stripe payments</p></div>
+            <div class="platform-node"><h3>Menu as asset</h3><p>Sub-recipes, 6-channel sync, engineering matrix, 86 propagation</p></div>
+            <div class="platform-node"><h3>Run the business</h3><p>Payroll, invoice OCR, 3-way match, vendor EDI hooks</p></div>
+            <div class="platform-node"><h3>Know the numbers</h3><p>12 analytics modules, AI Command Center, 350+ owner questions</p></div>
+          </div>
+          <p class="visual-caption" style="color:#94a3b8;margin-top:10px">Native modules share live orders, labor, inventory, and margin — no CSV exports</p>
         </div>
       </div>
     </section>
@@ -492,8 +612,30 @@
           </ul>
         </div>
         <div>
-          <img class="product-shot" src="../docs/assets/command-center-live.png" alt="Analytics and menu intelligence" style="opacity:0.95" />
-          <p class="visual-caption">Menu mix and margin feed the Command Center</p>
+          <div class="ui-mock">
+            <div class="ui-mock-bar">
+              <span class="ui-mock-dot r"></span><span class="ui-mock-dot y"></span><span class="ui-mock-dot g"></span>
+              <span class="ui-mock-title">Menu Hub — Smoky Oak BBQ</span>
+            </div>
+            <div class="ui-mock-body">
+              <div class="menu-channel-row">
+                <span class="menu-channel">POS</span>
+                <span class="menu-channel">QR</span>
+                <span class="menu-channel">Website</span>
+                <span class="menu-channel">DoorDash</span>
+                <span class="menu-channel">Uber Eats</span>
+                <span class="menu-channel">Grubhub</span>
+              </div>
+              <div class="menu-matrix">
+                <div style="background:#dcfce7"><strong>★ Stars</strong><br/>Brisket Plate<br/><span style="color:var(--green)">38% margin</span></div>
+                <div style="background:#fef3c7"><strong>? Puzzles</strong><br/>Lamb Chops<br/><span style="color:var(--amber)">Raise price $3</span></div>
+                <div style="background:#dbeafe"><strong>⬆ Plowhorses</strong><br/>Mac &amp; Cheese<br/>High mix · trim cost</div>
+                <div style="background:#fee2e2"><strong>✕ Dogs</strong><br/>Side Salad<br/>86 or rework</div>
+              </div>
+              <div style="margin-top:8px;font-size:9px;color:var(--muted);text-align:center">Recipe-linked COGS updates when vendor prices change</div>
+            </div>
+          </div>
+          <p class="visual-caption">Six channels stay in sync · engineering matrix drives pricing decisions</p>
         </div>
       </div>
     </section>
@@ -544,7 +686,31 @@
           </div>
         </div>
         <div>
-          <img class="product-shot" src="../docs/assets/command-center-live.png" alt="AI Command Center" />
+          <div class="ui-mock" style="background:#0f172a;border-color:#334155">
+            <div class="ui-mock-bar">
+              <span class="ui-mock-dot r"></span><span class="ui-mock-dot y"></span><span class="ui-mock-dot g"></span>
+              <span class="ui-mock-title">Analytics Suite — 12 modules</span>
+            </div>
+            <div class="ui-mock-body">
+              <div class="analytics-suite">
+                <div class="analytics-module hot"><strong>Executive</strong>Sales · profit</div>
+                <div class="analytics-module"><strong>Food cost</strong>Theoretical vs actual</div>
+                <div class="analytics-module"><strong>Labor</strong>Prime cost · SPLH</div>
+                <div class="analytics-module"><strong>Menu mix</strong>Stars &amp; dogs</div>
+                <div class="analytics-module"><strong>Purchasing</strong>Vendor scorecards</div>
+                <div class="analytics-module"><strong>Forecast</strong>Demand · prep</div>
+                <div class="analytics-module"><strong>Waste</strong>Variance alerts</div>
+                <div class="analytics-module"><strong>Inventory</strong>On-hand · par</div>
+                <div class="analytics-module hot"><strong>AI Command</strong>350+ prompts</div>
+              </div>
+              <div style="margin-top:10px;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:10px;font-size:9px;color:#e2e8f0">
+                <div style="color:#94a3b8;margin-bottom:4px">Cross-domain insight</div>
+                <strong>Labor + waste + vendor price drift = margin leak this week</strong>
+                <div style="margin-top:6px;color:#fdba74">Suggested: trim Tuesday prep · renegotiate produce bid</div>
+              </div>
+            </div>
+          </div>
+          <p class="visual-caption" style="color:#94a3b8">Twelve in-app modules — AI synthesizes answers across all of them</p>
         </div>
       </div>
     </section>
@@ -552,29 +718,43 @@
     <!-- 11 Team -->
     <section class="slide">
       <span class="slide-num">11</span>
-      <h2>We are operator-led builders who shipped a production platform — not a slide-deck prototype</h2>
-      <p class="lead" style="margin-bottom:4px">Investors bet on people. Replace placeholders below with names, photos, and LinkedIn before sending.</p>
+      <h2>David Foy built and shipped the production platform — operator pain, full-stack execution, and founder-led sales</h2>
       <div class="team-grid">
         <div class="card team-card">
-          <div class="team-avatar">CEO</div>
-          <h3>[Founder Name]</h3>
-          <p class="team-role">Founder &amp; CEO</p>
-          <p>Restaurant operator background — lived the POS + spreadsheet pain. Product vision, customer discovery, founding sales.</p>
+          <img class="team-photo" src="team/david-foy.png" alt="David Foy, Founder and CEO of Pinnacle Restaurant Manager" width="88" height="88" />
+          <p class="team-name">David Foy</p>
+          <p class="team-role">Founder &amp; CEO · Product &amp; Engineering</p>
+          <p>Operator-first builder behind Pinnacle Designs LLC. Owns product vision, customer discovery, and the full stack from signup through payroll.</p>
+          <ul class="team-creds">
+            <li>Shipped live SaaS: self-serve billing, embedded demo, 50+ API domains</li>
+            <li>Built invoice OCR, 3-way match, AI Command Center on production data</li>
+            <li>Stripe + Square Connect · multi-tenant security · Vercel production deploy</li>
+          </ul>
         </div>
         <div class="card team-card">
-          <div class="team-avatar">CTO</div>
-          <h3>[Founder Name]</h3>
-          <p class="team-role">Co-founder · Product &amp; Engineering</p>
-          <p>Full-stack delivery — Next.js, Prisma, payments, OCR pipeline. Built the live platform from signup through payroll.</p>
+          <div style="width:88px;height:88px;border-radius:50%;margin:0 auto 12px;background:linear-gradient(135deg,#1e293b,#334155);display:flex;align-items:center;justify-content:center;font-size:28px">🎯</div>
+          <p class="team-name">Domain depth</p>
+          <p class="team-role">Restaurant operations · SaaS GTM</p>
+          <p>Deep empathy for independent operators — fragmented POS, spreadsheet payroll, and month-end surprises that Pinnacle replaces.</p>
+          <ul class="team-creds">
+            <li>Founding-10 program · embedded live demo · PWA install</li>
+            <li>Pitch pipeline, admin review, and reference-customer motion in place</li>
+            <li>Seed use-of-funds weighted to convert demo traffic into paid locations</li>
+          </ul>
         </div>
         <div class="card team-card">
-          <div class="team-avatar">+</div>
-          <h3>Hiring with seed</h3>
-          <p class="team-role">First GTM hire · Month 3</p>
-          <p>Customer success + outbound to convert demo traffic and founding-10 program into reference accounts.</p>
+          <div style="width:88px;height:88px;border-radius:50%;margin:0 auto 12px;background:linear-gradient(135deg,#ea580c,#f97316);display:flex;align-items:center;justify-content:center;color:#fff;font-size:26px;font-weight:800">+1</div>
+          <p class="team-name">First key hire</p>
+          <p class="team-role">Head of Customer Success · Month 3</p>
+          <p>Convert marketing-site demo traffic and founding-operator cohort into reference accounts and expansion revenue.</p>
+          <ul class="team-creds">
+            <li>Onboarding playbooks · weekly business reviews with operators</li>
+            <li>Outbound to 2–10 location groups upgrading from POS + spreadsheets</li>
+            <li>Funded by seed GTM allocation ($300K)</li>
+          </ul>
         </div>
       </div>
-      <p class="footer-note">Advisors (restaurant ops, SaaS GTM, payments) — add logos/names as confirmed.</p>
+      <p class="footer-note">Advisor bench (restaurant ops, SaaS finance, payments) — names available on request.</p>
     </section>
 
     <!-- 12 Differentiation -->
