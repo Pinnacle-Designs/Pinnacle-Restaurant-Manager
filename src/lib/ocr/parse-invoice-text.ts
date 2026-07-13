@@ -685,6 +685,40 @@ export function scoreInvoiceData(data: InvoiceData): number {
   return score;
 }
 
+function lineMergeKey(line: InvoiceLineData): string {
+  const sku = line.sku?.trim().toUpperCase();
+  if (sku) return `sku:${sku}`;
+  const desc = line.description.trim().toUpperCase().slice(0, 48);
+  return `desc:${desc}|${line.lineTotal.toFixed(2)}`;
+}
+
+function unionInvoiceLines(sources: InvoiceLineData[][]): InvoiceLineData[] {
+  const map = new Map<string, InvoiceLineData>();
+
+  for (const lines of sources) {
+    for (const line of lines) {
+      if (line.lineTotal <= 0 && line.unitPrice <= 0) continue;
+      const key = lineMergeKey(line);
+      const existing = map.get(key);
+      if (!existing) {
+        map.set(key, line);
+        continue;
+      }
+      const existingScore =
+        (existing.sku ? 2 : 0) +
+        (existing.description.length > 3 ? 1 : 0) +
+        (existing.qty > 0 ? 1 : 0);
+      const nextScore =
+        (line.sku ? 2 : 0) + (line.description.length > 3 ? 1 : 0) + (line.qty > 0 ? 1 : 0);
+      if (nextScore > existingScore || line.description.length > existing.description.length) {
+        map.set(key, line);
+      }
+    }
+  }
+
+  return Array.from(map.values()).slice(0, 60);
+}
+
 export function mergeInvoiceData(...sources: InvoiceData[]): InvoiceData {
   const usable = sources.filter(Boolean);
   if (!usable.length) {
@@ -715,22 +749,29 @@ export function mergeInvoiceData(...sources: InvoiceData[]): InvoiceData {
   const invoiceNumber =
     usable.map((s) => s.invoiceNumber?.trim()).find(Boolean) ?? best.invoiceNumber;
 
-  const lines = best.lines.length > 0
-    ? best.lines
-    : usable.reduce(
-        (longest, s) => (s.lines.length > longest.length ? s.lines : longest),
-        [] as InvoiceLineData[]
-      );
+  const allLineSources = usable.map((s) => s.lines).filter((l) => l.length > 0);
+  const unionLines = unionInvoiceLines(allLineSources);
+
+  const lines = unionLines.length > 0
+    ? unionLines
+    : best.lines.length > 0
+      ? best.lines
+      : usable.reduce(
+          (longest, s) => (s.lines.length > longest.length ? s.lines : longest),
+          [] as InvoiceLineData[]
+        );
 
   const longestLines = usable.reduce(
     (longest, s) => (s.lines.length > longest.length ? s.lines : longest),
     [] as InvoiceLineData[]
   );
   const resolvedLines =
-    longestLines.length > lines.length + 1 &&
-    scoreInvoiceData({ ...best, lines: longestLines }) >= scoreInvoiceData(best) - 4
-      ? longestLines
-      : lines;
+    lines.length >= longestLines.length - 1
+      ? lines
+      : longestLines.length > lines.length + 1 &&
+          scoreInvoiceData({ ...best, lines: longestLines }) >= scoreInvoiceData({ ...best, lines }) - 4
+        ? unionInvoiceLines([lines, longestLines])
+        : lines;
 
   const amountCandidates = usable.map((s) => s.amount).filter((a) => a > 0);
   let amount = amountCandidates.length ? Math.max(...amountCandidates) : best.amount;

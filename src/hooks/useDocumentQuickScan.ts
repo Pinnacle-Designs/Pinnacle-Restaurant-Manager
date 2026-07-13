@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import type { DocumentScanMode } from "@/components/scan/DocumentScanModeToggle";
-import { readFileAsDataUrl, compressFileForUpload, MAX_UPLOAD_BYTES } from "@/lib/receipt/panorama-stitch";
+import { readFileAsDataUrl, compressFileForDocumentScan, MAX_UPLOAD_BYTES } from "@/lib/receipt/panorama-stitch";
 import type { ScanPage, StitchedDocument } from "@/components/scan/MultiPageScanCapture";
 
 export function useDocumentQuickScan(initialMode: DocumentScanMode = "single") {
@@ -58,7 +58,7 @@ export function useDocumentQuickScan(initialMode: DocumentScanMode = "single") {
   const handleSingleFile = useCallback(async (selectedFile: File) => {
     try {
       setCaptureError(null);
-      const compressed = await compressFileForUpload(selectedFile);
+      const compressed = await compressFileForDocumentScan(selectedFile);
       setFile(compressed);
       setPreview(await readFileAsDataUrl(compressed));
     } catch (err) {

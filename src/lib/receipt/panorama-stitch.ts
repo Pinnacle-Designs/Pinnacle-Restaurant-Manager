@@ -1,11 +1,29 @@
-/** Max width for stitched document images (keeps uploads reasonable). */
+/** Default max width for receipt / general uploads. */
 const MAX_STITCH_WIDTH = 1200;
+
+/** Higher resolution for invoice OCR — Tesseract needs ~2000px+ for distributor tables. */
+export const OCR_SCAN_MAX_WIDTH = 2800;
+export const OCR_SCAN_MIN_WIDTH = 2000;
 
 /** Stay under Vercel's ~4.5MB request body limit (leave room for multipart fields). */
 export const MAX_UPLOAD_BYTES = 2_800_000;
 
 /** Per-page cap before stitching so multi-page scans stay within server limits. */
 export const MAX_PAGE_SOURCE_BYTES = 650_000;
+
+export interface CompressUploadOptions {
+  maxBytes?: number;
+  /** Try these widths in order (first = preferred). */
+  widths?: number[];
+  qualityStart?: number;
+}
+
+/** Invoice / vendor document scans — preserve text detail for OCR. */
+export const OCR_SCAN_COMPRESS: CompressUploadOptions = {
+  maxBytes: MAX_UPLOAD_BYTES,
+  widths: [OCR_SCAN_MAX_WIDTH, 2400, 2200, OCR_SCAN_MIN_WIDTH, 1800, 1600, 1400],
+  qualityStart: 0.84,
+};
 
 export interface ScanPage {
   id: string;
@@ -61,12 +79,13 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 async function compressImageElement(
   img: HTMLImageElement,
   maxBytes: number,
-  maxWidth = MAX_STITCH_WIDTH
+  maxWidth = MAX_STITCH_WIDTH,
+  qualityStart = 0.88
 ): Promise<{ blob: Blob; dataUrl: string; width: number; height: number }> {
   const naturalW = img.naturalWidth || img.width;
   const naturalH = img.naturalHeight || img.height;
   let width = Math.min(maxWidth, naturalW);
-  let quality = 0.88;
+  let quality = qualityStart;
 
   for (let attempt = 0; attempt < 16; attempt++) {
     const height = Math.round((width / naturalW) * naturalH);
@@ -101,12 +120,13 @@ async function compressImageElement(
 async function compressWithRetries(
   img: HTMLImageElement,
   maxBytes: number,
-  widths = [MAX_STITCH_WIDTH, 1000, 850, 720, 600, 480, 400]
+  widths = [MAX_STITCH_WIDTH, 1000, 850, 720, 600, 480, 400],
+  qualityStart?: number
 ): Promise<{ blob: Blob; dataUrl: string; width: number; height: number }> {
   let lastError: Error | undefined;
   for (const width of widths) {
     try {
-      return await compressImageElement(img, maxBytes, width);
+      return await compressImageElement(img, maxBytes, width, qualityStart);
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
     }
@@ -117,20 +137,32 @@ async function compressWithRetries(
 /** Compress a camera/upload file before sending to scan APIs. */
 export async function compressFileForUpload(
   file: File,
-  maxBytes = MAX_UPLOAD_BYTES
+  maxBytes = MAX_UPLOAD_BYTES,
+  opts: CompressUploadOptions = {}
 ): Promise<File> {
   const limit = Math.min(maxBytes, MAX_UPLOAD_BYTES);
+  const widths = opts.widths ?? [MAX_STITCH_WIDTH, 1000, 800, 640, 520];
   const isJpeg = file.type === "image/jpeg" || /\.jpe?g$/i.test(file.name);
 
-  // Small JPEGs can skip re-encoding; everything else (HEIC, PNG, large photos) is normalized.
-  if (isJpeg && file.size <= limit * 0.85) {
+  // Small JPEGs at OCR-friendly resolution can skip re-encoding.
+  if (isJpeg && file.size <= limit * 0.85 && !opts.widths) {
     return file;
   }
 
   const img = await loadImage(await readFileAsDataUrl(file));
-  const { blob } = await compressWithRetries(img, limit, [MAX_STITCH_WIDTH, 1000, 800, 640, 520]);
+  const naturalW = img.naturalWidth || img.width;
+  if (isJpeg && file.size <= limit * 0.92 && naturalW >= OCR_SCAN_MIN_WIDTH && opts.widths) {
+    return file;
+  }
+
+  const { blob } = await compressWithRetries(img, limit, widths, opts.qualityStart);
   const base = file.name.replace(/\.[^.]+$/, "") || "scan";
   return blobToFile(blob, `${base}.jpg`);
+}
+
+/** Compress for invoice / PO document OCR (higher resolution). */
+export async function compressFileForDocumentScan(file: File): Promise<File> {
+  return compressFileForUpload(file, MAX_UPLOAD_BYTES, OCR_SCAN_COMPRESS);
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -156,7 +188,7 @@ export async function stitchDocumentPanorama(
 
   const images = await Promise.all(sources.map(loadImage));
   const targetWidth = Math.min(
-    MAX_STITCH_WIDTH,
+    OCR_SCAN_MAX_WIDTH,
     Math.max(...images.map((img) => img.naturalWidth || img.width))
   );
 
@@ -188,10 +220,10 @@ export async function stitchDocumentPanorama(
   const pageCount = sources.length;
   const stitchWidths =
     pageCount >= 4
-      ? [1000, 850, 720, 600, 480, 400]
+      ? [2200, 2000, 1800, 1600, 1400, 1200, 1000, 850]
       : pageCount >= 2
-        ? [1100, 950, 800, 680, 560, 440]
-        : undefined;
+        ? [OCR_SCAN_MAX_WIDTH, 2400, 2200, 2000, 1800, 1600, 1400, 1200]
+        : [OCR_SCAN_MAX_WIDTH, 2400, 2200, OCR_SCAN_MIN_WIDTH, 1800, 1600];
 
   const compressed = await compressWithRetries(tempImg, maxBytes, stitchWidths);
 

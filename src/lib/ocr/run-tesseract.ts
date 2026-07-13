@@ -11,6 +11,10 @@ const OCR_PASSES: Array<{ psm: TesseractPsm; label: string }> = [
   { psm: "3", label: "auto layout" },
 ];
 
+function earlyExitScore(kind: OcrTextKind): number {
+  return kind === "invoice" ? 95 : 82;
+}
+
 export async function configureTesseractForDocument(worker: Worker, psm: TesseractPsm): Promise<void> {
   await worker.setParameters({
     tessedit_pageseg_mode: psm,
@@ -19,13 +23,22 @@ export async function configureTesseractForDocument(worker: Worker, psm: Tessera
   } as Record<string, string>);
 }
 
-export async function recognizeWithBestPass(
+/** Run all PSM passes and return unique passages sorted by quality (best first). */
+export async function recognizeAllPasses(
   worker: Worker,
   input: Blob | Buffer | string,
   kind: OcrTextKind,
   onProgress?: (message: string) => void
-): Promise<string> {
-  const candidates: string[] = [];
+): Promise<string[]> {
+  const scored: Array<{ text: string; score: number }> = [];
+  const seen = new Set<string>();
+
+  const addCandidate = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || seen.has(trimmed)) return;
+    seen.add(trimmed);
+    scored.push({ text: trimmed, score: scoreOcrText(trimmed, kind) });
+  };
 
   for (const pass of OCR_PASSES) {
     onProgress?.(`OCR pass (${pass.label})…`);
@@ -33,20 +46,28 @@ export async function recognizeWithBestPass(
     const { data } = await worker.recognize(input as Parameters<Worker["recognize"]>[0]);
     const plain = (data.text ?? "").trim();
     if (plain) {
-      candidates.push(plain);
-      if (scoreOcrText(plain, kind) >= 82) break;
+      addCandidate(plain);
+      if (scoreOcrText(plain, kind) >= earlyExitScore(kind)) break;
     }
 
     const structured = wordsToTabularText(tesseractWordsFromData(data.words));
     if (structured) {
-      const plainScore = scoreOcrText(plain, kind);
-      const structScore = scoreOcrText(structured, kind);
-      if (structScore >= plainScore - 2) {
-        candidates.push(structured);
-        if (structScore >= 82) break;
-      }
+      addCandidate(structured);
+      if (scoreOcrText(structured, kind) >= earlyExitScore(kind)) break;
     }
   }
 
+  return scored
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.text);
+}
+
+export async function recognizeWithBestPass(
+  worker: Worker,
+  input: Blob | Buffer | string,
+  kind: OcrTextKind,
+  onProgress?: (message: string) => void
+): Promise<string> {
+  const candidates = await recognizeAllPasses(worker, input, kind, onProgress);
   return pickBestOcrTextPassage(kind, ...candidates);
 }

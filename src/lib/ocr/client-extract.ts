@@ -2,8 +2,12 @@
 
 import type { Worker } from "tesseract.js";
 import { pickBestOcrTextPassage, scoreOcrText, type OcrTextKind } from "./ocr-text-score";
-import { preprocessImageFileForOcr, preprocessImageFileSoftForOcr } from "./image-preprocess";
-import { recognizeWithBestPass } from "./run-tesseract";
+import {
+  preprocessImageFileForOcr,
+  preprocessImageFileSoftForOcr,
+  preprocessImageFileHighContrastForOcr,
+} from "./image-preprocess";
+import { recognizeAllPasses } from "./run-tesseract";
 import { getBrowserTesseractOptions, type OcrProgressHandler } from "./tesseract-options";
 
 let workerPromise: Promise<Worker> | null = null;
@@ -32,16 +36,28 @@ async function getOcrWorker(onProgress?: OcrProgressHandler): Promise<Worker> {
   return workerPromise;
 }
 
-/** Run OCR — one preprocessed image, pick best layout pass (no noisy merging). */
-export async function extractTextFromImageFile(
+function dedupeCandidates(kind: OcrTextKind, passages: string[]): string[] {
+  const seen = new Set<string>();
+  const scored: Array<{ text: string; score: number }> = [];
+  for (const passage of passages) {
+    const trimmed = passage.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    scored.push({ text: trimmed, score: scoreOcrText(trimmed, kind) });
+  }
+  return scored.sort((a, b) => b.score - a.score).map((e) => e.text);
+}
+
+/** Run OCR on every preprocessing variant; return all unique passages (best first). */
+export async function collectOcrTextCandidatesFromFile(
   file: File,
   onProgress?: OcrProgressHandler,
   kind: OcrTextKind = "generic"
-): Promise<string> {
+): Promise<string[]> {
   onProgress?.("Enhancing photo for text recognition…");
   const worker = await getOcrWorker(onProgress);
 
-  const candidates: string[] = [];
+  const allPassages: string[] = [];
   const inputs: Array<{ blob: Blob | File; label: string }> = [{ blob: file, label: "original photo" }];
 
   try {
@@ -56,13 +72,30 @@ export async function extractTextFromImageFile(
     /* optional */
   }
 
-  for (const input of inputs) {
-    onProgress?.(`Reading ${input.label}…`);
-    const passage = await recognizeWithBestPass(worker, input.blob, kind, onProgress);
-    if (passage.trim()) candidates.push(passage);
-    if (scoreOcrText(passage, kind) >= 78) break;
+  try {
+    inputs.push({ blob: await preprocessImageFileHighContrastForOcr(file), label: "high contrast photo" });
+  } catch {
+    /* optional */
   }
 
+  for (const input of inputs) {
+    onProgress?.(`Reading ${input.label}…`);
+    const passages = await recognizeAllPasses(worker, input.blob, kind, onProgress);
+    allPassages.push(...passages);
+    const best = pickBestOcrTextPassage(kind, ...passages);
+    if (scoreOcrText(best, kind) >= (kind === "invoice" ? 90 : 78)) break;
+  }
+
+  return dedupeCandidates(kind, allPassages);
+}
+
+/** Run OCR — multiple preprocessed images, pick best layout pass. */
+export async function extractTextFromImageFile(
+  file: File,
+  onProgress?: OcrProgressHandler,
+  kind: OcrTextKind = "generic"
+): Promise<string> {
+  const candidates = await collectOcrTextCandidatesFromFile(file, onProgress, kind);
   return pickBestOcrTextPassage(kind, ...candidates);
 }
 

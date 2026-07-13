@@ -279,6 +279,9 @@ const SKIP_LINE =
 const SKU_LIKE_LINE = /\b[A-Z]{2,6}\d{2,4}\b/;
 const MONEY_LIKE_LINE = /[\d,]+\.\d{2}/;
 
+const PRODUCT_LINE =
+  /\b(?:TOFU|CABBAGE|BROCCOLI|FENNEL|CHICKEN|BEEF|BRISKET|EGGPLANT|PORK|LAMB|SALMON|SHRIMP|RICE|PASTA|CHEESE|BUTTER|CREAM|MILK|LETTUCE|TOMATO|ONION|POTATO|CARROT|PEPPER|MUSHROOM|SPINACH|KALE|ARUGULA)\b/i;
+
 export function extractVendorName(text: string): string {
   const lines = text
     .split(/\r?\n/)
@@ -290,6 +293,7 @@ export function extractVendorName(text: string): string {
     if (/^[^a-zA-Z]*$/.test(line)) return false;
     if (SKU_LIKE_LINE.test(line) && MONEY_LIKE_LINE.test(line)) return false;
     if (/^\b[A-Z]{2,6}\d{2,4}\b(?:\s|$)/.test(line) && !COMPANY_SUFFIX.test(line)) return false;
+    if (PRODUCT_LINE.test(line) && !COMPANY_SUFFIX.test(line) && line.length < 50) return false;
     return true;
   };
 

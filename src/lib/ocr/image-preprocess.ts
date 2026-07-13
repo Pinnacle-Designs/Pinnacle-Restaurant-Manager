@@ -58,12 +58,17 @@ export async function preprocessImageFileForOcr(file: File): Promise<Blob> {
 
 /** Grayscale + contrast only — keeps faint table rules and colored stamps readable. */
 export async function preprocessImageFileSoftForOcr(file: File): Promise<Blob> {
-  return preprocessImageVariant(file, { threshold: false });
+  return preprocessImageVariant(file, { threshold: false, contrastBoost: 1.0 });
+}
+
+/** Strong contrast without hard binarize — helps phone photos in uneven light. */
+export async function preprocessImageFileHighContrastForOcr(file: File): Promise<Blob> {
+  return preprocessImageVariant(file, { threshold: false, contrastBoost: 1.35, stretchPercentile: 0.02 });
 }
 
 async function preprocessImageVariant(
   file: File,
-  opts: { threshold: boolean }
+  opts: { threshold: boolean; contrastBoost?: number; stretchPercentile?: number }
 ): Promise<Blob> {
   if (typeof document === "undefined") return file;
 
@@ -87,14 +92,19 @@ async function preprocessImageVariant(
     const imageData = ctx.getImageData(0, 0, width, height);
     const gray = toGrayscale(imageData.data, width, height);
     const sorted = [...gray].sort((a, b) => a - b);
-    const low = sorted[Math.floor(sorted.length * 0.03)] ?? 0;
-    const high = sorted[Math.floor(sorted.length * 0.97)] ?? 255;
+    const pct = opts.stretchPercentile ?? 0.03;
+    const low = sorted[Math.floor(sorted.length * pct)] ?? 0;
+    const high = sorted[Math.floor(sorted.length * (1 - pct))] ?? 255;
     const threshold = otsuThreshold(gray);
+    const boost = opts.contrastBoost ?? 1.0;
 
     const out = ctx.createImageData(width, height);
     for (let i = 0; i < width * height; i += 1) {
       const idx = i * 4;
-      const enhanced = stretchContrast(gray[i]!, low, high);
+      let enhanced = stretchContrast(gray[i]!, low, high);
+      if (boost !== 1) {
+        enhanced = clamp(Math.round((enhanced - 128) * boost + 128), 0, 255);
+      }
       const value = opts.threshold ? (enhanced > threshold ? 255 : 0) : enhanced;
       out.data[idx] = value;
       out.data[idx + 1] = value;

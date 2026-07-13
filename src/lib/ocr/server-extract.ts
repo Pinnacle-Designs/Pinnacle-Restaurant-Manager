@@ -1,18 +1,39 @@
 import { getServerTesseractOptions } from "./tesseract-options";
-import { recognizeWithBestPass } from "./run-tesseract";
-import { preprocessImageBufferForOcr, preprocessImageBufferSoftForOcr } from "./server-image-preprocess";
+import { recognizeAllPasses } from "./run-tesseract";
+import {
+  preprocessImageBufferForOcr,
+  preprocessImageBufferSoftForOcr,
+  preprocessImageBufferAdaptiveForOcr,
+} from "./server-image-preprocess";
 import { pickBestOcrTextPassage, scoreOcrText, type OcrTextKind } from "./ocr-text-score";
 
-/** Server-side OCR with preprocessing + best-pass selection. */
-export async function extractTextFromImageBuffer(
+const MAX_CANDIDATES = 8;
+
+function dedupeSortedCandidates(kind: OcrTextKind, passages: string[]): string[] {
+  const seen = new Set<string>();
+  const scored: Array<{ text: string; score: number }> = [];
+  for (const passage of passages) {
+    const trimmed = passage.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    scored.push({ text: trimmed, score: scoreOcrText(trimmed, kind) });
+  }
+  return scored
+    .sort((a, b) => b.score - a.score)
+    .slice(0, MAX_CANDIDATES)
+    .map((entry) => entry.text);
+}
+
+/** Collect OCR text from every preprocessing variant and Tesseract pass. */
+export async function collectOcrTextCandidatesFromBuffer(
   buffer: Buffer,
   kind: OcrTextKind = "generic"
-): Promise<string> {
+): Promise<string[]> {
   const { createWorker } = await import("tesseract.js");
   const worker = await createWorker("eng", 1, getServerTesseractOptions());
 
   try {
-    const candidates: string[] = [];
+    const allPassages: string[] = [];
     const variants: Array<{ buffer: Buffer; label: string }> = [{ buffer, label: "original" }];
 
     try {
@@ -25,31 +46,53 @@ export async function extractTextFromImageBuffer(
     } catch {
       /* optional */
     }
-
-    for (const variant of variants) {
-      const passage = await recognizeWithBestPass(worker, variant.buffer, kind);
-      if (passage.trim()) candidates.push(passage);
-      if (scoreOcrText(passage, kind) >= 78) break;
+    try {
+      variants.push({ buffer: await preprocessImageBufferAdaptiveForOcr(buffer), label: "adaptive" });
+    } catch {
+      /* optional */
     }
 
-    return pickBestOcrTextPassage(kind, ...candidates);
+    for (const variant of variants) {
+      const passages = await recognizeAllPasses(worker, variant.buffer, kind);
+      allPassages.push(...passages);
+      const best = pickBestOcrTextPassage(kind, ...passages);
+      if (scoreOcrText(best, kind) >= (kind === "invoice" ? 90 : 78)) break;
+    }
+
+    return dedupeSortedCandidates(kind, allPassages);
   } finally {
     await worker.terminate();
   }
+}
+
+/** Server-side OCR with preprocessing + best-pass selection. */
+export async function extractTextFromImageBuffer(
+  buffer: Buffer,
+  kind: OcrTextKind = "generic"
+): Promise<string> {
+  const candidates = await collectOcrTextCandidatesFromBuffer(buffer, kind);
+  return pickBestOcrTextPassage(kind, ...candidates);
+}
+
+export async function collectOcrTextCandidatesFromBase64Images(
+  images: string | string[],
+  kind: OcrTextKind = "generic"
+): Promise<string[]> {
+  const list = Array.isArray(images) ? images : [images];
+  const all: string[] = [];
+
+  for (const b64 of list.slice(0, 3)) {
+    const buffer = Buffer.from(b64, "base64");
+    all.push(...(await collectOcrTextCandidatesFromBuffer(buffer, kind)));
+  }
+
+  return dedupeSortedCandidates(kind, all);
 }
 
 export async function extractTextFromBase64Images(
   images: string | string[],
   kind: OcrTextKind = "generic"
 ): Promise<string> {
-  const list = Array.isArray(images) ? images : [images];
-  const parts: string[] = [];
-
-  for (const b64 of list.slice(0, 3)) {
-    const buffer = Buffer.from(b64, "base64");
-    const text = (await extractTextFromImageBuffer(buffer, kind)).trim();
-    if (text) parts.push(text);
-  }
-
-  return parts.join("\n\n");
+  const candidates = await collectOcrTextCandidatesFromBase64Images(images, kind);
+  return pickBestOcrTextPassage(kind, ...candidates);
 }

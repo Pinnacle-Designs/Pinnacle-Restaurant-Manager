@@ -122,7 +122,7 @@ Read crinkled, watermarked, or stained paper carefully. For meat/seafood sold by
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [{ role: "user", content }],
-      max_tokens: multiPage ? 4096 : panoramic ? 3000 : 2500,
+      max_tokens: multiPage ? 4096 : panoramic ? 3500 : 3000,
       response_format: { type: "json_object" },
     });
 

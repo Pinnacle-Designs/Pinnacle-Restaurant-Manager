@@ -49,17 +49,16 @@ function aiOcrEnabled(): boolean {
   return Boolean(process.env.OPENAI_API_KEY?.trim() && process.env.OCR_DISABLE_AI !== "true");
 }
 
-async function extractServerText(
+async function extractServerCandidates(
   imageBase64: string | string[],
   kind: "invoice" | "receipt"
-): Promise<string | null> {
+): Promise<string[]> {
   try {
-    const { extractTextFromBase64Images } = await import("./server-extract");
-    const text = (await extractTextFromBase64Images(imageBase64, kind)).trim();
-    return text || null;
+    const { collectOcrTextCandidatesFromBase64Images } = await import("./server-extract");
+    return await collectOcrTextCandidatesFromBase64Images(imageBase64, kind);
   } catch (err) {
     console.warn("Server OCR fallback failed:", err);
-    return null;
+    return [];
   }
 }
 
@@ -70,29 +69,28 @@ async function resolveOcrText(
 ): Promise<{ text: string; alternates: string[] }> {
   const client = clientText?.trim() || "";
   const clientScore = client ? scoreOcrText(client, kind) : 0;
-  const clientHasSkuLines = /\b[A-Z]{2,6}\d{2,4}\b/.test(client) && /[\d,]+\.\d{2}/.test(client);
 
-  let server = "";
   const needsServer =
+    kind === "invoice" ||
     !client ||
     isWeakOcrText(client, kind) ||
-    clientScore < 72 ||
-    (kind === "invoice" && !clientHasSkuLines);
+    clientScore < 72;
+
+  let serverPassages: string[] = [];
   if (needsServer) {
-    server = (await extractServerText(imageBase64, kind)) ?? "";
+    serverPassages = await extractServerCandidates(imageBase64, kind);
   }
 
-  const text = pickBestOcrTextPassage(kind, client, server);
-  const alternates = [client, server].filter((t) => t && t !== text);
-  return { text, alternates: [...new Set(alternates)] };
+  const allPassages = [...new Set([client, ...serverPassages].filter(Boolean))];
+  const text = pickBestOcrTextPassage(kind, ...allPassages);
+  return { text, alternates: allPassages.filter((p) => p !== text) };
 }
 
 function bestLocalInvoiceDraft(
   passages: string[],
   memoryCtx: Awaited<ReturnType<typeof buildVendorOcrContext>>
 ): InvoiceData {
-  let best = emptyInvoice();
-  let bestScore = 0;
+  const drafts: InvoiceData[] = [];
 
   for (const passage of passages) {
     if (!passage.trim()) continue;
@@ -102,14 +100,16 @@ function bestLocalInvoiceDraft(
       totalLabel: memoryCtx.layoutHints.totalLabel ?? "Total Invoice",
       skuHints: memoryCtx.skuHints,
     });
-    const score = scoreInvoiceData(parsed);
-    if (score > bestScore) {
-      best = parsed;
-      bestScore = score;
+    if (scoreInvoiceData(parsed) > 0) {
+      drafts.push(parsed);
     }
   }
 
-  return best;
+  if (!drafts.length) return emptyInvoice();
+  if (drafts.length === 1) return drafts[0]!;
+
+  drafts.sort((a, b) => scoreInvoiceData(b) - scoreInvoiceData(a));
+  return mergeInvoiceData(...drafts);
 }
 
 function pickInvoiceSource(
@@ -131,8 +131,9 @@ function pickInvoiceSource(
     return "none";
   }
 
-  if (localScore >= aiScore + 2 || local.lines.length > ai.lines.length) return "local";
+  if (localScore >= aiScore + 2 || local.lines.length > ai.lines.length + 1) return "local";
   if (aiScore > localScore && hasUsefulInvoiceData(ai)) return "ai";
+  if (localScore < 20 && aiScore >= 15 && hasUsefulInvoiceData(ai)) return "ai";
   if (mergedScore >= Math.max(localScore, aiScore)) return localScore >= aiScore ? "local" : "ai";
   return "local";
 }
@@ -195,12 +196,13 @@ export async function resolveInvoiceScan(
       };
 
   const preparedText = text ? prepareOcrTextForParsing(text, memoryCtx) : "";
-  const passages = [
+  const allPassages = [
     preparedText,
     ...alternates.map((a) => prepareOcrTextForParsing(a, memoryCtx)),
   ].filter(Boolean);
-  const localDraft = text
-    ? bestLocalInvoiceDraft([...new Set(passages)], memoryCtx)
+  const uniquePassages = [...new Set(allPassages)];
+  const localDraft = uniquePassages.length
+    ? bestLocalInvoiceDraft(uniquePassages, memoryCtx)
     : emptyInvoice();
 
   let ai: InvoiceData | null = null;
