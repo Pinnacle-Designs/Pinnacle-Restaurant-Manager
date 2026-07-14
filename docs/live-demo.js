@@ -271,6 +271,7 @@
     var appUrl = "";
     var heroController = null;
     var modalController = null;
+    var connectPromise = null;
 
     function showFindingApp() {
       heroSlot.innerHTML = "";
@@ -312,23 +313,37 @@
       });
     }
 
-    function connectApp() {
+    function connectApp(options) {
+      var force = options && options.force;
+      if (connectPromise && !force) return connectPromise;
+
+      if (force) connectPromise = null;
+
       showFindingApp();
-      return docs.resolveAppUrl().then(function (url) {
-        appUrl = url;
-        if (!appUrl) {
-          heroSlot.innerHTML = "";
-          heroSlot.appendChild(
-            createFallback(
-              "Connection failed — run <code>npm run dev</code>, then open this page on the same port shown in the terminal (e.g. <code>http://localhost:3001</code> or <code>/docs</code>)."
-            )
-          );
-          return "";
-        }
-        mountHero();
-        docs.wireOptionalAppLinks(appUrl);
-        return url;
-      });
+      connectPromise = docs
+        .resolveAppUrl()
+        .then(function (url) {
+          appUrl = url || "";
+          if (!appUrl) {
+            connectPromise = null;
+            heroSlot.innerHTML = "";
+            heroSlot.appendChild(
+              createFallback(
+                "Connection failed — run <code>npm run dev</code>, then open this page on the same port shown in the terminal (e.g. <code>http://localhost:3001</code> or <code>/docs</code>)."
+              )
+            );
+            return "";
+          }
+          mountHero();
+          docs.wireOptionalAppLinks(appUrl);
+          return appUrl;
+        })
+        .catch(function (err) {
+          connectPromise = null;
+          throw err;
+        });
+
+      return connectPromise;
     }
 
     function openModal() {
@@ -350,22 +365,33 @@
       modalController = null;
     }
 
-    connectApp().catch(function (err) {
-      console.error("Live demo failed to start:", err);
-      heroSlot.innerHTML = "";
-      heroSlot.appendChild(
-        createFallback(
-          isProductionSite()
-            ? productionErrorMessage()
-            : "Demo failed to start. Stop other <code>npm run dev</code> instances, restart on one port, then reload."
-        )
-      );
-    });
+    function attachModalHandlers() {
+      if (closeBtn)
+        closeBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          closeModal();
+        });
+      if (modalBackdrop) modalBackdrop.addEventListener("click", closeModal);
+      if (modal) {
+        modal.addEventListener("click", function (e) {
+          e.stopPropagation();
+        });
+      }
+      var panel = modal && modal.querySelector(".app-embed-modal-panel");
+      if (panel) {
+        panel.addEventListener("click", function (e) {
+          e.stopPropagation();
+        });
+      }
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && modal && modal.classList.contains("open")) closeModal();
+      });
+    }
 
-    if (expandBtn) {
-      expandBtn.addEventListener("click", function (e) {
-        e.stopPropagation();
-        if (!appUrl) {
+    function attachDemoActionHandlers() {
+      if (expandBtn) {
+        expandBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
           connectApp().then(function (url) {
             if (!url) {
               alert(
@@ -375,50 +401,46 @@
             }
             openModal();
           });
-          return;
-        }
-        openModal();
+        });
+      }
+
+      heroSlot.addEventListener("click", function (e) {
+        var retry = e.target.closest(".hero-app-retry");
+        if (retry) connectApp({ force: true }).catch(handleConnectFailure);
       });
+
+      var tryDemoBtn = document.getElementById("hero-try-demo-btn");
+      if (tryDemoBtn) {
+        tryDemoBtn.addEventListener("click", function () {
+          var wrap = document.getElementById("hero-app-embed-wrap");
+          if (wrap) wrap.scrollIntoView({ behavior: "smooth", block: "center" });
+          connectApp().then(function (url) {
+            if (!url) return;
+            if (heroController && heroController.reload) heroController.reload();
+          });
+        });
+      }
     }
 
-    if (closeBtn)
-      closeBtn.addEventListener("click", function (e) {
-        e.stopPropagation();
-        closeModal();
-      });
-    if (modalBackdrop) modalBackdrop.addEventListener("click", closeModal);
-    if (modal) {
-      modal.addEventListener("click", function (e) {
-        e.stopPropagation();
-      });
+    function handleConnectFailure(err) {
+      console.error("Live demo failed to start:", err);
+      heroSlot.innerHTML = "";
+      heroSlot.appendChild(
+        createFallback(
+          isProductionSite()
+            ? productionErrorMessage()
+            : "Demo failed to start. Stop other <code>npm run dev</code> instances, restart on one port, then reload."
+        )
+      );
     }
-    var panel = modal && modal.querySelector(".app-embed-modal-panel");
-    if (panel) {
-      panel.addEventListener("click", function (e) {
-        e.stopPropagation();
-      });
-    }
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && modal && modal.classList.contains("open")) closeModal();
-    });
 
-    heroSlot.addEventListener("click", function (e) {
-      var retry = e.target.closest(".hero-app-retry");
-      if (retry) connectApp();
-    });
+    attachModalHandlers();
 
-    var tryDemoBtn = document.getElementById("hero-try-demo-btn");
-    if (tryDemoBtn) {
-      tryDemoBtn.addEventListener("click", function () {
-        var wrap = document.getElementById("hero-app-embed-wrap");
-        if (wrap) wrap.scrollIntoView({ behavior: "smooth", block: "center" });
-        if (!appUrl) {
-          connectApp();
-          return;
-        }
-        if (heroController && heroController.reload) heroController.reload();
+    connectApp()
+      .catch(handleConnectFailure)
+      .finally(function () {
+        attachDemoActionHandlers();
       });
-    }
   }
 
   function init() {
