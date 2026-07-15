@@ -10,5 +10,5 @@
  * Pages URL uses a different GitHub user/org than the default in embed-config.
  */
 window.PINNACLE_CONFIG = {
-  appUrl: "https://pinnacle-resturant-manager.vercel.app",
+  appUrl: "https://www.pinnaclerestaurantmanager.com",
 };

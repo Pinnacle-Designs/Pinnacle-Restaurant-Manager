@@ -11,7 +11,7 @@ import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
-const APP_URL = "https://pinnacle-resturant-manager.vercel.app";
+const APP_URL = "https://www.pinnaclerestaurantmanager.com";
 const POSTGRES_URL =
   "postgresql://pinnacle:pinnacle@localhost:5432/pinnacle?schema=public";
 const ENV_PATH = path.join(process.cwd(), ".env");

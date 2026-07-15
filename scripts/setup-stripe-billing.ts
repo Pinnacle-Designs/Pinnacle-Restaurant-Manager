@@ -52,7 +52,7 @@ function appUrl(): string {
   return (
     process.env.APP_URL?.trim() ||
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    "https://pinnacle-resturant-manager.vercel.app"
+    "https://www.pinnaclerestaurantmanager.com"
   ).replace(/\/$/, "");
 }
 
@@ -146,19 +146,14 @@ async function ensureWebhook(stripe: Stripe, url: string): Promise<string | null
   return endpoint.secret ?? null;
 }
 
-function writePriceIdsToEnv(priceIds: Record<string, string>) {
+function writeEnvUpdates(updates: Record<string, string>) {
   const envPath = path.join(process.cwd(), ".env");
   if (!fs.existsSync(envPath)) {
-    console.warn("\nNo .env file — copy price IDs manually.");
+    console.warn("\nNo .env file — copy values manually.");
     return;
   }
 
   let text = fs.readFileSync(envPath, "utf8");
-  const updates: Record<string, string> = {
-    STRIPE_PRICE_STARTER: priceIds.STARTER!,
-    STRIPE_PRICE_GROWTH: priceIds.GROWTH!,
-    STRIPE_PRICE_PRO: priceIds.PRO!,
-  };
 
   for (const [key, value] of Object.entries(updates)) {
     const pattern = new RegExp(`^${key}=.*$`, "m");
@@ -171,7 +166,15 @@ function writePriceIdsToEnv(priceIds: Record<string, string>) {
   }
 
   fs.writeFileSync(envPath, text.endsWith("\n") ? text : `${text}\n`, "utf8");
-  console.log("\nUpdated .env with STRIPE_PRICE_STARTER, STRIPE_PRICE_GROWTH, STRIPE_PRICE_PRO");
+  console.log(`\nUpdated .env with ${Object.keys(updates).join(", ")}`);
+}
+
+function writePriceIdsToEnv(priceIds: Record<string, string>) {
+  writeEnvUpdates({
+    STRIPE_PRICE_STARTER: priceIds.STARTER!,
+    STRIPE_PRICE_GROWTH: priceIds.GROWTH!,
+    STRIPE_PRICE_PRO: priceIds.PRO!,
+  });
 }
 
 async function main() {
@@ -214,6 +217,10 @@ async function main() {
   let webhookSecret: string | null = null;
   if (createWebhook) {
     webhookSecret = await ensureWebhook(stripe, appUrl());
+  }
+
+  if (writeEnv && webhookSecret) {
+    writeEnvUpdates({ STRIPE_WEBHOOK_SECRET: webhookSecret });
   }
 
   console.log("\n--- Environment variables ---\n");
